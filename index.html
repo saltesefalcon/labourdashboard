@@ -6,33 +6,23 @@
 <title>Labour Dashboard (Secure)</title>
 
 <style>
-  :root{
-    --bg:#0f172a; --panel:#111827; --ink:#e5e7eb; --muted:#9ca3af;
-    --accent:#22c55e; --warn:#ef4444; --brand:#0ea5e9; --line:#1f2937;
-    --gold:#d4af37;
-  }
-  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
-    font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
+  :root{--bg:#0f172a;--panel:#111827;--ink:#e5e7eb;--muted:#9ca3af;--accent:#22c55e;--warn:#ef4444;--brand:#0ea5e9;--line:#1f2937;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
   .wrap{max-width:1100px;margin:24px auto;padding:16px}
   h1{font-size:1.6rem;margin:0 0 2px}
   .sub{color:var(--muted);font-size:.95rem;margin:0 0 18px}
-
   .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
   .authbox{display:flex;gap:8px;align-items:center}
   .avatar{width:28px;height:28px;border-radius:50%;background:#0b1220;border:1px solid var(--line)}
-
   .bar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:12px 0 16px}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
   .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
   .kpi h3{font-size:.85rem;color:var(--muted);margin:0 0 6px}
   .kpi .v{font-size:1.4rem;font-weight:600}
-  .kpi.good .v{color:var(--accent)}
-  .kpi.bad .v{color:var(--warn)}
+  .kpi.good .v{color:var(--accent)} .kpi.bad .v{color:var(--warn)}
   .controls{display:flex;gap:8px;flex-wrap:wrap}
-  select,input,button{
-    background:#0b1220;color:var(--ink);border:1px solid var(--line);
-    border-radius:10px;padding:8px 10px;font-size:.95rem
-  }
+  select,input,button{background:#0b1220;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:.95rem}
+  input[type="number"]{width:130px}
   button.primary{background:var(--brand);border-color:transparent;color:#001827;font-weight:600}
   .grid{display:grid;gap:12px}
   .section-title{margin:6px 0 6px;font-size:1.05rem;color:var(--muted)}
@@ -44,14 +34,11 @@
   .pill.bad{border-color:#4c1f1f;color:#f39a9a}
   .footer{margin-top:24px;color:var(--muted);font-size:.85rem}
   @media (max-width:900px){ .kpis{grid-template-columns:repeat(2,1fr)} }
-
-  /* Auth gate */
-  .gate{max-width:520px;margin:48px auto 0; padding:18px}
-  .gate h2{margin:0 0 10px;font-size:1.2rem}
-  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
   .row > *{flex:1}
-  .muted{color:var(--muted);font-size:.9rem}
-  .error{color:#fca5a5;margin-top:8px}
+  .small{font-size:.85rem;color:var(--muted)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:900px){ .two{grid-template-columns:1fr} }
   .denied{border:1px solid #4c1f1f;background:#1b1515}
 </style>
 </head>
@@ -70,32 +57,32 @@
       </div>
     </div>
 
-    <!-- AUTH GATE (shown when signed out or not allowed) -->
-    <div id="authGate" class="card gate">
+    <!-- AUTH GATE -->
+    <div id="authGate" class="card" style="max-width:520px;margin:48px auto 0;">
       <h2>Sign in to view data</h2>
-      <div class="muted" style="margin-bottom:10px">Use your email and password.</div>
+      <div class="small" style="margin-bottom:10px">Use your email and password.</div>
       <div class="row" style="margin-bottom:10px">
         <input id="email" type="email" placeholder="Email" autocomplete="username" />
         <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
       </div>
       <div class="row" style="margin-bottom:10px;align-items:center">
         <button id="doSignin" class="primary">Sign in</button>
-        <span id="authMsg" class="error" style="display:none"></span>
+        <span id="authMsg" style="color:#fca5a5;display:none"></span>
       </div>
-      <div class="muted">If you need access, ask an admin to add your account.</div>
+      <div class="small">If you need access, ask an admin to add your account.</div>
     </div>
 
-    <!-- ACCESS DENIED (signed in but UID not allowed) -->
-    <div id="denied" class="card gate denied" style="display:none">
+    <!-- ACCESS DENIED -->
+    <div id="denied" class="card denied" style="display:none;max-width:520px;margin:48px auto 0;">
       <h2>Access denied</h2>
-      <div class="muted">Your account is signed in, but not authorized for this dashboard.</div>
+      <div class="small">Your account is signed in, but not authorized for this dashboard.</div>
     </div>
 
-    <!-- MAIN APP (hidden until signed in & authorized) -->
+    <!-- MAIN APP -->
     <div id="app" hidden>
       <div class="bar">
         <div class="controls card">
-          <label style="display:block;font-size:.8rem;color:var(--muted);margin-bottom:6px">Location</label>
+          <label class="small">Location</label>
           <select id="locationSel">
             <option value="beacon">Beacon</option>
             <option value="tulia">Tulia</option>
@@ -105,18 +92,18 @@
         </div>
 
         <div class="controls card">
-          <label style="display:block;font-size:.8rem;color:var(--muted);margin-bottom:6px">Week of (Monday)</label>
+          <label class="small">Week of (Monday)</label>
           <input id="weekInput" type="date" />
-          <button id="prevBtn">◀</button>
-          <button id="nextBtn">▶</button>
+          <button id="prevBtn">◀</button><button id="nextBtn">▶</button>
         </div>
 
         <div class="controls card">
-          <label style="display:block;font-size:.8rem;color:var(--muted);margin-bottom:6px">Target Labour %</label>
+          <label class="small">Target Labour %</label>
           <span id="targetPill" class="pill">—</span>
         </div>
       </div>
 
+      <!-- KPIs -->
       <div class="kpis">
         <div class="card kpi"><h3>Projected Sales</h3><div class="v" id="kpiProjSales">—</div></div>
         <div class="card kpi"><h3>Actual Sales</h3><div class="v" id="kpiActSales">—</div></div>
@@ -124,57 +111,97 @@
         <div class="card kpi"><h3>Actual Labour %</h3><div class="v" id="kpiActPct">—</div></div>
       </div>
 
+      <!-- DAILY TABLE -->
       <div class="grid" style="margin-top:14px">
         <div class="card">
           <div class="section-title">Daily breakdown (Mon–Sun)</div>
           <table id="dailyTable">
             <thead>
               <tr>
-                <th>Date</th>
-                <th title="Projected sales">Proj $</th>
-                <th title="Actual sales">Act $</th>
-                <th title="Projected labour cost">Proj Labour $</th>
-                <th title="Actual labour cost">Act Labour $</th>
-                <th title="Projected labour minutes">Proj Min</th>
-                <th title="Actual labour minutes">Act Min</th>
-                <th>Labour %</th>
-                <th>Δ vs Target</th>
+                <th>Date</th><th title="Projected sales">Proj $</th><th title="Actual sales">Act $</th>
+                <th title="Projected labour cost">Proj Labour $</th><th title="Actual labour cost">Act Labour $</th>
+                <th title="Projected labour minutes">Proj Min</th><th title="Actual labour minutes">Act Min</th>
+                <th>Labour %</th><th>Δ vs Target</th>
               </tr>
             </thead>
             <tbody></tbody>
             <tfoot>
               <tr>
                 <th>Total</th>
-                <th id="tProjSales">—</th>
-                <th id="tActSales">—</th>
-                <th id="tProjLabour">—</th>
-                <th id="tActLabour">—</th>
-                <th id="tProjMin">—</th>
-                <th id="tActMin">—</th>
-                <th id="tLabourPct">—</th>
-                <th id="tDelta">—</th>
+                <th id="tProjSales">—</th><th id="tActSales">—</th>
+                <th id="tProjLabour">—</th><th id="tActLabour">—</th>
+                <th id="tProjMin">—</th><th id="tActMin">—</th>
+                <th id="tLabourPct">—</th><th id="tDelta">—</th>
               </tr>
             </tfoot>
           </table>
         </div>
       </div>
 
-      <p class="footer">Data source: 7shifts Daily Sales & Labor API (via secure Firestore). Only authorized users can read data.</p>
+      <!-- MANUAL INPUTS + LAST WEEK / BUDGETS -->
+      <div class="two" style="margin-top:12px">
+        <div class="card">
+          <div class="section-title">Manual inputs (saved per week)</div>
+          <div class="row">
+            <label>Comps $<br><input id="inComps" type="number" step="0.01" placeholder="0"></label>
+            <label>Voids $<br><input id="inVoids" type="number" step="0.01" placeholder="0"></label>
+          </div>
+          <div class="row">
+            <label>Salaried Mgmt $ (week)<br><input id="inSalary" type="number" step="0.01" placeholder="0"></label>
+            <label>Remittance $ (week)<br><input id="inRemit" type="number" step="0.01" placeholder="0"></label>
+          </div>
+          <div class="row">
+            <label>Last Week Sales $<br><input id="inLastWeekSales" type="number" step="0.01" placeholder="0"></label>
+          </div>
+          <div class="row">
+            <label>Budget % Food<br><input id="pctFood" type="number" step="0.01" placeholder="0.00"></label>
+            <label>Budget % Wine<br><input id="pctWine" type="number" step="0.01" placeholder="0.00"></label>
+            <label>Budget % Liquor<br><input id="pctLiquor" type="number" step="0.01" placeholder="0.00"></label>
+            <label>Budget % Beer<br><input id="pctBeer" type="number" step="0.01" placeholder="0.00"></label>
+          </div>
+          <div class="row">
+            <button id="saveOverrides" class="primary">Save</button>
+            <span id="saveMsg" class="small"></span>
+          </div>
+          <div class="small">Tip: percentages are decimal (e.g., 0.35 for 35%).</div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">Last Week & Purchasing Budgets</div>
+          <table>
+            <tbody>
+              <tr><td style="text-align:left">Last Week Sales</td><td id="vwLastWeek" style="text-align:right">—</td></tr>
+              <tr><td style="text-align:left">Projected Sales (this week)</td><td id="vwProjSales" style="text-align:right">—</td></tr>
+              <tr><td colspan="2"><hr style="border:0;border-top:1px solid var(--line)"></td></tr>
+              <tr><th style="text-align:left">Category</th><th style="text-align:right">Budget $</th></tr>
+              <tr><td style="text-align:left">Food</td><td id="bdgFood" style="text-align:right">—</td></tr>
+              <tr><td style="text-align:left">Wine</td><td id="bdgWine" style="text-align:right">—</td></tr>
+              <tr><td style="text-align:left">Liquor</td><td id="bdgLiquor" style="text-align:right">—</td></tr>
+              <tr><td style="text-align:left">Beer</td><td id="bdgBeer" style="text-align:right">—</td></tr>
+              <tr><td colspan="2"><hr style="border:0;border-top:1px solid var(--line)"></td></tr>
+              <tr><td style="text-align:left">Comps</td><td id="vwComps" style="text-align:right">—</td></tr>
+              <tr><td style="text-align:left">Voids</td><td id="vwVoids" style="text-align:right">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <p class="footer">Data source: 7shifts Daily Sales & Labor API (via secure Firestore). Manual inputs saved under “overrides”.</p>
     </div>
   </div>
 
   <!-- Firebase (modular SDK) -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
-    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
-    // Your Firebase web config
+    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyDVULptnW9wPbhH6Qn7ys8RGmLqIxUwuCI",
       authDomain: "labour-dashboard.firebaseapp.com",
       projectId: "labour-dashboard",
-      storageBucket: "labour-dashboard.firebasestorage.app",
+      storageBucket: "labour-dashboard.appspot.com",
       messagingSenderId: "174483804575",
       appId: "1:174483804575:web:84f6858e812c9705fe6daa"
     };
@@ -183,7 +210,7 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    // Allowlist (UI hint). REAL enforcement is in Firestore rules.
+    // Allowlist (UI hint only; rules enforce for real)
     const ALLOWED_UIDS = new Set([
       "e0G8FBe3xlYExc3HvSGtIk5Osgw1",
       "BslFJsAMikSucxwbL8S7qPXcC6r2",
@@ -191,117 +218,141 @@
     ]);
 
     // Elements
-    const appEl     = document.getElementById("app");
-    const gateEl    = document.getElementById("authGate");
-    const deniedEl  = document.getElementById("denied");
+    const appEl = document.getElementById("app");
+    const gateEl = document.getElementById("authGate");
+    const deniedEl = document.getElementById("denied");
     const signinBtn = document.getElementById("signinBtn");
-    const signoutBtn= document.getElementById("signoutBtn");
-    const doSignin  = document.getElementById("doSignin");
-    const emailEl   = document.getElementById("email");
-    const passEl    = document.getElementById("password");
-    const authMsg   = document.getElementById("authMsg");
-    const authStatus= document.getElementById("authStatus");
-    const userAvatar= document.getElementById("userAvatar");
+    const signoutBtn = document.getElementById("signoutBtn");
+    const doSignin = document.getElementById("doSignin");
+    const emailEl = document.getElementById("email");
+    const passEl = document.getElementById("password");
+    const authMsg = document.getElementById("authMsg");
+    const authStatus = document.getElementById("authStatus");
+    const userAvatar = document.getElementById("userAvatar");
 
-    // Dashboard controls
     const locationSel = document.getElementById("locationSel");
-    const weekInput   = document.getElementById("weekInput");
-    const prevBtn     = document.getElementById("prevBtn");
-    const nextBtn     = document.getElementById("nextBtn");
+    const weekInput = document.getElementById("weekInput");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+
+    // Inputs
+    const inComps = document.getElementById("inComps");
+    const inVoids = document.getElementById("inVoids");
+    const inSalary = document.getElementById("inSalary");
+    const inRemit = document.getElementById("inRemit");
+    const inLastWeekSales = document.getElementById("inLastWeekSales");
+    const pctFood = document.getElementById("pctFood");
+    const pctWine = document.getElementById("pctWine");
+    const pctLiquor = document.getElementById("pctLiquor");
+    const pctBeer = document.getElementById("pctBeer");
+    const saveBtn = document.getElementById("saveOverrides");
+    const saveMsg = document.getElementById("saveMsg");
+
+    // Views (budgets & extras)
+    const vwLastWeek = document.getElementById("vwLastWeek");
+    const vwProjSales = document.getElementById("vwProjSales");
+    const bdgFood = document.getElementById("bdgFood");
+    const bdgWine = document.getElementById("bdgWine");
+    const bdgLiquor = document.getElementById("bdgLiquor");
+    const bdgBeer = document.getElementById("bdgBeer");
+    const vwComps = document.getElementById("vwComps");
+    const vwVoids = document.getElementById("vwVoids");
 
     // Helpers
     const fmtMoney = n => (n==null? "—" : n.toLocaleString(undefined,{style:"currency",currency:"CAD",maximumFractionDigits:0}));
-    const fmtInt   = n => (n==null? "—" : Math.round(n).toLocaleString());
-    const fmtPct   = n => (n==null? "—" : (n*100).toFixed(1) + "%");
-    function getMondayISO(d=new Date()){
-      const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-      const day = dt.getUTCDay() || 7;
-      if (day !== 1) dt.setUTCDate(dt.getUTCDate() - (day - 1));
-      return dt.toISOString().slice(0,10);
-    }
-    function shiftDays(iso, delta){
-      const d = new Date(iso+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+delta); return d.toISOString().slice(0,10);
-    }
+    const fmtInt = n => (n==null? "—" : Math.round(n).toLocaleString());
+    const fmtPct = n => (n==null? "—" : (n*100).toFixed(1) + "%");
+    function getMondayISO(d=new Date()){ const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())); const day=dt.getUTCDay()||7; if(day!==1) dt.setUTCDate(dt.getUTCDate()-(day-1)); return dt.toISOString().slice(0,10); }
+    function shiftDays(iso,delta){ const d=new Date(iso+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+delta); return d.toISOString().slice(0,10); }
+    function num(v){ const n=parseFloat(v); return isNaN(n)?0:n; }
 
-    // Init default selectors
+    // Defaults
     weekInput.value = getMondayISO(new Date());
-    locationSel.value = "tulia";
+    locationSel.value = "beacon";
 
-    prevBtn.onclick = () => { weekInput.value = shiftDays(weekInput.value, -7); load(); };
-    nextBtn.onclick = () => { weekInput.value = shiftDays(weekInput.value, +7); load(); };
+    prevBtn.onclick = () => { weekInput.value = shiftDays(weekInput.value,-7); load(); };
+    nextBtn.onclick = () => { weekInput.value = shiftDays(weekInput.value,+7); load(); };
     locationSel.onchange = load;
     weekInput.onchange = load;
 
-    // Auth UI handlers
+    // Auth UI
     signinBtn.onclick = () => { gateEl.scrollIntoView({behavior:"smooth",block:"center"}); emailEl.focus(); };
     signoutBtn.onclick = async () => { await signOut(auth); };
-
     doSignin.onclick = async () => {
-      authMsg.style.display = "none";
-      try {
-        await signInWithEmailAndPassword(auth, emailEl.value.trim(), passEl.value);
-        emailEl.value = ""; passEl.value = "";
-      } catch (e) {
-        authMsg.textContent = e.message || "Sign-in failed";
-        authMsg.style.display = "";
-      }
+      authMsg.style.display="none";
+      try { await signInWithEmailAndPassword(auth, emailEl.value.trim(), passEl.value); emailEl.value=""; passEl.value=""; }
+      catch(e){ authMsg.textContent = e.message || "Sign-in failed"; authMsg.style.display=""; }
     };
 
-    // Auth state gate
     onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        // signed out
         authStatus.textContent = "Not signed in";
         userAvatar.hidden = true;
-        signoutBtn.style.display = "none";
-        signinBtn.style.display = "";
-        appEl.hidden = true;
-        deniedEl.style.display = "none";
-        gateEl.style.display = "";
+        signoutBtn.style.display = "none"; signinBtn.style.display = "";
+        appEl.hidden = true; deniedEl.style.display="none"; gateEl.style.display="";
         return;
       }
-
-      // signed in
       authStatus.textContent = user.email || "Signed in";
-      signoutBtn.style.display = "";
-      signinBtn.style.display = "none";
-      gateEl.style.display = "none";
+      signoutBtn.style.display = ""; signinBtn.style.display = "none"; gateEl.style.display="none";
+      userAvatar.hidden = !user.photoURL; if (user.photoURL) userAvatar.src = user.photoURL;
 
-      // small avatar if available
-      userAvatar.hidden = !user.photoURL;
-      if (user.photoURL) userAvatar.src = user.photoURL;
+      if (!ALLOWED_UIDS.has(user.uid)) { appEl.hidden=true; deniedEl.style.display=""; return; }
 
-      // Check allowlist in UI (final enforcement is rules)
-      if (!ALLOWED_UIDS.has(user.uid)) {
-        appEl.hidden = true;
-        deniedEl.style.display = "";
-        return;
-      }
-
-      deniedEl.style.display = "none";
-      appEl.hidden = false;
-      load(); // now safe to read Firestore
+      deniedEl.style.display="none"; appEl.hidden=false; load();
     });
 
     async function load(){
+      saveMsg.textContent = "";
       const weekISO = weekInput.value;
       const locKey = locationSel.value;
-      const path = `companies/aidan/locations/${locKey}/labour/weeks/${weekISO}`;
-      try {
-        const snap = await getDoc(doc(db, path));
-        const data = snap.exists() ? snap.data() : null;
-        render(data);
-      } catch (e) {
-        // If rules block (not authorized), this will throw; show message
-        console.error(e);
-        render(null);
-      }
+
+      // Base (7shifts) data
+      const basePath = `companies/aidan/locations/${locKey}/labour/weeks/${weekISO}`;
+      const baseSnap = await getDoc(doc(db, basePath));
+      const base = baseSnap.exists()? baseSnap.data(): null;
+
+      // Overrides
+      const ovrPath = `companies/aidan/locations/${locKey}/overrides/weeks/${weekISO}`;
+      const ovrSnap = await getDoc(doc(db, ovrPath));
+      const ovr = ovrSnap.exists()? ovrSnap.data(): {};
+
+      // Populate inputs
+      inComps.value = ovr.comps ?? "";
+      inVoids.value = ovr.voids ?? "";
+      inSalary.value = ovr.salaried_mgmt ?? "";
+      inRemit.value = ovr.remittance_week ?? "";
+      inLastWeekSales.value = ovr.last_week_sales ?? "";
+      pctFood.value = ovr.budget_pct_food ?? "";
+      pctWine.value = ovr.budget_pct_wine ?? "";
+      pctLiquor.value = ovr.budget_pct_liquor ?? "";
+      pctBeer.value = ovr.budget_pct_beer ?? "";
+
+      render(base, ovr);
+      saveBtn.onclick = async () => {
+        const newOvr = {
+          comps: num(inComps.value),
+          voids: num(inVoids.value),
+          salaried_mgmt: num(inSalary.value),
+          remittance_week: num(inRemit.value),
+          last_week_sales: num(inLastWeekSales.value),
+          budget_pct_food: num(pctFood.value),
+          budget_pct_wine: num(pctWine.value),
+          budget_pct_liquor: num(pctLiquor.value),
+          budget_pct_beer: num(pctBeer.value)
+        };
+        try{
+          await setDoc(doc(db, ovrPath), newOvr, { merge:true });
+          saveMsg.textContent = "Saved ✓";
+          render(base, newOvr);
+        }catch(e){
+          saveMsg.textContent = "Save failed: " + (e.message||e);
+        }
+      };
     }
 
-    function render(data){
+    function render(data, ovr={}){
       const target = data?.target_labour_pct ?? null;
-      const targetPill = document.getElementById("targetPill");
-      targetPill.textContent = target!=null ? fmtPct(target) : "—";
+      document.getElementById("targetPill").textContent = target!=null ? fmtPct(target) : "—";
 
       const days = data?.days ?? [];
       const t = { projSales:0, actSales:0, projLab:0, actLab:0, projMin:0, actMin:0 };
@@ -333,34 +384,52 @@
         tbody.appendChild(tr);
       }
 
-      // totals
-      const weekPct = (t.actLab && t.actSales) ? t.actLab / t.actSales : null;
+      // Apply manual extras to weekly totals
+      const salaried = Number(ovr.salaried_mgmt) || 0;
+      const remit = Number(ovr.remittance_week) || 0;
+
+      const adjustedActLab = t.actLab + salaried + remit; // include salary & remittance in total labour
+      const weekPct = (adjustedActLab && t.actSales) ? adjustedActLab / t.actSales : null;
       const weekDelta = (weekPct!=null && target!=null) ? (weekPct - target) : null;
+
       document.getElementById("tProjSales").textContent = fmtMoney(t.projSales);
       document.getElementById("tActSales").textContent = fmtMoney(t.actSales);
       document.getElementById("tProjLabour").textContent = fmtMoney(t.projLab);
-      document.getElementById("tActLabour").textContent = fmtMoney(t.actLab);
+      document.getElementById("tActLabour").textContent = fmtMoney(adjustedActLab);
       document.getElementById("tProjMin").textContent = fmtInt(t.projMin);
       document.getElementById("tActMin").textContent = fmtInt(t.actMin);
       document.getElementById("tLabourPct").textContent = fmtPct(weekPct);
       document.getElementById("tDelta").innerHTML = `<span class="pill ${weekDelta!=null?(weekDelta<=0?"good":"bad"):""}">${weekDelta!=null? (weekDelta*100).toFixed(1)+" pp":"—"}</span>`;
 
-      // headline KPIs (weighted)
+      // Headline KPIs (use adjusted actual labour)
       document.getElementById("kpiProjSales").textContent = fmtMoney(t.projSales);
       document.getElementById("kpiActSales").textContent  = fmtMoney(t.actSales);
       document.getElementById("kpiProjPct").textContent   = fmtPct( (t.projLab && t.projSales) ? t.projLab/t.projSales : null );
       document.getElementById("kpiActPct").textContent    = fmtPct( weekPct );
-      for (const id of ["kpiProjPct","kpiActPct"]){
-        const el = document.getElementById(id).parentElement;
-        if (target!=null && weekPct!=null && id==="kpiActPct"){
-          el.classList.remove("good","bad");
-          el.classList.add( (weekDelta<=0) ? "good" : "bad" );
-        } else {
-          el.classList.remove("good","bad");
-        }
-      }
+      const k = document.getElementById("kpiActPct").parentElement;
+      k.classList.remove("good","bad");
+      if (target!=null && weekPct!=null) k.classList.add(weekDelta<=0?"good":"bad");
+
+      // Last week & budgets widget
+      const comps = Number(ovr.comps)||0, voids = Number(ovr.voids)||0;
+      vwComps.textContent = fmtMoney(comps);
+      vwVoids.textContent = fmtMoney(voids);
+      vwLastWeek.textContent = fmtMoney(Number(ovr.last_week_sales)||0);
+      vwProjSales.textContent = fmtMoney(t.projSales);
+
+      const pFood = Number(ovr.budget_pct_food)||0;
+      const pWine = Number(ovr.budget_pct_wine)||0;
+      const pLiquor = Number(ovr.budget_pct_liquor)||0;
+      const pBeer = Number(ovr.budget_pct_beer)||0;
+
+      const bdg = (pct)=> t.projSales * pct;
+      bdgFood.textContent = fmtMoney(bdg(pFood));
+      bdgWine.textContent = fmtMoney(bdg(pWine));
+      bdgLiquor.textContent = fmtMoney(bdg(pLiquor));
+      bdgBeer.textContent = fmtMoney(bdg(pBeer));
     }
   </script>
 </body>
 </html>
+
 
