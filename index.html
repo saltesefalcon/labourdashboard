@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Labour Dashboard</title>
+<title>Labour Dashboard (Secure)</title>
 
 <style>
   :root{
@@ -16,6 +16,11 @@
   .wrap{max-width:1100px;margin:24px auto;padding:16px}
   h1{font-size:1.6rem;margin:0 0 2px}
   .sub{color:var(--muted);font-size:.95rem;margin:0 0 18px}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .authbox{display:flex;gap:8px;align-items:center}
+  .avatar{width:28px;height:28px;border-radius:50%;background:#0b1220;border:1px solid var(--line)}
+
   .bar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:12px 0 16px}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
   .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
@@ -39,117 +44,178 @@
   .pill.bad{border-color:#4c1f1f;color:#f39a9a}
   .footer{margin-top:24px;color:var(--muted);font-size:.85rem}
   @media (max-width:900px){ .kpis{grid-template-columns:repeat(2,1fr)} }
+
+  /* Auth gate */
+  .gate{max-width:520px;margin:48px auto 0; padding:18px}
+  .gate h2{margin:0 0 10px;font-size:1.2rem}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row > *{flex:1}
+  .muted{color:var(--muted);font-size:.9rem}
+  .error{color:#fca5a5;margin-top:8px}
+  .denied{border:1px solid #4c1f1f;background:#1b1515}
 </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Labour Dashboard</h1>
-    <p class="sub">Weekly labour vs. sales — fed by 7shifts / stored in Firebase</p>
-
-    <div class="bar">
-      <div class="controls card">
-        <label style="display:block;font-size:.8rem;color:var(--muted);margin-bottom:6px">Location</label>
-        <select id="locationSel">
-          <!-- Make sure these IDs match your backend writer -->
-          <option value="beacon">Beacon</option>
-          <option value="tulia">Tulia</option>
-          <option value="cesoir">Ce Soir</option>
-          <option value="prohibition">Prohibition</option>
-        </select>
+    <div class="topbar">
+      <div>
+        <h1>Labour Dashboard</h1>
+        <p class="sub">Secure • Sign-in required</p>
       </div>
-
-      <div class="controls card">
-        <label style="display:block;font-size:.8rem;color:var(--muted);margin-bottom:6px">Week of (Monday)</label>
-        <input id="weekInput" type="date" />
-        <button id="prevBtn">◀</button>
-        <button id="nextBtn">▶</button>
-      </div>
-
-      <div class="controls card">
-        <label style="display:block;font-size:.8rem;color:var(--muted);margin-bottom:6px">Target Labour %</label>
-        <span id="targetPill" class="pill">—</span>
+      <div class="authbox">
+        <div id="authStatus" class="muted">Not signed in</div>
+        <img class="avatar" id="userAvatar" alt="" hidden />
+        <button id="signinBtn" class="primary">Sign in</button>
+        <button id="signoutBtn" style="display:none">Sign out</button>
       </div>
     </div>
 
-    <div class="kpis">
-      <div class="card kpi"><h3>Projected Sales</h3><div class="v" id="kpiProjSales">—</div></div>
-      <div class="card kpi"><h3>Actual Sales</h3><div class="v" id="kpiActSales">—</div></div>
-      <div class="card kpi"><h3>Projected Labour %</h3><div class="v" id="kpiProjPct">—</div></div>
-      <div class="card kpi"><h3>Actual Labour %</h3><div class="v" id="kpiActPct">—</div></div>
-    </div>
-
-    <div class="grid" style="margin-top:14px">
-      <div class="card">
-        <div class="section-title">Daily breakdown (Mon–Sun)</div>
-        <table id="dailyTable">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th title="Projected sales">Proj $</th>
-              <th title="Actual sales">Act $</th>
-              <th title="Projected labour cost">Proj Labour $</th>
-              <th title="Actual labour cost">Act Labour $</th>
-              <th title="Projected labour minutes">Proj Min</th>
-              <th title="Actual labour minutes">Act Min</th>
-              <th>Labour %</th>
-              <th>Δ vs Target</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-          <tfoot>
-            <tr>
-              <th>Total</th>
-              <th id="tProjSales">—</th>
-              <th id="tActSales">—</th>
-              <th id="tProjLabour">—</th>
-              <th id="tActLabour">—</th>
-              <th id="tProjMin">—</th>
-              <th id="tActMin">—</th>
-              <th id="tLabourPct">—</th>
-              <th id="tDelta">—</th>
-            </tr>
-          </tfoot>
-        </table>
+    <!-- AUTH GATE (shown when signed out or not allowed) -->
+    <div id="authGate" class="card gate">
+      <h2>Sign in to view data</h2>
+      <div class="muted" style="margin-bottom:10px">Use your email and password.</div>
+      <div class="row" style="margin-bottom:10px">
+        <input id="email" type="email" placeholder="Email" autocomplete="username" />
+        <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
       </div>
+      <div class="row" style="margin-bottom:10px;align-items:center">
+        <button id="doSignin" class="primary">Sign in</button>
+        <span id="authMsg" class="error" style="display:none"></span>
+      </div>
+      <div class="muted">If you need access, ask an admin to add your account.</div>
     </div>
 
-    <p class="footer">Data source: 7shifts Daily Sales & Labor API. Sales and labour values are per day; weekly KPIs are sums/weighted % for the selected Monday–Sunday range.</p>
+    <!-- ACCESS DENIED (signed in but UID not allowed) -->
+    <div id="denied" class="card gate denied" style="display:none">
+      <h2>Access denied</h2>
+      <div class="muted">Your account is signed in, but not authorized for this dashboard.</div>
+    </div>
+
+    <!-- MAIN APP (hidden until signed in & authorized) -->
+    <div id="app" hidden>
+      <div class="bar">
+        <div class="controls card">
+          <label style="display:block;font-size:.8rem;color:var(--muted);margin-bottom:6px">Location</label>
+          <select id="locationSel">
+            <option value="beacon">Beacon</option>
+            <option value="tulia">Tulia</option>
+            <option value="cesoir">Ce Soir</option>
+            <option value="prohibition">Prohibition</option>
+          </select>
+        </div>
+
+        <div class="controls card">
+          <label style="display:block;font-size:.8rem;color:var(--muted);margin-bottom:6px">Week of (Monday)</label>
+          <input id="weekInput" type="date" />
+          <button id="prevBtn">◀</button>
+          <button id="nextBtn">▶</button>
+        </div>
+
+        <div class="controls card">
+          <label style="display:block;font-size:.8rem;color:var(--muted);margin-bottom:6px">Target Labour %</label>
+          <span id="targetPill" class="pill">—</span>
+        </div>
+      </div>
+
+      <div class="kpis">
+        <div class="card kpi"><h3>Projected Sales</h3><div class="v" id="kpiProjSales">—</div></div>
+        <div class="card kpi"><h3>Actual Sales</h3><div class="v" id="kpiActSales">—</div></div>
+        <div class="card kpi"><h3>Projected Labour %</h3><div class="v" id="kpiProjPct">—</div></div>
+        <div class="card kpi"><h3>Actual Labour %</h3><div class="v" id="kpiActPct">—</div></div>
+      </div>
+
+      <div class="grid" style="margin-top:14px">
+        <div class="card">
+          <div class="section-title">Daily breakdown (Mon–Sun)</div>
+          <table id="dailyTable">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th title="Projected sales">Proj $</th>
+                <th title="Actual sales">Act $</th>
+                <th title="Projected labour cost">Proj Labour $</th>
+                <th title="Actual labour cost">Act Labour $</th>
+                <th title="Projected labour minutes">Proj Min</th>
+                <th title="Actual labour minutes">Act Min</th>
+                <th>Labour %</th>
+                <th>Δ vs Target</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+            <tfoot>
+              <tr>
+                <th>Total</th>
+                <th id="tProjSales">—</th>
+                <th id="tActSales">—</th>
+                <th id="tProjLabour">—</th>
+                <th id="tActLabour">—</th>
+                <th id="tProjMin">—</th>
+                <th id="tActMin">—</th>
+                <th id="tLabourPct">—</th>
+                <th id="tDelta">—</th>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <p class="footer">Data source: 7shifts Daily Sales & Labor API (via secure Firestore). Only authorized users can read data.</p>
+    </div>
   </div>
 
   <!-- Firebase (modular SDK) -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
     import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
 
-    // TODO: replace with your Firebase web config
+    // Your Firebase web config
     const firebaseConfig = {
-      apiKey: "FIREBASE_API_KEY",
-      authDomain: "FIREBASE_AUTH_DOMAIN",
-      projectId: "FIREBASE_PROJECT_ID",
-      storageBucket: "FIREBASE_STORAGE_BUCKET",
-      messagingSenderId: "FIREBASE_SENDER_ID",
-      appId: "FIREBASE_APP_ID"
+      apiKey: "AIzaSyDVULptnW9wPbhH6Qn7ys8RGmLqIxUwuCI",
+      authDomain: "labour-dashboard.firebaseapp.com",
+      projectId: "labour-dashboard",
+      storageBucket: "labour-dashboard.firebasestorage.app",
+      messagingSenderId: "174483804575",
+      appId: "1:174483804575:web:84f6858e812c9705fe6daa"
     };
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const auth = getAuth(app);
 
-    // location -> Firestore doc key your backend writes to
-    const LOCATION_KEYS = {
-      beacon: "beacon",
-      tulia: "tulia",
-      cesoir: "cesoir",
-      prohibition: "prohibition",
-    };
+    // Allowlist (UI hint). REAL enforcement is in Firestore rules.
+    const ALLOWED_UIDS = new Set([
+      "e0G8FBe3xlYExc3HvSGtIk5Osgw1",
+      "BslFJsAMikSucxwbL8S7qPXcC6r2",
+      "9aQ5evQ3nbYt0kjw91ruil5Igq52"
+    ]);
+
+    // Elements
+    const appEl     = document.getElementById("app");
+    const gateEl    = document.getElementById("authGate");
+    const deniedEl  = document.getElementById("denied");
+    const signinBtn = document.getElementById("signinBtn");
+    const signoutBtn= document.getElementById("signoutBtn");
+    const doSignin  = document.getElementById("doSignin");
+    const emailEl   = document.getElementById("email");
+    const passEl    = document.getElementById("password");
+    const authMsg   = document.getElementById("authMsg");
+    const authStatus= document.getElementById("authStatus");
+    const userAvatar= document.getElementById("userAvatar");
+
+    // Dashboard controls
+    const locationSel = document.getElementById("locationSel");
+    const weekInput   = document.getElementById("weekInput");
+    const prevBtn     = document.getElementById("prevBtn");
+    const nextBtn     = document.getElementById("nextBtn");
 
     // Helpers
     const fmtMoney = n => (n==null? "—" : n.toLocaleString(undefined,{style:"currency",currency:"CAD",maximumFractionDigits:0}));
     const fmtInt   = n => (n==null? "—" : Math.round(n).toLocaleString());
     const fmtPct   = n => (n==null? "—" : (n*100).toFixed(1) + "%");
-
     function getMondayISO(d=new Date()){
       const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-      const day = dt.getUTCDay() || 7; // Sun=0
+      const day = dt.getUTCDay() || 7;
       if (day !== 1) dt.setUTCDate(dt.getUTCDate() - (day - 1));
       return dt.toISOString().slice(0,10);
     }
@@ -157,27 +223,79 @@
       const d = new Date(iso+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+delta); return d.toISOString().slice(0,10);
     }
 
-    const locationSel = document.getElementById("locationSel");
-    const weekInput = document.getElementById("weekInput");
-    const prevBtn = document.getElementById("prevBtn");
-    const nextBtn = document.getElementById("nextBtn");
-
-    // set defaults
+    // Init default selectors
     weekInput.value = getMondayISO(new Date());
-    locationSel.value = "tulia"; // default like your trackers; change if needed
+    locationSel.value = "tulia";
 
     prevBtn.onclick = () => { weekInput.value = shiftDays(weekInput.value, -7); load(); };
     nextBtn.onclick = () => { weekInput.value = shiftDays(weekInput.value, +7); load(); };
     locationSel.onchange = load;
     weekInput.onchange = load;
 
+    // Auth UI handlers
+    signinBtn.onclick = () => { gateEl.scrollIntoView({behavior:"smooth",block:"center"}); emailEl.focus(); };
+    signoutBtn.onclick = async () => { await signOut(auth); };
+
+    doSignin.onclick = async () => {
+      authMsg.style.display = "none";
+      try {
+        await signInWithEmailAndPassword(auth, emailEl.value.trim(), passEl.value);
+        emailEl.value = ""; passEl.value = "";
+      } catch (e) {
+        authMsg.textContent = e.message || "Sign-in failed";
+        authMsg.style.display = "";
+      }
+    };
+
+    // Auth state gate
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        // signed out
+        authStatus.textContent = "Not signed in";
+        userAvatar.hidden = true;
+        signoutBtn.style.display = "none";
+        signinBtn.style.display = "";
+        appEl.hidden = true;
+        deniedEl.style.display = "none";
+        gateEl.style.display = "";
+        return;
+      }
+
+      // signed in
+      authStatus.textContent = user.email || "Signed in";
+      signoutBtn.style.display = "";
+      signinBtn.style.display = "none";
+      gateEl.style.display = "none";
+
+      // small avatar if available
+      userAvatar.hidden = !user.photoURL;
+      if (user.photoURL) userAvatar.src = user.photoURL;
+
+      // Check allowlist in UI (final enforcement is rules)
+      if (!ALLOWED_UIDS.has(user.uid)) {
+        appEl.hidden = true;
+        deniedEl.style.display = "";
+        return;
+      }
+
+      deniedEl.style.display = "none";
+      appEl.hidden = false;
+      load(); // now safe to read Firestore
+    });
+
     async function load(){
-      const locKey = LOCATION_KEYS[locationSel.value];
       const weekISO = weekInput.value;
+      const locKey = locationSel.value;
       const path = `companies/aidan/locations/${locKey}/labour/weeks/${weekISO}`;
-      const snap = await getDoc(doc(db, path));
-      const data = snap.exists() ? snap.data() : null;
-      render(data);
+      try {
+        const snap = await getDoc(doc(db, path));
+        const data = snap.exists() ? snap.data() : null;
+        render(data);
+      } catch (e) {
+        // If rules block (not authorized), this will throw; show message
+        console.error(e);
+        render(null);
+      }
     }
 
     function render(data){
@@ -236,14 +354,13 @@
         const el = document.getElementById(id).parentElement;
         if (target!=null && weekPct!=null && id==="kpiActPct"){
           el.classList.remove("good","bad");
-          el.classList.add(weekDelta<=0?"good":"bad");
+          el.classList.add( (weekDelta<=0) ? "good" : "bad" );
         } else {
           el.classList.remove("good","bad");
         }
       }
     }
-
-    load();
   </script>
 </body>
 </html>
+
