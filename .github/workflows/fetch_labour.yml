@@ -1,1 +1,60 @@
+name: Fetch 7shifts Labour (all locations) -> Firestore
+
+on:
+  workflow_dispatch:
+    inputs:
+      week_of:
+        description: "Week Monday (YYYY-MM-DD). Optional; defaults to current week."
+        required: false
+  schedule:
+    - cron: "10 10 * * *"   # 10:10 UTC ≈ 06:10 Toronto
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app_key: beacon
+            token_secret: BEACON_TOKEN
+            company_id_secret: BEACON_COMPANY_ID
+            location_id_secret: BEACON_LOCATION_ID
+          - app_key: tulia
+            token_secret: TULIA_TOKEN
+            company_id_secret: TULIA_COMPANY_ID
+            location_id_secret: TULIA_LOCATION_ID
+          - app_key: prohibition
+            token_secret: PROHIBITION_TOKEN
+            company_id_secret: PROHIBITION_COMPANY_ID
+            location_id_secret: PROHIBITION_LOCATION_ID
+          - app_key: cesoir
+            token_secret: CESSOIR_TOKEN
+            company_id_secret: CESSOIR_COMPANY_ID
+            location_id_secret: CESSOIR_LOCATION_ID
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install deps
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm i axios firebase-admin
+
+      - name: Run fetch for ${{ matrix.app_key }}
+        env:
+          FIREBASE_SA_JSON: ${{ secrets.FIREBASE_SA_JSON }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          SEVENSHIFTS_TOKEN: ${{ secrets[matrix.token_secret] }}
+          COMPANY_ID: ${{ secrets[matrix.company_id_secret] }}
+          LOCATION_ID: ${{ secrets[matrix.location_id_secret] }}
+          APP_KEY: ${{ matrix.app_key }}
+          WEEK_OF: ${{ github.event.inputs.week_of }}
+        run: node scripts/fetch_7shifts_labour_single.js
 
