@@ -81,7 +81,7 @@ async function main(){
   }
 
   const target = process.env.TARGET_LABOUR_PCT != null ? Number(process.env.TARGET_LABOUR_PCT) : null;
-  const ref = db.doc(`companies/aidan/locations/${appKey}/labour/weeks/${weekISO}`);
+  const ref = db.doc(`companies/aidan/locations/${appKey}/labour/${weekISO}`);
   await ref.set({ ...(target!=null?{target_labour_pct:target}:{ }), days }, { merge:true });
 
   console.log(`[${appKey}] Wrote week ${weekISO} to Firestore.`);
