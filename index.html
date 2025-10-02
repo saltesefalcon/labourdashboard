@@ -307,12 +307,12 @@
       const locKey = locationSel.value;
 
       // Base (7shifts) data
-      const basePath = `companies/aidan/locations/${locKey}/labour/weeks/${weekISO}`;
+      const basePath = `companies/aidan/locations/${locKey}/labour/${weekISO}`;
       const baseSnap = await getDoc(doc(db, basePath));
       const base = baseSnap.exists()? baseSnap.data(): null;
 
       // Overrides
-      const ovrPath = `companies/aidan/locations/${locKey}/overrides/weeks/${weekISO}`;
+      const ovrPath = `companies/aidan/locations/${locKey}/overrides/${weekISO}`;
       const ovrSnap = await getDoc(doc(db, ovrPath));
       const ovr = ovrSnap.exists()? ovrSnap.data(): {};
 
