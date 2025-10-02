@@ -29,9 +29,9 @@ jobs:
             company_id_secret: PROHIBITION_COMPANY_ID
             location_id_secret: PROHIBITION_LOCATION_ID
           - app_key: cesoir
-            token_secret: CESSOIR_TOKEN
-            company_id_secret: CESSOIR_COMPANY_ID
-            location_id_secret: CESSOIR_LOCATION_ID
+            token_secret: CESOIR_TOKEN
+            company_id_secret: CESOIR_COMPANY_ID
+            location_id_secret: CESOIR_LOCATION_ID
 
     steps:
       - name: Checkout repo
