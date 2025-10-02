@@ -216,6 +216,7 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const auth = getAuth(app);
+    const functions = getFunctions(app, "us-central1");
 
     // Allowlist (UI hint only; rules enforce for real)
     const ALLOWED_UIDS = new Set([
@@ -236,6 +237,8 @@
     const authMsg = document.getElementById("authMsg");
     const authStatus = document.getElementById("authStatus");
     const userAvatar = document.getElementById("userAvatar");
+    const refreshBtn = document.getElementById("refreshBtn");
+    const refreshMsg = document.getElementById("refreshMsg");
 
     const locationSel = document.getElementById("locationSel");
     const weekInput = document.getElementById("weekInput");
@@ -282,6 +285,20 @@
     locationSel.onchange = load;
     weekInput.onchange = load;
 
+      async function refreshWeek() {
+    refreshMsg.textContent = "Dispatching update...";
+    const weekISO = weekInput.value; // Monday ISO date (YYYY-MM-DD)
+    try {
+      const call = httpsCallable(functions, "dispatchFetchWeek");
+      await call({ week_of: weekISO });
+      refreshMsg.textContent = "Update started. Check again in ~1 min.";
+    } catch (e) {
+      refreshMsg.textContent = "Refresh failed: " + (e.message || e);
+    }
+  }
+  refreshBtn.onclick = refreshWeek;
+
+
     // Auth UI
     signinBtn.onclick = () => { gateEl.scrollIntoView({behavior:"smooth",block:"center"}); emailEl.focus(); };
     signoutBtn.onclick = async () => { await signOut(auth); };
@@ -293,19 +310,51 @@
 
     onAuthStateChanged(auth, async (user) => {
       if (!user) {
+        // Signed out
         authStatus.textContent = "Not signed in";
         userAvatar.hidden = true;
-        signoutBtn.style.display = "none"; signinBtn.style.display = "";
-        appEl.hidden = true; deniedEl.style.display="none"; gateEl.style.display="";
+        signoutBtn.style.display = "none";
+        signinBtn.style.display = "";
+        appEl.hidden = true;
+        deniedEl.style.display = "none";
+        gateEl.style.display = "";
+    
+        // NEW: disable the Refresh button when signed out
+        if (typeof refreshBtn !== "undefined" && refreshBtn) refreshBtn.disabled = true;
+        if (typeof refreshMsg !== "undefined" && refreshMsg) refreshMsg.textContent = "";
         return;
       }
+    
+      // Signed in
       authStatus.textContent = user.email || "Signed in";
-      signoutBtn.style.display = ""; signinBtn.style.display = "none"; gateEl.style.display="none";
-      userAvatar.hidden = !user.photoURL; if (user.photoURL) userAvatar.src = user.photoURL;
-
-      if (!ALLOWED_UIDS.has(user.uid)) { appEl.hidden=true; deniedEl.style.display=""; return; }
-
-      deniedEl.style.display="none"; appEl.hidden=false; load();
+      signoutBtn.style.display = "";
+      signinBtn.style.display = "none";
+      gateEl.style.display = "none";
+    
+      // Small avatar if available
+      userAvatar.hidden = !user.photoURL;
+      if (user.photoURL) userAvatar.src = user.photoURL;
+    
+      // Allowlist check (UI hint; real enforcement is in rules/functions)
+      if (!ALLOWED_UIDS.has(user.uid)) {
+        appEl.hidden = true;
+        deniedEl.style.display = "";
+    
+        // NEW: signed in but not authorized -> disable Refresh and show note
+        if (typeof refreshBtn !== "undefined" && refreshBtn) refreshBtn.disabled = true;
+        if (typeof refreshMsg !== "undefined" && refreshMsg) refreshMsg.textContent = "Not authorized to refresh.";
+        return;
+      }
+    
+      // Authorized
+      deniedEl.style.display = "none";
+      appEl.hidden = false;
+    
+      // NEW: enable Refresh button for authorized users
+      if (typeof refreshBtn !== "undefined" && refreshBtn) refreshBtn.disabled = false;
+      if (typeof refreshMsg !== "undefined" && refreshMsg) refreshMsg.textContent = "";
+    
+      load(); // now safe to read Firestore
     });
 
     async function load(){
