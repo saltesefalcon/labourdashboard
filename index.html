@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Labour Dashboard (Secure)</title>
+<title>Labour Dashboard V2 (Secure)</title>
 
 <style>
   :root{--bg:#0f172a;--panel:#111827;--ink:#e5e7eb;--muted:#9ca3af;--accent:#22c55e;--warn:#ef4444;--brand:#0ea5e9;--line:#1f2937;}
@@ -46,7 +46,7 @@
   <div class="wrap">
     <div class="topbar">
       <div>
-        <h1>Labour Dashboard</h1>
+        <h1>Labour Dashboard V2</h1>
         <p class="sub">Secure • Sign-in required</p>
       </div>
       <div class="authbox">
@@ -59,49 +59,48 @@
     </div>
 
     <!-- SETTINGS MODAL (admin only) -->
-<div id="settingsModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9999; align-items:center; justify-content:center;">
-  <div class="card" style="width:560px; max-width:90%; background:var(--panel); border:1px solid var(--line)">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
-      <div style="font-weight:600">Location Settings</div>
-      <button id="settingsClose">✕</button>
-    </div>
+    <div id="settingsModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9999; align-items:center; justify-content:center;">
+      <div class="card" style="width:560px; max-width:90%; background:var(--panel); border:1px solid var(--line)">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+          <div style="font-weight:600">Location Settings</div>
+          <button id="settingsClose">✕</button>
+        </div>
 
-    <div class="small" style="margin-bottom:10px">
-      These values persist for the selected location until changed by an admin.
-      Percentages are decimals (e.g. <code>0.35</code> for 35%).
-    </div>
+        <div class="small" style="margin-bottom:10px">
+          These values persist for the selected location until changed by an admin.
+          Percentages are decimals (e.g. <code>0.35</code> for 35%).
+        </div>
 
-    <div class="row">
-      <label>Salaried Mgmt $ (per week)<br>
-        <input id="setSalary" type="number" step="0.01" placeholder="0">
-      </label>
-      <label>Remittance % of Actual Sales<br>
-        <input id="setRemitPct" type="number" step="0.0001" placeholder="0.0000">
-      </label>
-    </div>
+        <div class="row">
+          <label>Salaried Mgmt $ (per week)<br>
+            <input id="setSalary" type="number" step="0.01" placeholder="0">
+          </label>
+          <label>Remittance % of Actual Sales<br>
+            <input id="setRemitPct" type="number" step="0.0001" placeholder="0.0000">
+          </label>
+        </div>
 
-    <div class="row">
-      <label>Budget % Food<br>
-        <input id="setPctFood" type="number" step="0.01" placeholder="0.00">
-      </label>
-      <label>Budget % Wine<br>
-        <input id="setPctWine" type="number" step="0.01" placeholder="0.00">
-      </label>
-      <label>Budget % Liquor<br>
-        <input id="setPctLiquor" type="number" step="0.01" placeholder="0.00">
-      </label>
-      <label>Budget % Beer<br>
-        <input id="setPctBeer" type="number" step="0.01" placeholder="0.00">
-      </label>
-    </div>
+        <div class="row">
+          <label>Budget % Food<br>
+            <input id="setPctFood" type="number" step="0.01" placeholder="0.00">
+          </label>
+          <label>Budget % Wine<br>
+            <input id="setPctWine" type="number" step="0.01" placeholder="0.00">
+          </label>
+          <label>Budget % Liquor<br>
+            <input id="setPctLiquor" type="number" step="0.01" placeholder="0.00">
+          </label>
+          <label>Budget % Beer<br>
+            <input id="setPctBeer" type="number" step="0.01" placeholder="0.00">
+          </label>
+        </div>
 
-    <div class="row" style="margin-top:10px">
-      <button id="settingsSave" class="primary">Save Settings</button>
-      <span id="settingsMsg" class="small"></span>
+        <div class="row" style="margin-top:10px">
+          <button id="settingsSave" class="primary">Save Settings</button>
+          <span id="settingsMsg" class="small"></span>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
-
 
     <!-- AUTH GATE -->
     <div id="authGate" class="card" style="max-width:520px;margin:48px auto 0;">
@@ -195,28 +194,35 @@
       <div class="two" style="margin-top:12px">
         <div class="card">
           <div class="section-title">Manual inputs (saved per week)</div>
+
           <div class="row">
             <label>Comps $<br><input id="inComps" type="number" step="0.01" placeholder="0"></label>
             <label>Voids $<br><input id="inVoids" type="number" step="0.01" placeholder="0"></label>
           </div>
+
           <div class="row">
-            <label>Salaried Mgmt $ (week)<br><input id="inSalary" type="number" step="0.01" placeholder="0"></label>
-            <label>Remittance $ (week)<br><input id="inRemit" type="number" step="0.01" placeholder="0"></label>
+            <!-- These mirror Settings and are read-only here -->
+            <label>Salaried Mgmt $ (from settings)<br><input id="inSalary" type="number" step="0.01" placeholder="0" disabled></label>
+            <label>Remittance $ (auto from % x Actual Sales)<br><input id="inRemit" type="number" step="0.01" placeholder="0" disabled></label>
           </div>
+
           <div class="row">
             <label>Last Week Sales $<br><input id="inLastWeekSales" type="number" step="0.01" placeholder="0"></label>
           </div>
+
           <div class="row">
-            <label>Budget % Food<br><input id="pctFood" type="number" step="0.01" placeholder="0.00"></label>
-            <label>Budget % Wine<br><input id="pctWine" type="number" step="0.01" placeholder="0.00"></label>
-            <label>Budget % Liquor<br><input id="pctLiquor" type="number" step="0.01" placeholder="0.00"></label>
-            <label>Budget % Beer<br><input id="pctBeer" type="number" step="0.01" placeholder="0.00"></label>
+            <!-- Budgets come from settings; shown read-only on this card -->
+            <label>Budget % Food<br><input id="pctFood" type="number" step="0.01" placeholder="0.00" disabled></label>
+            <label>Budget % Wine<br><input id="pctWine" type="number" step="0.01" placeholder="0.00" disabled></label>
+            <label>Budget % Liquor<br><input id="pctLiquor" type="number" step="0.01" placeholder="0.00" disabled></label>
+            <label>Budget % Beer<br><input id="pctBeer" type="number" step="0.01" placeholder="0.00" disabled></label>
           </div>
+
           <div class="row">
             <button id="saveOverrides" class="primary">Save</button>
             <span id="saveMsg" class="small"></span>
           </div>
-          <div class="small">Tip: percentages are decimal (e.g., 0.35 for 35%).</div>
+          <div class="small">Tip: percentages are decimals (e.g., 0.35 for 35%).</div>
         </div>
 
         <div class="card">
@@ -239,496 +245,519 @@
         </div>
       </div>
 
-      <p class="footer">Data source: 7shifts Daily Sales & Labor API (via secure Firestore). Manual inputs saved under “overrides”.</p>
+      <p class="footer">Data source: 7shifts Daily Sales & Labor API (via secure Firestore). Overrides are per week; Settings are sticky per location.</p>
     </div>
   </div>
 
   <!-- Firebase (modular SDK) -->
   <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
-  import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
-  import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
-  import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-functions.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
+    import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+    import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-functions.js";
 
-  // Firebase config
-  const firebaseConfig = {
-    apiKey: "AIzaSyDVULptnW9wPbhH6Qn7ys8RGmLqIxUwuCI",
-    authDomain: "labour-dashboard.firebaseapp.com",
-    projectId: "labour-dashboard",
-    storageBucket: "labour-dashboard.appspot.com",
-    messagingSenderId: "174483804575",
-    appId: "1:174483804575:web:84f6858e812c9705fe6daa"
-  };
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyDVULptnW9wPbhH6Qn7ys8RGmLqIxUwuCI",
+      authDomain: "labour-dashboard.firebaseapp.com",
+      projectId: "labour-dashboard",
+      storageBucket: "labour-dashboard.appspot.com",
+      messagingSenderId: "174483804575",
+      appId: "1:174483804575:web:84f6858e812c9705fe6daa"
+    };
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  const auth = getAuth(app);
-  const functions = getFunctions(app, "us-central1");
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    const functions = getFunctions(app, "us-central1");
 
-  // Allowlist (UI hint only; rules enforce for real)
-  const ALLOWED_UIDS = new Set([
-    "e0G8FBe3xlYExc3HvSGtIk5Osgw1",
-    "BslFJsAMikSucxwbL8S7qPXcC6r2",
-    "9aQ5evQ3nbYt0kjw91ruil5Igq52"
-  ]);
+    // Allow/ Admin lists (UI hints; real enforcement in rules/functions)
+    const ALLOWED_UIDS = new Set([
+      "e0G8FBe3xlYExc3HvSGtIk5Osgw1",
+      "BslFJsAMikSucxwbL8S7qPXcC6r2",
+      "9aQ5evQ3nbYt0kjw91ruil5Igq52"
+    ]);
+    const ADMIN_UIDS = new Set([
+      "e0G8FBe3xlYExc3HvSGtIk5Osgw1",
+      "BslFJsAMikSucxwbL8S7qPXcC6r2",
+      "9aQ5evQ3nbYt0kjw91ruil5Igq52"
+    ]);
 
-  const ADMIN_UIDS = new Set([
-  "e0G8FBe3xlYExc3HvSGtIk5Osgw1",
-  "BslFJsAMikSucxwbL8S7qPXcC6r2",
-  "9aQ5evQ3nbYt0kjw91ruil5Igq52"
-]);
+    // Elements
+    const appEl = document.getElementById("app");
+    const gateEl = document.getElementById("authGate");
+    const deniedEl = document.getElementById("denied");
+    const signinBtn = document.getElementById("signinBtn");
+    const signoutBtn = document.getElementById("signoutBtn");
+    const settingsBtn = document.getElementById("settingsBtn");
+    const doSignin = document.getElementById("doSignin");
+    const emailEl = document.getElementById("email");
+    const passEl = document.getElementById("password");
+    const authMsg = document.getElementById("authMsg");
+    const authStatus = document.getElementById("authStatus");
+    const userAvatar = document.getElementById("userAvatar");
+    const refreshBtn = document.getElementById("refreshBtn");
+    const refreshMsg = document.getElementById("refreshMsg");
+    const pdfBtn = document.getElementById("pdfBtn");
 
+    const locationSel = document.getElementById("locationSel");
+    const weekInput = document.getElementById("weekInput");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
 
-  // Elements
-  const appEl = document.getElementById("app");
-  const gateEl = document.getElementById("authGate");
-  const deniedEl = document.getElementById("denied");
-  const signinBtn = document.getElementById("signinBtn");
-  const signoutBtn = document.getElementById("signoutBtn");
-  const doSignin = document.getElementById("doSignin");
-  const emailEl = document.getElementById("email");
-  const passEl = document.getElementById("password");
-  const authMsg = document.getElementById("authMsg");
-  const authStatus = document.getElementById("authStatus");
-  const userAvatar = document.getElementById("userAvatar");
-  const refreshBtn = document.getElementById("refreshBtn");
-  const refreshMsg = document.getElementById("refreshMsg");
-  const pdfBtn = document.getElementById("pdfBtn");
+    // Settings modal bits
+    const settingsModal = document.getElementById("settingsModal");
+    const settingsClose = document.getElementById("settingsClose");
+    const settingsSave = document.getElementById("settingsSave");
+    const settingsMsg = document.getElementById("settingsMsg");
+    const setSalary = document.getElementById("setSalary");
+    const setRemitPct = document.getElementById("setRemitPct");
+    const setPctFood = document.getElementById("setPctFood");
+    const setPctWine = document.getElementById("setPctWine");
+    const setPctLiquor = document.getElementById("setPctLiquor");
+    const setPctBeer = document.getElementById("setPctBeer");
 
-  const locationSel = document.getElementById("locationSel");
-  const weekInput = document.getElementById("weekInput");
-  const prevBtn = document.getElementById("prevBtn");
-  const nextBtn = document.getElementById("nextBtn");
+    // Inputs
+    const inComps = document.getElementById("inComps");
+    const inVoids = document.getElementById("inVoids");
+    const inSalary = document.getElementById("inSalary");
+    const inRemit = document.getElementById("inRemit");
+    const inLastWeekSales = document.getElementById("inLastWeekSales");
+    const pctFood = document.getElementById("pctFood");
+    const pctWine = document.getElementById("pctWine");
+    const pctLiquor = document.getElementById("pctLiquor");
+    const pctBeer = document.getElementById("pctBeer");
+    const saveBtn = document.getElementById("saveOverrides");
+    const saveMsg = document.getElementById("saveMsg");
 
-  // Admin & Settings UI
-  const settingsBtn   = document.getElementById("settingsBtn");
-  const settingsModal = document.getElementById("settingsModal");
-  const settingsClose = document.getElementById("settingsClose");
-  const settingsSave  = document.getElementById("settingsSave");
-  const settingsMsg   = document.getElementById("settingsMsg");
-  
-  const setSalary   = document.getElementById("setSalary");
-  const setRemitPct = document.getElementById("setRemitPct");
-  const setPctFood  = document.getElementById("setPctFood");
-  const setPctWine  = document.getElementById("setPctWine");
-  const setPctLiquor= document.getElementById("setPctLiquor");
-  const setPctBeer  = document.getElementById("setPctBeer");
+    // Views
+    const vwLastWeek = document.getElementById("vwLastWeek");
+    const vwProjSales = document.getElementById("vwProjSales");
+    const bdgFood = document.getElementById("bdgFood");
+    const bdgWine = document.getElementById("bdgWine");
+    const bdgLiquor = document.getElementById("bdgLiquor");
+    const bdgBeer = document.getElementById("bdgBeer");
+    const vwComps = document.getElementById("vwComps");
+    const vwVoids = document.getElementById("vwVoids");
 
+    // Helpers
+    const fmtMoney = n => (n==null? "—" : n.toLocaleString(undefined,{style:"currency",currency:"CAD",maximumFractionDigits:0}));
+    const fmtInt   = n => (n==null? "—" : Math.round(n).toLocaleString());
+    const fmtPct   = n => (n==null? "—" : (n*100).toFixed(1) + "%");
+    function getMondayISO(d=new Date()){ const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())); const day=dt.getUTCDay()||7; if(day!==1) dt.setUTCDate(dt.getUTCDate()-(day-1)); return dt.toISOString().slice(0,10); }
+    function shiftDays(iso,delta){ const d=new Date(iso+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+delta); return d.toISOString().slice(0,10); }
+    function num(v){ const n=parseFloat(v); return isNaN(n)?0:n; }
 
-  // Inputs
-  const inComps = document.getElementById("inComps");
-  const inVoids = document.getElementById("inVoids");
-  const inSalary = document.getElementById("inSalary");
-  const inRemit = document.getElementById("inRemit");
-  const inLastWeekSales = document.getElementById("inLastWeekSales");
-  const pctFood = document.getElementById("pctFood");
-  const pctWine = document.getElementById("pctWine");
-  const pctLiquor = document.getElementById("pctLiquor");
-  const pctBeer = document.getElementById("pctBeer");
-  const saveBtn = document.getElementById("saveOverrides");
-  const saveMsg = document.getElementById("saveMsg");
-
-  // Views (budgets & extras)
-  const vwLastWeek = document.getElementById("vwLastWeek");
-  const vwProjSales = document.getElementById("vwProjSales");
-  const bdgFood = document.getElementById("bdgFood");
-  const bdgWine = document.getElementById("bdgWine");
-  const bdgLiquor = document.getElementById("bdgLiquor");
-  const bdgBeer = document.getElementById("bdgBeer");
-  const vwComps = document.getElementById("vwComps");
-  const vwVoids = document.getElementById("vwVoids");
-
-  // Helpers
-  const fmtMoney = n => (n==null? "—" : n.toLocaleString(undefined,{style:"currency",currency:"CAD",maximumFractionDigits:0}));
-  const fmtInt   = n => (n==null? "—" : Math.round(n).toLocaleString());
-  const fmtPct   = n => (n==null? "—" : (n*100).toFixed(1) + "%");
-  function getMondayISO(d=new Date()){ const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())); const day=dt.getUTCDay()||7; if(day!==1) dt.setUTCDate(dt.getUTCDate()-(day-1)); return dt.toISOString().slice(0,10); }
-  function shiftDays(iso,delta){ const d=new Date(iso+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+delta); return d.toISOString().slice(0,10); }
-  function num(v){ const n=parseFloat(v); return isNaN(n)?0:n; }
-
-  // --- Settings helpers (place right under your existing Helpers) ---
-function getSettingsPath(locKey) {
-  // one document per location to hold “sticky” settings
-  // e.g. companies/aidan/locations/beacon/settings/app
-  return `companies/aidan/locations/${locKey}/settings/app`;
-}
-
-async function loadSettingsFor(locKey) {
-  const ref = doc(db, getSettingsPath(locKey));
-  const snap = await getDoc(ref);
-  // default shape if nothing saved yet
-  return snap.exists() ? snap.data() : {
-    salaried_mgmt: 0,
-    budget_pct_food: 0,
-    budget_pct_wine: 0,
-    budget_pct_liquor: 0,
-    budget_pct_beer: 0,
-    admins: []  // optional list of admin UIDs
-  };
-}
-
-async function saveSettingsFor(locKey, data) {
-  const ref = doc(db, getSettingsPath(locKey));
-  await setDoc(ref, data, { merge: true });
-}
-
-
-  // Defaults
-  weekInput.value = getMondayISO(new Date());
-  locationSel.value = "beacon";
-
-  prevBtn.onclick = () => { weekInput.value = shiftDays(weekInput.value,-7); load(); };
-  nextBtn.onclick = () => { weekInput.value = shiftDays(weekInput.value,+7); load(); };
-  locationSel.onchange = load;
-  weekInput.onchange = load;
-
-  // --- Refresh Week (Cloud Function dispatcher) ---
-  async function refreshWeek() {
-    refreshMsg.textContent = "Dispatching update...";
-    const weekISO = weekInput.value;
-    try {
-      const call = httpsCallable(functions, "dispatchFetchWeek");
-      await call({ week_of: weekISO });
-      refreshMsg.textContent = "Update started. Check again in ~1 min.";
-    } catch (e) {
-      refreshMsg.textContent = "Refresh failed: " + (e.message || e);
+    // Settings helpers (sticky per location)
+    function getSettingsPath(locKey){
+      return `companies/aidan/locations/${locKey}/settings/app`;
     }
-  }
-  refreshBtn.onclick = refreshWeek;
-
-  // --- Auth UI ---
-  signinBtn.onclick = () => { gateEl.scrollIntoView({behavior:"smooth",block:"center"}); emailEl.focus(); };
-  signoutBtn.onclick = async () => { await signOut(auth); };
-  doSignin.onclick = async () => {
-    authMsg.style.display="none";
-    try { await signInWithEmailAndPassword(auth, emailEl.value.trim(), passEl.value); emailEl.value=""; passEl.value=""; }
-    catch(e){ authMsg.textContent = e.message || "Sign-in failed"; authMsg.style.display=""; }
-  };
-
-  onAuthStateChanged(auth, async (user) => {
-    if (!user) {
-      // Signed out
-      authStatus.textContent = "Not signed in";
-      userAvatar.hidden = true;
-      signoutBtn.style.display = "none";
-      signinBtn.style.display = "";
-      appEl.hidden = true;
-      deniedEl.style.display = "none";
-      gateEl.style.display = "";
-
-      if (refreshBtn) refreshBtn.disabled = true;
-      if (refreshMsg) refreshMsg.textContent = "";
-      if (pdfBtn) { pdfBtn.disabled = true; pdfBtn.onclick = null; }
-      return;
-    }
-
-    // Signed in
-    authStatus.textContent = user.email || "Signed in";
-    signoutBtn.style.display = "";
-    signinBtn.style.display = "none";
-    gateEl.style.display = "none";
-
-    userAvatar.hidden = !user.photoURL;
-    if (user.photoURL) userAvatar.src = user.photoURL;
-
-    if (!ALLOWED_UIDS.has(user.uid)) {
-      appEl.hidden = true;
-      deniedEl.style.display = "";
-
-      if (refreshBtn) refreshBtn.disabled = true;
-      if (refreshMsg) refreshMsg.textContent = "Not authorized to refresh.";
-      if (pdfBtn) { pdfBtn.disabled = true; pdfBtn.onclick = null; }
-      return;
-    }
-
-    // Authorized
-    deniedEl.style.display = "none";
-    appEl.hidden = false;
-
-    if (refreshBtn) { refreshBtn.disabled = false; refreshMsg.textContent = ""; }
-    if (pdfBtn) {
-      pdfBtn.disabled = false;
-      pdfBtn.onclick = downloadPdfAll;   // hook up the click
-    }
-
-    load(); // now safe to read Firestore
-  });
-
-  // --- Data load for the current selection (populates UI) ---
-  async function load(){
-    saveMsg.textContent = "";
-    const weekISO = weekInput.value;
-    const locKey = locationSel.value;
-
-    // Base (7shifts) data
-    const basePath = `companies/aidan/locations/${locKey}/labour/${weekISO}`;
-    const baseSnap = await getDoc(doc(db, basePath));
-    const base = baseSnap.exists()? baseSnap.data(): null;
-
-    // Overrides
-    const ovrPath = `companies/aidan/locations/${locKey}/overrides/${weekISO}`;
-    const ovrSnap = await getDoc(doc(db, ovrPath));
-    const ovr = ovrSnap.exists()? ovrSnap.data(): {};
-
-    // Populate inputs
-    inComps.value = ovr.comps ?? "";
-    inVoids.value = ovr.voids ?? "";
-    inSalary.value = ovr.salaried_mgmt ?? "";
-    inRemit.value = ovr.remittance_week ?? "";
-    inLastWeekSales.value = ovr.last_week_sales ?? "";
-    pctFood.value = ovr.budget_pct_food ?? "";
-    pctWine.value = ovr.budget_pct_wine ?? "";
-    pctLiquor.value = ovr.budget_pct_liquor ?? "";
-    pctBeer.value = ovr.budget_pct_beer ?? "";
-
-    render(base, ovr);
-
-    // Save overrides
-    saveBtn.onclick = async () => {
-      const newOvr = {
-        comps: num(inComps.value),
-        voids: num(inVoids.value),
-        salaried_mgmt: num(inSalary.value),
-        remittance_week: num(inRemit.value),
-        last_week_sales: num(inLastWeekSales.value),
-        budget_pct_food: num(pctFood.value),
-        budget_pct_wine: num(pctWine.value),
-        budget_pct_liquor: num(pctLiquor.value),
-        budget_pct_beer: num(pctBeer.value)
+    async function loadSettingsFor(locKey){
+      const snap = await getDoc(doc(db, getSettingsPath(locKey)));
+      return snap.exists() ? snap.data() : {
+        salaried_mgmt: 0,
+        remit_pct: 0,               // <= % of actual sales
+        budget_pct_food: 0,
+        budget_pct_wine: 0,
+        budget_pct_liquor: 0,
+        budget_pct_beer: 0
       };
+    }
+    async function saveSettingsFor(locKey, data){
+      await setDoc(doc(db, getSettingsPath(locKey)), data, { merge:true });
+    }
+
+    // Defaults
+    weekInput.value = getMondayISO(new Date());
+    locationSel.value = "beacon";
+    prevBtn.onclick = () => { weekInput.value = shiftDays(weekInput.value,-7); load(); };
+    nextBtn.onclick = () => { weekInput.value = shiftDays(weekInput.value,+7); load(); };
+    locationSel.onchange = load;
+    weekInput.onchange = load;
+
+    // Refresh week (Cloud Function)
+    async function refreshWeek(){
+      refreshMsg.textContent = "Dispatching update...";
       try{
-        await setDoc(doc(db, ovrPath), newOvr, { merge:true });
-        saveMsg.textContent = "Saved ✓";
-        render(base, newOvr);
+        const call = httpsCallable(functions, "dispatchFetchWeek");
+        await call({ week_of: weekInput.value });
+        refreshMsg.textContent = "Update started. Check again in ~1 min.";
       }catch(e){
-        saveMsg.textContent = "Save failed: " + (e.message||e);
+        refreshMsg.textContent = "Refresh failed: " + (e.message || e);
+      }
+    }
+    refreshBtn.onclick = refreshWeek;
+
+    // Auth UI
+    signinBtn.onclick = () => { gateEl.scrollIntoView({behavior:"smooth",block:"center"}); emailEl.focus(); };
+    signoutBtn.onclick = async () => { await signOut(auth); };
+    doSignin.onclick = async () => {
+      authMsg.style.display="none";
+      try { await signInWithEmailAndPassword(auth, emailEl.value.trim(), passEl.value); emailEl.value=""; passEl.value=""; }
+      catch(e){ authMsg.textContent = e.message || "Sign-in failed"; authMsg.style.display=""; }
+    };
+
+    let IS_ADMIN = false;
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        authStatus.textContent = "Not signed in";
+        userAvatar.hidden = true;
+        signoutBtn.style.display = "none";
+        signinBtn.style.display = "";
+        settingsBtn.style.display = "none";
+        appEl.hidden = true;
+        deniedEl.style.display = "none";
+        gateEl.style.display = "";
+        IS_ADMIN = false;
+
+        if (refreshBtn) refreshBtn.disabled = true;
+        if (refreshMsg) refreshMsg.textContent = "";
+        if (pdfBtn) { pdfBtn.disabled = true; pdfBtn.onclick = null; }
+        return;
+      }
+
+      authStatus.textContent = user.email || "Signed in";
+      signoutBtn.style.display = "";
+      signinBtn.style.display = "none";
+      gateEl.style.display = "none";
+
+      userAvatar.hidden = !user.photoURL;
+      if (user.photoURL) userAvatar.src = user.photoURL;
+
+      if (!ALLOWED_UIDS.has(user.uid)) {
+        appEl.hidden = true;
+        deniedEl.style.display = "";
+        settingsBtn.style.display = "none";
+        IS_ADMIN = false;
+
+        if (refreshBtn) refreshBtn.disabled = true;
+        if (refreshMsg) refreshMsg.textContent = "Not authorized to refresh.";
+        if (pdfBtn) { pdfBtn.disabled = true; pdfBtn.onclick = null; }
+        return;
+      }
+
+      // Authorized
+      deniedEl.style.display = "none";
+      appEl.hidden = false;
+
+      IS_ADMIN = ADMIN_UIDS.has(user.uid);
+      settingsBtn.style.display = IS_ADMIN ? "" : "none";
+
+      if (refreshBtn) { refreshBtn.disabled = false; refreshMsg.textContent = ""; }
+      if (pdfBtn) { pdfBtn.disabled = false; pdfBtn.onclick = downloadPdfAll; }
+
+      load();
+    });
+
+    // Settings modal logic
+    settingsClose.onclick = () => settingsModal.style.display = "none";
+    settingsBtn.onclick = async () => {
+      const settings = await loadSettingsFor(locationSel.value);
+      setSalary.value   = settings.salaried_mgmt ?? 0;
+      setRemitPct.value = settings.remit_pct ?? 0;
+      setPctFood.value  = settings.budget_pct_food ?? 0;
+      setPctWine.value  = settings.budget_pct_wine ?? 0;
+      setPctLiquor.value= settings.budget_pct_liquor ?? 0;
+      setPctBeer.value  = settings.budget_pct_beer ?? 0;
+      settingsMsg.textContent = "";
+      settingsModal.style.display = "flex";
+    };
+    settingsSave.onclick = async () => {
+      settingsMsg.textContent = "Saving…";
+      try{
+        await saveSettingsFor(locationSel.value, {
+          salaried_mgmt: num(setSalary.value),
+          remit_pct:     num(setRemitPct.value),
+          budget_pct_food:   num(setPctFood.value),
+          budget_pct_wine:   num(setPctWine.value),
+          budget_pct_liquor: num(setPctLiquor.value),
+          budget_pct_beer:   num(setPctBeer.value)
+        });
+        settingsMsg.textContent = "Saved ✓";
+        await load(); // refresh the view with new settings
+      }catch(e){
+        settingsMsg.textContent = "Save failed: " + (e.message || e);
       }
     };
-  }
 
-  function render(data, ovr={}){
-    const target = data?.target_labour_pct ?? null;
-    document.getElementById("targetPill").textContent = target!=null ? fmtPct(target) : "—";
+    // ---- Data load for the current selection (populates UI) ----
+    async function load(){
+      saveMsg.textContent = "";
+      const weekISO = weekInput.value;
+      const locKey = locationSel.value;
 
-    const days = data?.days ?? [];
-    const t = { projSales:0, actSales:0, projLab:0, actLab:0, projMin:0, actMin:0 };
+      // Base (7shifts) data
+      const basePath = `companies/aidan/locations/${locKey}/labour/${weekISO}`;
+      const baseSnap = await getDoc(doc(db, basePath));
+      const base = baseSnap.exists()? baseSnap.data(): null;
 
-    const tbody = document.querySelector("#dailyTable tbody");
-    tbody.innerHTML = "";
-    for (const d of days){
-      t.projSales += d.projected_sales ?? 0;
-      t.actSales  += d.actual_sales ?? 0;
-      t.projLab   += d.projected_labor_cost ?? 0;
-      t.actLab    += d.actual_labor_cost ?? 0;
-      t.projMin   += d.projected_labor_minutes ?? 0;
-      t.actMin    += d.actual_labor_minutes ?? 0;
+      // Sticky location settings
+      const settings = await loadSettingsFor(locKey);
 
-      const pct = (d.actual_labor_cost && d.actual_sales) ? d.actual_labor_cost / d.actual_sales : null;
-      const delta = (pct!=null && target!=null) ? (pct - target) : null;
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${d.date || "—"}</td>
-        <td>${fmtMoney(d.projected_sales)}</td>
-        <td>${fmtMoney(d.actual_sales)}</td>
-        <td>${fmtMoney(d.projected_labor_cost)}</td>
-        <td>${fmtMoney(d.actual_labor_cost)}</td>
-        <td>${fmtInt(d.projected_labor_minutes)}</td>
-        <td>${fmtInt(d.actual_labor_minutes)}</td>
-        <td>${fmtPct(pct)}</td>
-        <td><span class="pill ${delta!=null?(delta<=0?"good":"bad"):""}">${delta!=null? (delta*100).toFixed(1)+" pp":"—"}</span></td>
+      // Weekly overrides (only comps, voids, last week sales live here now)
+      const ovrPath = `companies/aidan/locations/${locKey}/overrides/${weekISO}`;
+      const ovrSnap = await getDoc(doc(db, ovrPath));
+      const ovr = ovrSnap.exists()? ovrSnap.data(): {};
+
+      // Prefill: weekly fields
+      inComps.value         = ovr.comps ?? "";
+      inVoids.value         = ovr.voids ?? "";
+      inLastWeekSales.value = ovr.last_week_sales ?? "";
+
+      // Prefill: settings (shown read-only on this card)
+      inSalary.value  = settings.salaried_mgmt ?? 0;
+      pctFood.value   = settings.budget_pct_food ?? 0;
+      pctWine.value   = settings.budget_pct_wine ?? 0;
+      pctLiquor.value = settings.budget_pct_liquor ?? 0;
+      pctBeer.value   = settings.budget_pct_beer ?? 0;
+
+      // Render uses settings + overrides
+      render(base, ovr, settings);
+
+      saveBtn.onclick = async () => {
+        const newOvr = {
+          comps: num(inComps.value),
+          voids: num(inVoids.value),
+          last_week_sales: num(inLastWeekSales.value)
+        };
+        try{
+          await setDoc(doc(db, ovrPath), newOvr, { merge:true });
+          saveMsg.textContent = "Saved ✓";
+          render(base, newOvr, settings);
+        }catch(e){
+          saveMsg.textContent = "Save failed: " + (e.message || e);
+        }
+      };
+    }
+
+    function render(data, ovr={}, settings={}){
+      const target = data?.target_labour_pct ?? null;
+      document.getElementById("targetPill").textContent = target!=null ? fmtPct(target) : "—";
+
+      const days = data?.days ?? [];
+      const t = { projSales:0, actSales:0, projLab:0, actLab:0, projMin:0, actMin:0 };
+
+      const tbody = document.querySelector("#dailyTable tbody");
+      tbody.innerHTML = "";
+      for (const d of days){
+        t.projSales += d.projected_sales ?? 0;
+        t.actSales  += d.actual_sales ?? 0;
+        t.projLab   += d.projected_labor_cost ?? 0;
+        t.actLab    += d.actual_labor_cost ?? 0;
+        t.projMin   += d.projected_labor_minutes ?? 0;
+        t.actMin    += d.actual_labor_minutes ?? 0;
+
+        const pct = (d.actual_labor_cost && d.actual_sales) ? d.actual_labor_cost / d.actual_sales : null;
+        const delta = (pct!=null && target!=null) ? (pct - target) : null;
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${d.date || "—"}</td>
+          <td>${fmtMoney(d.projected_sales)}</td>
+          <td>${fmtMoney(d.actual_sales)}</td>
+          <td>${fmtMoney(d.projected_labor_cost)}</td>
+          <td>${fmtMoney(d.actual_labor_cost)}</td>
+          <td>${fmtInt(d.projected_labor_minutes)}</td>
+          <td>${fmtInt(d.actual_labor_minutes)}</td>
+          <td>${fmtPct(pct)}</td>
+          <td><span class="pill ${delta!=null?(delta<=0?"good":"bad"):""}">${delta!=null? (delta*100).toFixed(1)+" pp":"—"}</span></td>
+        `;
+        tbody.appendChild(tr);
+      }
+
+      // Use settings for salary and remit %, not overrides
+      const salaried = Number(settings.salaried_mgmt) || 0;
+      const remit    = (Number(settings.remit_pct) || 0) * (t.actSales || 0);
+
+      // Show computed remit in the disabled input
+      inRemit.value = remit.toFixed(2);
+
+      const adjustedActLab = t.actLab + salaried + remit;
+      const weekPct = (adjustedActLab && t.actSales) ? adjustedActLab / t.actSales : null;
+      const weekDelta = (weekPct!=null && target!=null) ? (weekPct - target) : null;
+
+      document.getElementById("tProjSales").textContent = fmtMoney(t.projSales);
+      document.getElementById("tActSales").textContent  = fmtMoney(t.actSales);
+      document.getElementById("tProjLabour").textContent= fmtMoney(t.projLab);
+      document.getElementById("tActLabour").textContent = fmtMoney(adjustedActLab);
+      document.getElementById("tProjMin").textContent   = fmtInt(t.projMin);
+      document.getElementById("tActMin").textContent    = fmtInt(t.actMin);
+      document.getElementById("tLabourPct").textContent = fmtPct(weekPct);
+      document.getElementById("tDelta").innerHTML = `<span class="pill ${weekDelta!=null?(weekDelta<=0?"good":"bad"):""}">${weekDelta!=null? (weekDelta*100).toFixed(1)+" pp":"—"}</span>`;
+
+      // Headline KPIs
+      document.getElementById("kpiProjSales").textContent = fmtMoney(t.projSales);
+      document.getElementById("kpiActSales").textContent  = fmtMoney(t.actSales);
+      document.getElementById("kpiProjPct").textContent   = fmtPct( (t.projLab && t.projSales) ? t.projLab/t.projSales : null );
+      document.getElementById("kpiActPct").textContent    = fmtPct( weekPct );
+      const k = document.getElementById("kpiActPct").parentElement;
+      k.classList.remove("good","bad");
+      if (target!=null && weekPct!=null) k.classList.add(weekDelta<=0?"good":"bad");
+
+      // Last week & budgets widget (budgets from settings)
+      const comps = Number(ovr.comps)||0, voids = Number(ovr.voids)||0;
+      vwComps.textContent = fmtMoney(comps);
+      vwVoids.textContent = fmtMoney(voids);
+      vwLastWeek.textContent = fmtMoney(Number(ovr.last_week_sales)||0);
+      vwProjSales.textContent = fmtMoney(t.projSales);
+
+      const pFood   = Number(settings.budget_pct_food)||0;
+      const pWine   = Number(settings.budget_pct_wine)||0;
+      const pLiquor = Number(settings.budget_pct_liquor)||0;
+      const pBeer   = Number(settings.budget_pct_beer)||0;
+
+      const bdg = (pct)=> t.projSales * pct;
+      bdgFood.textContent   = fmtMoney(bdg(pFood));
+      bdgWine.textContent   = fmtMoney(bdg(pWine));
+      bdgLiquor.textContent = fmtMoney(bdg(pLiquor));
+      bdgBeer.textContent   = fmtMoney(bdg(pBeer));
+    }
+
+    // ---------------------- PDF GENERATOR ----------------------
+    const LOC_LABEL = { beacon:"BEACON", tulia:"TULIA", cesoir:"CE SOIR", prohibition:"PROHIBITION" };
+    const LOC_ORDER = ["beacon","tulia","cesoir","prohibition"];
+
+    async function readWeekForLocation(locKey, weekISO){
+      const basePath = `companies/aidan/locations/${locKey}/labour/${weekISO}`;
+      const ovrPath  = `companies/aidan/locations/${locKey}/overrides/${weekISO}`;
+
+      const [baseSnap, ovrSnap, settings] = await Promise.all([
+        getDoc(doc(db, basePath)),
+        getDoc(doc(db, ovrPath)),
+        loadSettingsFor(locKey)
+      ]);
+      const base = baseSnap.exists()? baseSnap.data(): null;
+      const ovr  = ovrSnap.exists()? ovrSnap.data(): {};
+
+      const days = base?.days || [];
+      let projSales=0, actSales=0, projLab=0, actLab=0, projMin=0, actMin=0;
+      for (const d of days){
+        projSales += d.projected_sales ?? 0;
+        actSales  += d.actual_sales ?? 0;
+        projLab   += d.projected_labor_cost ?? 0;
+        actLab    += d.actual_labor_cost ?? 0;
+        projMin   += d.projected_labor_minutes ?? 0;
+        actMin    += d.actual_labor_minutes ?? 0;
+      }
+
+      const salaried = Number(settings.salaried_mgmt)||0;
+      const remitPct = Number(settings.remit_pct)||0;
+      const remit    = remitPct * (actSales || 0);
+      const adjActLab = actLab + salaried + remit;
+
+      const target = base?.target_labour_pct ?? null;
+      const projPct = (projLab && projSales) ? projLab/projSales : null;
+      const actPct  = (adjActLab && actSales) ? adjActLab/actSales : null;
+      const delta   = (actPct!=null && target!=null) ? (actPct-target) : null;
+
+      const budgets = {
+        food:   projSales * (Number(settings.budget_pct_food)||0),
+        wine:   projSales * (Number(settings.budget_pct_wine)||0),
+        liquor: projSales * (Number(settings.budget_pct_liquor)||0),
+        beer:   projSales * (Number(settings.budget_pct_beer)||0),
+      };
+
+      return {
+        locKey,
+        target,
+        projSales, actSales,
+        projLab,   actLab: adjActLab,
+        projMin,   actMin,
+        projPct,   actPct, delta,
+        comps: Number(ovr.comps)||0,
+        voids: Number(ovr.voids)||0,
+        lastWeek: Number(ovr.last_week_sales)||0,
+        budgets
+      };
+    }
+
+    function sectionHtml(s, weekISO){
+      return `
+        <section class="loc">
+          <div class="loc-hdr">
+            <div class="loc-name">${LOC_LABEL[s.locKey] || s.locKey.toUpperCase()}</div>
+            <div class="loc-week">Week of ${weekISO}</div>
+          </div>
+
+          <div class="kpis">
+            <div class="k"><div class="k-h">Projected Sales</div><div class="k-v">${fmtMoney(s.projSales)}</div></div>
+            <div class="k"><div class="k-h">Actual Sales</div><div class="k-v">${fmtMoney(s.actSales)}</div></div>
+            <div class="k"><div class="k-h">Projected Labour %</div><div class="k-v">${fmtPct(s.projPct)}</div></div>
+            <div class="k ${s.delta!=null && s.delta>0 ? "bad": "good"}"><div class="k-h">Actual Labour %</div><div class="k-v">${fmtPct(s.actPct)}</div></div>
+          </div>
+
+          <table class="mini">
+            <tbody>
+              <tr><th>Total Proj Labour $</th><td>${fmtMoney(s.projLab)}</td><th>Total Act Labour $</th><td>${fmtMoney(s.actLab)}</td></tr>
+              <tr><th>Target Labour %</th><td>${fmtPct(s.target)}</td><th>Δ vs Target</th><td>${s.delta==null?"—":(s.delta*100).toFixed(1)+" pp"}</td></tr>
+              <tr><th>Proj Min</th><td>${fmtInt(s.projMin)}</td><th>Act Min</th><td>${fmtInt(s.actMin)}</td></tr>
+            </tbody>
+          </table>
+
+          <div class="two-col">
+            <table class="mini">
+              <thead><tr><th colspan="2">Last Week & Extras</th></tr></thead>
+              <tbody>
+                <tr><th>Last Week Sales</th><td>${fmtMoney(s.lastWeek)}</td></tr>
+                <tr><th>Comps</th><td>${fmtMoney(s.comps)}</td></tr>
+                <tr><th>Voids</th><td>${fmtMoney(s.voids)}</td></tr>
+              </tbody>
+            </table>
+
+            <table class="mini">
+              <thead><tr><th colspan="2">Purchasing Budgets</th></tr></thead>
+              <tbody>
+                <tr><th>Food</th><td>${fmtMoney(s.budgets.food)}</td></tr>
+                <tr><th>Wine</th><td>${fmtMoney(s.budgets.wine)}</td></tr>
+                <tr><th>Liquor</th><td>${fmtMoney(s.budgets.liquor)}</td></tr>
+                <tr><th>Beer</th><td>${fmtMoney(s.budgets.beer)}</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       `;
-      tbody.appendChild(tr);
     }
 
-    // Apply manual extras to weekly totals
-    const salaried = Number(ovr.salaried_mgmt) || 0;
-    const remit = Number(ovr.remittance_week) || 0;
+    async function downloadPdfAll(){
+      const weekISO = weekInput.value;
+      const results = await Promise.all(LOC_ORDER.map(loc => readWeekForLocation(loc, weekISO)));
+      const sections = results.map(r => sectionHtml(r, weekISO)).join("");
 
-    const adjustedActLab = t.actLab + salaried + remit; // include salary & remittance in total labour
-    const weekPct = (adjustedActLab && t.actSales) ? adjustedActLab / t.actSales : null;
-    const weekDelta = (weekPct!=null && target!=null) ? (weekPct - target) : null;
-
-    document.getElementById("tProjSales").textContent = fmtMoney(t.projSales);
-    document.getElementById("tActSales").textContent = fmtMoney(t.actSales);
-    document.getElementById("tProjLabour").textContent = fmtMoney(t.projLab);
-    document.getElementById("tActLabour").textContent = fmtMoney(adjustedActLab);
-    document.getElementById("tProjMin").textContent = fmtInt(t.projMin);
-    document.getElementById("tActMin").textContent = fmtInt(t.actMin);
-    document.getElementById("tLabourPct").textContent = fmtPct(weekPct);
-    document.getElementById("tDelta").innerHTML = `<span class="pill ${weekDelta!=null?(weekDelta<=0?"good":"bad"):""}">${weekDelta!=null? (weekDelta*100).toFixed(1)+" pp":"—"}</span>`;
-
-    // Headline KPIs (use adjusted actual labour)
-    document.getElementById("kpiProjSales").textContent = fmtMoney(t.projSales);
-    document.getElementById("kpiActSales").textContent  = fmtMoney(t.actSales);
-    document.getElementById("kpiProjPct").textContent   = fmtPct( (t.projLab && t.projSales) ? t.projLab/t.projSales : null );
-    document.getElementById("kpiActPct").textContent    = fmtPct( weekPct );
-    const k = document.getElementById("kpiActPct").parentElement;
-    k.classList.remove("good","bad");
-    if (target!=null && weekPct!=null) k.classList.add(weekDelta<=0?"good":"bad");
-
-    // Last week & budgets widget
-    const comps = Number(ovr.comps)||0, voids = Number(ovr.voids)||0;
-    vwComps.textContent = fmtMoney(comps);
-    vwVoids.textContent = fmtMoney(voids);
-    vwLastWeek.textContent = fmtMoney(Number(ovr.last_week_sales)||0);
-    vwProjSales.textContent = fmtMoney(t.projSales);
-
-    const pFood = Number(ovr.budget_pct_food)||0;
-    const pWine = Number(ovr.budget_pct_wine)||0;
-    const pLiquor = Number(ovr.budget_pct_liquor)||0;
-    const pBeer = Number(ovr.budget_pct_beer)||0;
-
-    const bdg = (pct)=> t.projSales * pct;
-    bdgFood.textContent = fmtMoney(bdg(pFood));
-    bdgWine.textContent = fmtMoney(bdg(pWine));
-    bdgLiquor.textContent = fmtMoney(bdg(pLiquor));
-    bdgBeer.textContent = fmtMoney(bdg(pBeer));
-  }
-
-  // ---------------------- PDF GENERATOR ----------------------
-
-  const LOC_LABEL = { beacon:"BEACON", tulia:"TULIA", cesoir:"CE SOIR", prohibition:"PROHIBITION" };
-  const LOC_ORDER = ["beacon","tulia","cesoir","prohibition"];
-
-  async function readWeekForLocation(locKey, weekISO){
-    const basePath = `companies/aidan/locations/${locKey}/labour/${weekISO}`;
-    const ovrPath  = `companies/aidan/locations/${locKey}/overrides/${weekISO}`;
-
-    const [baseSnap, ovrSnap] = await Promise.all([
-      getDoc(doc(db, basePath)),
-      getDoc(doc(db, ovrPath)),
-    ]);
-    const base = baseSnap.exists()? baseSnap.data(): null;
-    const ovr  = ovrSnap.exists()? ovrSnap.data(): {};
-
-    const days = base?.days || [];
-    let projSales=0, actSales=0, projLab=0, actLab=0, projMin=0, actMin=0;
-    for (const d of days){
-      projSales += d.projected_sales ?? 0;
-      actSales  += d.actual_sales ?? 0;
-      projLab   += d.projected_labor_cost ?? 0;
-      actLab    += d.actual_labor_cost ?? 0;
-      projMin   += d.projected_labor_minutes ?? 0;
-      actMin    += d.actual_labor_minutes ?? 0;
+      const w = window.open("", "_blank");
+      w.document.write(`<!doctype html><html><head><meta charset="utf-8">
+        <title>Labour Dashboard — ${weekISO}</title>
+        <style>
+          @media print { @page { size: Letter; margin: 14mm; } }
+          body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;margin:0;color:#111}
+          .wrap{max-width:980px;margin:24px auto;padding:0 16px}
+          .title{font-weight:700;font-size:20px;margin:8px 0 16px}
+          .loc{page-break-inside:avoid;border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin:0 0 16px}
+          .loc-hdr{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+          .loc-name{font-weight:700;font-size:18px}
+          .loc-week{color:#6b7280;font-size:12px}
+          .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0 6px}
+          .k{border:1px solid #e5e7eb;border-radius:10px;padding:10px}
+          .k-h{font-size:12px;color:#6b7280;margin-bottom:4px}
+          .k-v{font-size:16px;font-weight:600}
+          .k.good .k-v{color:#16a34a}
+          .k.bad .k-v{color:#dc2626}
+          .mini{width:100%;border-collapse:collapse;margin-top:6px}
+          .mini th,.mini td{border-bottom:1px solid #e5e7eb;padding:8px;text-align:right}
+          .mini th:first-child,.mini td:first-child{text-align:left}
+          .two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+          @media (max-width:800px){ .kpis{grid-template-columns:repeat(2,1fr)} .two-col{grid-template-columns:1fr} }
+        </style>
+      </head><body><div class="wrap">
+        <div class="title">Labour Dashboard — Week of ${weekISO}</div>
+        ${sections}
+      </div></body></html>`);
+      w.document.close();
+      w.focus();
+      w.print();
     }
-
-    const salaried = Number(ovr.salaried_mgmt)||0;
-    const remit    = Number(ovr.remittance_week)||0;
-    const adjActLab = actLab + salaried + remit;
-
-    const target = base?.target_labour_pct ?? null;
-    const projPct = (projLab && projSales) ? projLab/projSales : null;
-    const actPct  = (adjActLab && actSales) ? adjActLab/actSales : null;
-    const delta   = (actPct!=null && target!=null) ? (actPct-target) : null;
-
-    const budgets = {
-      food:   projSales * (Number(ovr.budget_pct_food)||0),
-      wine:   projSales * (Number(ovr.budget_pct_wine)||0),
-      liquor: projSales * (Number(ovr.budget_pct_liquor)||0),
-      beer:   projSales * (Number(ovr.budget_pct_beer)||0),
-    };
-
-    return {
-      locKey,
-      target,
-      projSales, actSales,
-      projLab,   actLab: adjActLab,
-      projMin,   actMin,
-      projPct,   actPct, delta,
-      comps: Number(ovr.comps)||0,
-      voids: Number(ovr.voids)||0,
-      lastWeek: Number(ovr.last_week_sales)||0,
-      budgets
-    };
-  }
-
-  function sectionHtml(s, weekISO){
-    return `
-      <section class="loc">
-        <div class="loc-hdr">
-          <div class="loc-name">${LOC_LABEL[s.locKey] || s.locKey.toUpperCase()}</div>
-          <div class="loc-week">Week of ${weekISO}</div>
-        </div>
-
-        <div class="kpis">
-          <div class="k"><div class="k-h">Projected Sales</div><div class="k-v">${fmtMoney(s.projSales)}</div></div>
-          <div class="k"><div class="k-h">Actual Sales</div><div class="k-v">${fmtMoney(s.actSales)}</div></div>
-          <div class="k"><div class="k-h">Projected Labour %</div><div class="k-v">${fmtPct(s.projPct)}</div></div>
-          <div class="k ${s.delta!=null && s.delta>0 ? "bad": "good"}"><div class="k-h">Actual Labour %</div><div class="k-v">${fmtPct(s.actPct)}</div></div>
-        </div>
-
-        <table class="mini">
-          <tbody>
-            <tr><th>Total Proj Labour $</th><td>${fmtMoney(s.projLab)}</td><th>Total Act Labour $</th><td>${fmtMoney(s.actLab)}</td></tr>
-            <tr><th>Target Labour %</th><td>${fmtPct(s.target)}</td><th>Δ vs Target</th><td>${s.delta==null?"—":(s.delta*100).toFixed(1)+" pp"}</td></tr>
-            <tr><th>Proj Min</th><td>${fmtInt(s.projMin)}</td><th>Act Min</th><td>${fmtInt(s.actMin)}</td></tr>
-          </tbody>
-        </table>
-
-        <div class="two-col">
-          <table class="mini">
-            <thead><tr><th colspan="2">Last Week & Extras</th></tr></thead>
-            <tbody>
-              <tr><th>Last Week Sales</th><td>${fmtMoney(s.lastWeek)}</td></tr>
-              <tr><th>Comps</th><td>${fmtMoney(s.comps)}</td></tr>
-              <tr><th>Voids</th><td>${fmtMoney(s.voids)}</td></tr>
-            </tbody>
-          </table>
-
-          <table class="mini">
-            <thead><tr><th colspan="2">Purchasing Budgets</th></tr></thead>
-            <tbody>
-              <tr><th>Food</th><td>${fmtMoney(s.budgets.food)}</td></tr>
-              <tr><th>Wine</th><td>${fmtMoney(s.budgets.wine)}</td></tr>
-              <tr><th>Liquor</th><td>${fmtMoney(s.budgets.liquor)}</td></tr>
-              <tr><th>Beer</th><td>${fmtMoney(s.budgets.beer)}</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-    `;
-  }
-
-  async function downloadPdfAll(){
-    const weekISO = weekInput.value;
-    const results = await Promise.all(LOC_ORDER.map(loc => readWeekForLocation(loc, weekISO)));
-    const sections = results.map(r => sectionHtml(r, weekISO)).join("");
-
-    const w = window.open("", "_blank");
-    w.document.write(`<!doctype html><html><head><meta charset="utf-8">
-      <title>Labour Dashboard – ${weekISO}</title>
-      <style>
-        @media print { @page { size: Letter; margin: 14mm; } }
-        body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;margin:0;color:#111}
-        .wrap{max-width:980px;margin:24px auto;padding:0 16px}
-        .title{font-weight:700;font-size:20px;margin:8px 0 16px}
-        .loc{page-break-inside:avoid;border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin:0 0 16px}
-        .loc-hdr{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
-        .loc-name{font-weight:700;font-size:18px}
-        .loc-week{color:#6b7280;font-size:12px}
-        .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0 6px}
-        .k{border:1px solid #e5e7eb;border-radius:10px;padding:10px}
-        .k-h{font-size:12px;color:#6b7280;margin-bottom:4px}
-        .k-v{font-size:16px;font-weight:600}
-        .k.good .k-v{color:#16a34a}
-        .k.bad .k-v{color:#dc2626}
-        .mini{width:100%;border-collapse:collapse;margin-top:6px}
-        .mini th,.mini td{border-bottom:1px solid #e5e7eb;padding:8px;text-align:right}
-        .mini th:first-child,.mini td:first-child{text-align:left}
-        .two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
-        @media (max-width:800px){ .kpis{grid-template-columns:repeat(2,1fr)} .two-col{grid-template-columns:1fr} }
-      </style>
-    </head><body><div class="wrap">
-      <div class="title">Labour Dashboard — Week of ${weekISO}</div>
-      ${sections}
-    </div></body></html>`);
-    w.document.close();
-    w.focus();
-    w.print();
-  }
-  // -------------------- end PDF GENERATOR --------------------
-</script>
-
+    // -------------------- end PDF GENERATOR --------------------
+  </script>
 </body>
 </html>
+
 
