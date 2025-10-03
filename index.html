@@ -218,7 +218,7 @@
     const db = getFirestore(app);
     const auth = getAuth(app);
     const functions = getFunctions(app, "us-central1");
-
+    
     // Allowlist (UI hint only; rules enforce for real)
     const ALLOWED_UIDS = new Set([
       "e0G8FBe3xlYExc3HvSGtIk5Osgw1",
@@ -240,7 +240,7 @@
     const userAvatar = document.getElementById("userAvatar");
     const refreshBtn = document.getElementById("refreshBtn");
     const refreshMsg = document.getElementById("refreshMsg");
-
+    const pdfBtn = document.getElementById("pdfBtn");
     const locationSel = document.getElementById("locationSel");
     const weekInput = document.getElementById("weekInput");
     const prevBtn = document.getElementById("prevBtn");
@@ -323,6 +323,9 @@
         // NEW: disable the Refresh button when signed out
         if (typeof refreshBtn !== "undefined" && refreshBtn) refreshBtn.disabled = true;
         if (typeof refreshMsg !== "undefined" && refreshMsg) refreshMsg.textContent = "";
+
+        // ⬅️ ADD THIS (Signed out)
+        if (pdfBtn) { pdfBtn.disabled = true; pdfBtn.onclick = null; }
         return;
       }
     
@@ -350,11 +353,16 @@
       // Authorized
       deniedEl.style.display = "none";
       appEl.hidden = false;
-    
-      // NEW: enable Refresh button for authorized users
-      if (typeof refreshBtn !== "undefined" && refreshBtn) refreshBtn.disabled = false;
-      if (typeof refreshMsg !== "undefined" && refreshMsg) refreshMsg.textContent = "";
-    
+      
+      // enable buttons
+      if (refreshBtn) { refreshBtn.disabled = false; refreshMsg.textContent = ""; }
+      
+      // ⬇️ Add these lines just below the Refresh enable lines
+      if (pdfBtn) {
+        pdfBtn.disabled = false;
+        pdfBtn.onclick = downloadPdfAll;   // hook up the click
+      }
+      
       load(); // now safe to read Firestore
     });
 
