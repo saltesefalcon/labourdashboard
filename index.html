@@ -272,6 +272,13 @@
     "9aQ5evQ3nbYt0kjw91ruil5Igq52"
   ]);
 
+  const ADMIN_UIDS = new Set([
+  "e0G8FBe3xlYExc3HvSGtIk5Osgw1",
+  "BslFJsAMikSucxwbL8S7qPXcC6r2",
+  "9aQ5evQ3nbYt0kjw91ruil5Igq52"
+]);
+
+
   // Elements
   const appEl = document.getElementById("app");
   const gateEl = document.getElementById("authGate");
@@ -292,6 +299,21 @@
   const weekInput = document.getElementById("weekInput");
   const prevBtn = document.getElementById("prevBtn");
   const nextBtn = document.getElementById("nextBtn");
+
+  // Admin & Settings UI
+  const settingsBtn   = document.getElementById("settingsBtn");
+  const settingsModal = document.getElementById("settingsModal");
+  const settingsClose = document.getElementById("settingsClose");
+  const settingsSave  = document.getElementById("settingsSave");
+  const settingsMsg   = document.getElementById("settingsMsg");
+  
+  const setSalary   = document.getElementById("setSalary");
+  const setRemitPct = document.getElementById("setRemitPct");
+  const setPctFood  = document.getElementById("setPctFood");
+  const setPctWine  = document.getElementById("setPctWine");
+  const setPctLiquor= document.getElementById("setPctLiquor");
+  const setPctBeer  = document.getElementById("setPctBeer");
+
 
   // Inputs
   const inComps = document.getElementById("inComps");
