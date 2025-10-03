@@ -346,6 +346,33 @@
   function shiftDays(iso,delta){ const d=new Date(iso+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+delta); return d.toISOString().slice(0,10); }
   function num(v){ const n=parseFloat(v); return isNaN(n)?0:n; }
 
+  // --- Settings helpers (place right under your existing Helpers) ---
+function getSettingsPath(locKey) {
+  // one document per location to hold “sticky” settings
+  // e.g. companies/aidan/locations/beacon/settings/app
+  return `companies/aidan/locations/${locKey}/settings/app`;
+}
+
+async function loadSettingsFor(locKey) {
+  const ref = doc(db, getSettingsPath(locKey));
+  const snap = await getDoc(ref);
+  // default shape if nothing saved yet
+  return snap.exists() ? snap.data() : {
+    salaried_mgmt: 0,
+    budget_pct_food: 0,
+    budget_pct_wine: 0,
+    budget_pct_liquor: 0,
+    budget_pct_beer: 0,
+    admins: []  // optional list of admin UIDs
+  };
+}
+
+async function saveSettingsFor(locKey, data) {
+  const ref = doc(db, getSettingsPath(locKey));
+  await setDoc(ref, data, { merge: true });
+}
+
+
   // Defaults
   weekInput.value = getMondayISO(new Date());
   locationSel.value = "beacon";
