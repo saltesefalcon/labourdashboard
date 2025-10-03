@@ -201,28 +201,13 @@
           </div>
 
           <div class="row">
-            <!-- These mirror Settings and are read-only here -->
-            <label>Salaried Mgmt $ (from settings)<br><input id="inSalary" type="number" step="0.01" placeholder="0" disabled></label>
-            <label>Remittance $ (auto from % x Actual Sales)<br><input id="inRemit" type="number" step="0.01" placeholder="0" disabled></label>
-          </div>
-
-          <div class="row">
             <label>Last Week Sales $<br><input id="inLastWeekSales" type="number" step="0.01" placeholder="0"></label>
-          </div>
-
-          <div class="row">
-            <!-- Budgets come from settings; shown read-only on this card -->
-            <label>Budget % Food<br><input id="pctFood" type="number" step="0.01" placeholder="0.00" disabled></label>
-            <label>Budget % Wine<br><input id="pctWine" type="number" step="0.01" placeholder="0.00" disabled></label>
-            <label>Budget % Liquor<br><input id="pctLiquor" type="number" step="0.01" placeholder="0.00" disabled></label>
-            <label>Budget % Beer<br><input id="pctBeer" type="number" step="0.01" placeholder="0.00" disabled></label>
           </div>
 
           <div class="row">
             <button id="saveOverrides" class="primary">Save</button>
             <span id="saveMsg" class="small"></span>
           </div>
-          <div class="small">Tip: percentages are decimals (e.g., 0.35 for 35%).</div>
         </div>
 
         <div class="card">
@@ -256,7 +241,6 @@
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
     import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-functions.js";
 
-    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyDVULptnW9wPbhH6Qn7ys8RGmLqIxUwuCI",
       authDomain: "labour-dashboard.firebaseapp.com",
@@ -271,7 +255,6 @@
     const auth = getAuth(app);
     const functions = getFunctions(app, "us-central1");
 
-    // Allow/ Admin lists (UI hints; real enforcement in rules/functions)
     const ALLOWED_UIDS = new Set([
       "e0G8FBe3xlYExc3HvSGtIk5Osgw1",
       "BslFJsAMikSucxwbL8S7qPXcC6r2",
@@ -305,7 +288,7 @@
     const prevBtn = document.getElementById("prevBtn");
     const nextBtn = document.getElementById("nextBtn");
 
-    // Settings modal bits
+    // Settings modal
     const settingsModal = document.getElementById("settingsModal");
     const settingsClose = document.getElementById("settingsClose");
     const settingsSave = document.getElementById("settingsSave");
@@ -317,20 +300,14 @@
     const setPctLiquor = document.getElementById("setPctLiquor");
     const setPctBeer = document.getElementById("setPctBeer");
 
-    // Inputs
+    // Weekly overrides (only these are editable here)
     const inComps = document.getElementById("inComps");
     const inVoids = document.getElementById("inVoids");
-    const inSalary = document.getElementById("inSalary");
-    const inRemit = document.getElementById("inRemit");
     const inLastWeekSales = document.getElementById("inLastWeekSales");
-    const pctFood = document.getElementById("pctFood");
-    const pctWine = document.getElementById("pctWine");
-    const pctLiquor = document.getElementById("pctLiquor");
-    const pctBeer = document.getElementById("pctBeer");
     const saveBtn = document.getElementById("saveOverrides");
     const saveMsg = document.getElementById("saveMsg");
 
-    // Views
+    // Budgets & extras view
     const vwLastWeek = document.getElementById("vwLastWeek");
     const vwProjSales = document.getElementById("vwProjSales");
     const bdgFood = document.getElementById("bdgFood");
@@ -348,15 +325,12 @@
     function shiftDays(iso,delta){ const d=new Date(iso+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+delta); return d.toISOString().slice(0,10); }
     function num(v){ const n=parseFloat(v); return isNaN(n)?0:n; }
 
-    // Settings helpers (sticky per location)
-    function getSettingsPath(locKey){
-      return `companies/aidan/locations/${locKey}/settings/app`;
-    }
+    function getSettingsPath(locKey){ return `companies/aidan/locations/${locKey}/settings/app`; }
     async function loadSettingsFor(locKey){
       const snap = await getDoc(doc(db, getSettingsPath(locKey)));
       return snap.exists() ? snap.data() : {
         salaried_mgmt: 0,
-        remit_pct: 0,               // <= % of actual sales
+        remit_pct: 0,
         budget_pct_food: 0,
         budget_pct_wine: 0,
         budget_pct_liquor: 0,
@@ -375,7 +349,6 @@
     locationSel.onchange = load;
     weekInput.onchange = load;
 
-    // Refresh week (Cloud Function)
     async function refreshWeek(){
       refreshMsg.textContent = "Dispatching update...";
       try{
@@ -388,7 +361,7 @@
     }
     refreshBtn.onclick = refreshWeek;
 
-    // Auth UI
+    // Auth
     signinBtn.onclick = () => { gateEl.scrollIntoView({behavior:"smooth",block:"center"}); emailEl.focus(); };
     signoutBtn.onclick = async () => { await signOut(auth); };
     doSignin.onclick = async () => {
@@ -409,8 +382,6 @@
         appEl.hidden = true;
         deniedEl.style.display = "none";
         gateEl.style.display = "";
-        IS_ADMIN = false;
-
         if (refreshBtn) refreshBtn.disabled = true;
         if (refreshMsg) refreshMsg.textContent = "";
         if (pdfBtn) { pdfBtn.disabled = true; pdfBtn.onclick = null; }
@@ -429,17 +400,14 @@
         appEl.hidden = true;
         deniedEl.style.display = "";
         settingsBtn.style.display = "none";
-        IS_ADMIN = false;
-
         if (refreshBtn) refreshBtn.disabled = true;
         if (refreshMsg) refreshMsg.textContent = "Not authorized to refresh.";
         if (pdfBtn) { pdfBtn.disabled = true; pdfBtn.onclick = null; }
         return;
       }
 
-      // Authorized
-      deniedEl.style.display = "none";
       appEl.hidden = false;
+      deniedEl.style.display = "none";
 
       IS_ADMIN = ADMIN_UIDS.has(user.uid);
       settingsBtn.style.display = IS_ADMIN ? "" : "none";
@@ -450,16 +418,16 @@
       load();
     });
 
-    // Settings modal logic
+    // Settings modal
     settingsClose.onclick = () => settingsModal.style.display = "none";
     settingsBtn.onclick = async () => {
-      const settings = await loadSettingsFor(locationSel.value);
-      setSalary.value   = settings.salaried_mgmt ?? 0;
-      setRemitPct.value = settings.remit_pct ?? 0;
-      setPctFood.value  = settings.budget_pct_food ?? 0;
-      setPctWine.value  = settings.budget_pct_wine ?? 0;
-      setPctLiquor.value= settings.budget_pct_liquor ?? 0;
-      setPctBeer.value  = settings.budget_pct_beer ?? 0;
+      const s = await loadSettingsFor(locationSel.value);
+      setSalary.value   = s.salaried_mgmt ?? 0;
+      setRemitPct.value = s.remit_pct ?? 0;
+      setPctFood.value  = s.budget_pct_food ?? 0;
+      setPctWine.value  = s.budget_pct_wine ?? 0;
+      setPctLiquor.value= s.budget_pct_liquor ?? 0;
+      setPctBeer.value  = s.budget_pct_beer ?? 0;
       settingsMsg.textContent = "";
       settingsModal.style.display = "flex";
     };
@@ -475,44 +443,32 @@
           budget_pct_beer:   num(setPctBeer.value)
         });
         settingsMsg.textContent = "Saved ✓";
-        await load(); // refresh the view with new settings
+        await load();
       }catch(e){
         settingsMsg.textContent = "Save failed: " + (e.message || e);
       }
     };
 
-    // ---- Data load for the current selection (populates UI) ----
+    // Load + Render
     async function load(){
       saveMsg.textContent = "";
       const weekISO = weekInput.value;
       const locKey = locationSel.value;
 
-      // Base (7shifts) data
       const basePath = `companies/aidan/locations/${locKey}/labour/${weekISO}`;
       const baseSnap = await getDoc(doc(db, basePath));
       const base = baseSnap.exists()? baseSnap.data(): null;
 
-      // Sticky location settings
       const settings = await loadSettingsFor(locKey);
 
-      // Weekly overrides (only comps, voids, last week sales live here now)
       const ovrPath = `companies/aidan/locations/${locKey}/overrides/${weekISO}`;
       const ovrSnap = await getDoc(doc(db, ovrPath));
       const ovr = ovrSnap.exists()? ovrSnap.data(): {};
 
-      // Prefill: weekly fields
       inComps.value         = ovr.comps ?? "";
       inVoids.value         = ovr.voids ?? "";
       inLastWeekSales.value = ovr.last_week_sales ?? "";
 
-      // Prefill: settings (shown read-only on this card)
-      inSalary.value  = settings.salaried_mgmt ?? 0;
-      pctFood.value   = settings.budget_pct_food ?? 0;
-      pctWine.value   = settings.budget_pct_wine ?? 0;
-      pctLiquor.value = settings.budget_pct_liquor ?? 0;
-      pctBeer.value   = settings.budget_pct_beer ?? 0;
-
-      // Render uses settings + overrides
       render(base, ovr, settings);
 
       saveBtn.onclick = async () => {
@@ -565,12 +521,8 @@
         tbody.appendChild(tr);
       }
 
-      // Use settings for salary and remit %, not overrides
       const salaried = Number(settings.salaried_mgmt) || 0;
       const remit    = (Number(settings.remit_pct) || 0) * (t.actSales || 0);
-
-      // Show computed remit in the disabled input
-      inRemit.value = remit.toFixed(2);
 
       const adjustedActLab = t.actLab + salaried + remit;
       const weekPct = (adjustedActLab && t.actSales) ? adjustedActLab / t.actSales : null;
@@ -584,15 +536,6 @@
       document.getElementById("tActMin").textContent    = fmtInt(t.actMin);
       document.getElementById("tLabourPct").textContent = fmtPct(weekPct);
       document.getElementById("tDelta").innerHTML = `<span class="pill ${weekDelta!=null?(weekDelta<=0?"good":"bad"):""}">${weekDelta!=null? (weekDelta*100).toFixed(1)+" pp":"—"}</span>`;
-
-      // Headline KPIs
-      document.getElementById("kpiProjSales").textContent = fmtMoney(t.projSales);
-      document.getElementById("kpiActSales").textContent  = fmtMoney(t.actSales);
-      document.getElementById("kpiProjPct").textContent   = fmtPct( (t.projLab && t.projSales) ? t.projLab/t.projSales : null );
-      document.getElementById("kpiActPct").textContent    = fmtPct( weekPct );
-      const k = document.getElementById("kpiActPct").parentElement;
-      k.classList.remove("good","bad");
-      if (target!=null && weekPct!=null) k.classList.add(weekDelta<=0?"good":"bad");
 
       // Last week & budgets widget (budgets from settings)
       const comps = Number(ovr.comps)||0, voids = Number(ovr.voids)||0;
@@ -641,8 +584,7 @@
       }
 
       const salaried = Number(settings.salaried_mgmt)||0;
-      const remitPct = Number(settings.remit_pct)||0;
-      const remit    = remitPct * (actSales || 0);
+      const remit    = (Number(settings.remit_pct)||0) * (actSales || 0);
       const adjActLab = actLab + salaried + remit;
 
       const target = base?.target_labour_pct ?? null;
@@ -759,5 +701,6 @@
   </script>
 </body>
 </html>
+
 
 
