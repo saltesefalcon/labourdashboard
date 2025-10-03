@@ -58,6 +58,51 @@
       </div>
     </div>
 
+    <!-- SETTINGS MODAL (admin only) -->
+<div id="settingsModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9999; align-items:center; justify-content:center;">
+  <div class="card" style="width:560px; max-width:90%; background:var(--panel); border:1px solid var(--line)">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+      <div style="font-weight:600">Location Settings</div>
+      <button id="settingsClose">✕</button>
+    </div>
+
+    <div class="small" style="margin-bottom:10px">
+      These values persist for the selected location until changed by an admin.
+      Percentages are decimals (e.g. <code>0.35</code> for 35%).
+    </div>
+
+    <div class="row">
+      <label>Salaried Mgmt $ (per week)<br>
+        <input id="setSalary" type="number" step="0.01" placeholder="0">
+      </label>
+      <label>Remittance % of Actual Sales<br>
+        <input id="setRemitPct" type="number" step="0.0001" placeholder="0.0000">
+      </label>
+    </div>
+
+    <div class="row">
+      <label>Budget % Food<br>
+        <input id="setPctFood" type="number" step="0.01" placeholder="0.00">
+      </label>
+      <label>Budget % Wine<br>
+        <input id="setPctWine" type="number" step="0.01" placeholder="0.00">
+      </label>
+      <label>Budget % Liquor<br>
+        <input id="setPctLiquor" type="number" step="0.01" placeholder="0.00">
+      </label>
+      <label>Budget % Beer<br>
+        <input id="setPctBeer" type="number" step="0.01" placeholder="0.00">
+      </label>
+    </div>
+
+    <div class="row" style="margin-top:10px">
+      <button id="settingsSave" class="primary">Save Settings</button>
+      <span id="settingsMsg" class="small"></span>
+    </div>
+  </div>
+</div>
+
+
     <!-- AUTH GATE -->
     <div id="authGate" class="card" style="max-width:520px;margin:48px auto 0;">
       <h2>Sign in to view data</h2>
