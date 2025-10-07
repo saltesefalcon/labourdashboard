@@ -341,6 +341,18 @@
       await setDoc(doc(db, getSettingsPath(locKey)), data, { merge:true });
     }
 
+    // --- currency scaling (detect cents vs dollars) ---
+    function detectCurrencyScale(days = []) {
+      // if any sales value >= 100,000 we assume "cents" and scale by 0.01
+      for (const d of days) {
+        const a = typeof d?.actual_sales === "number" ? d.actual_sales : null;
+        const p = typeof d?.projected_sales === "number" ? d.projected_sales : null;
+        if ((a != null && a >= 100000) || (p != null && p >= 100000)) return 0.01;
+      }
+      return 1; // already dollars
+    }
+
+
     // Defaults
     weekInput.value = getMondayISO(new Date());
     locationSel.value = "beacon";
@@ -487,74 +499,92 @@
       };
     }
 
-    function render(data, ovr={}, settings={}){
-      const target = data?.target_labour_pct ?? null;
-      document.getElementById("targetPill").textContent = target!=null ? fmtPct(target) : "—";
+   function render(data, ovr={}, settings={}){
+  const target = data?.target_labour_pct ?? null;
+  document.getElementById("targetPill").textContent = target!=null ? fmtPct(target) : "—";
 
-      const days = data?.days ?? [];
-      const t = { projSales:0, actSales:0, projLab:0, actLab:0, projMin:0, actMin:0 };
+  const days = data?.days ?? [];
+  const SCALE = detectCurrencyScale(days); // <— NEW
 
-      const tbody = document.querySelector("#dailyTable tbody");
-      tbody.innerHTML = "";
-      for (const d of days){
-        t.projSales += d.projected_sales ?? 0;
-        t.actSales  += d.actual_sales ?? 0;
-        t.projLab   += d.projected_labor_cost ?? 0;
-        t.actLab    += d.actual_labor_cost ?? 0;
-        t.projMin   += d.projected_labor_minutes ?? 0;
-        t.actMin    += d.actual_labor_minutes ?? 0;
+  const t = { projSales:0, actSales:0, projLab:0, actLab:0, projMin:0, actMin:0 };
 
-        const pct = (d.actual_labor_cost && d.actual_sales) ? d.actual_labor_cost / d.actual_sales : null;
-        const delta = (pct!=null && target!=null) ? (pct - target) : null;
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${d.date || "—"}</td>
-          <td>${fmtMoney(d.projected_sales)}</td>
-          <td>${fmtMoney(d.actual_sales)}</td>
-          <td>${fmtMoney(d.projected_labor_cost)}</td>
-          <td>${fmtMoney(d.actual_labor_cost)}</td>
-          <td>${fmtInt(d.projected_labor_minutes)}</td>
-          <td>${fmtInt(d.actual_labor_minutes)}</td>
-          <td>${fmtPct(pct)}</td>
-          <td><span class="pill ${delta!=null?(delta<=0?"good":"bad"):""}">${delta!=null? (delta*100).toFixed(1)+" pp":"—"}</span></td>
-        `;
-        tbody.appendChild(tr);
-      }
+  const tbody = document.querySelector("#dailyTable tbody");
+  tbody.innerHTML = "";
+  for (const d of days){
+    t.projSales += (d.projected_sales ?? 0)       * SCALE;
+    t.actSales  += (d.actual_sales ?? 0)          * SCALE;
+    t.projLab   += (d.projected_labor_cost ?? 0)  * SCALE;
+    t.actLab    += (d.actual_labor_cost ?? 0)     * SCALE;
+    t.projMin   += d.projected_labor_minutes ?? 0;
+    t.actMin    += d.actual_labor_minutes ?? 0;
 
-      const salaried = Number(settings.salaried_mgmt) || 0;
-      const remit    = (Number(settings.remit_pct) || 0) * (t.actSales || 0);
+    const pct = (d.actual_labor_cost && d.actual_sales)
+      ? ( (d.actual_labor_cost * SCALE) / (d.actual_sales * SCALE) ) // SCALE cancels, but keep explicit
+      : null;
 
-      const adjustedActLab = t.actLab + salaried + remit;
-      const weekPct = (adjustedActLab && t.actSales) ? adjustedActLab / t.actSales : null;
-      const weekDelta = (weekPct!=null && target!=null) ? (weekPct - target) : null;
+    const delta = (pct!=null && target!=null) ? (pct - target) : null;
 
-      document.getElementById("tProjSales").textContent = fmtMoney(t.projSales);
-      document.getElementById("tActSales").textContent  = fmtMoney(t.actSales);
-      document.getElementById("tProjLabour").textContent= fmtMoney(t.projLab);
-      document.getElementById("tActLabour").textContent = fmtMoney(adjustedActLab);
-      document.getElementById("tProjMin").textContent   = fmtInt(t.projMin);
-      document.getElementById("tActMin").textContent    = fmtInt(t.actMin);
-      document.getElementById("tLabourPct").textContent = fmtPct(weekPct);
-      document.getElementById("tDelta").innerHTML = `<span class="pill ${weekDelta!=null?(weekDelta<=0?"good":"bad"):""}">${weekDelta!=null? (weekDelta*100).toFixed(1)+" pp":"—"}</span>`;
+    const row = {
+      date: d.date || "—",
+      ps:   (d.projected_sales ?? 0)      * SCALE,
+      as:   (d.actual_sales ?? 0)         * SCALE,
+      plc:  (d.projected_labor_cost ?? 0) * SCALE,
+      alc:  (d.actual_labor_cost ?? 0)    * SCALE,
+      pmin: d.projected_labor_minutes ?? 0,
+      amin: d.actual_labor_minutes ?? 0,
+      pct, delta
+    };
 
-      // Last week & budgets widget (budgets from settings)
-      const comps = Number(ovr.comps)||0, voids = Number(ovr.voids)||0;
-      vwComps.textContent = fmtMoney(comps);
-      vwVoids.textContent = fmtMoney(voids);
-      vwLastWeek.textContent = fmtMoney(Number(ovr.last_week_sales)||0);
-      vwProjSales.textContent = fmtMoney(t.projSales);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${row.date}</td>
+      <td>${fmtMoney(row.ps)}</td>
+      <td>${fmtMoney(row.as)}</td>
+      <td>${fmtMoney(row.plc)}</td>
+      <td>${fmtMoney(row.alc)}</td>
+      <td>${fmtInt(row.pmin)}</td>
+      <td>${fmtInt(row.amin)}</td>
+      <td>${fmtPct(row.pct)}</td>
+      <td><span class="pill ${row.delta!=null?(row.delta<=0?"good":"bad"):""}">${row.delta!=null? (row.delta*100).toFixed(1)+" pp":"—"}</span></td>
+    `;
+    tbody.appendChild(tr);
+  }
 
-      const pFood   = Number(settings.budget_pct_food)||0;
-      const pWine   = Number(settings.budget_pct_wine)||0;
-      const pLiquor = Number(settings.budget_pct_liquor)||0;
-      const pBeer   = Number(settings.budget_pct_beer)||0;
+  const salaried = Number(settings.salaried_mgmt) || 0;
+  const remit    = (Number(settings.remit_pct) || 0) * (t.actSales || 0);
 
-      const bdg = (pct)=> t.projSales * pct;
-      bdgFood.textContent   = fmtMoney(bdg(pFood));
-      bdgWine.textContent   = fmtMoney(bdg(pWine));
-      bdgLiquor.textContent = fmtMoney(bdg(pLiquor));
-      bdgBeer.textContent   = fmtMoney(bdg(pBeer));
-    }
+  const adjustedActLab = t.actLab + salaried + remit;
+  const weekPct   = (adjustedActLab && t.actSales) ? adjustedActLab / t.actSales : null;
+  const weekDelta = (weekPct!=null && target!=null) ? (weekPct - target) : null;
+
+  document.getElementById("tProjSales").textContent = fmtMoney(t.projSales);
+  document.getElementById("tActSales").textContent  = fmtMoney(t.actSales);
+  document.getElementById("tProjLabour").textContent= fmtMoney(t.projLab);
+  document.getElementById("tActLabour").textContent = fmtMoney(adjustedActLab);
+  document.getElementById("tProjMin").textContent   = fmtInt(t.projMin);
+  document.getElementById("tActMin").textContent    = fmtInt(t.actMin);
+  document.getElementById("tLabourPct").textContent = fmtPct(weekPct);
+  document.getElementById("tDelta").innerHTML = `<span class="pill ${weekDelta!=null?(weekDelta<=0?"good":"bad"):""}">${weekDelta!=null? (weekDelta*100).toFixed(1)+" pp":"—"}</span>`;
+
+  // Last week & budgets
+  const comps = Number(ovr.comps)||0, voids = Number(ovr.voids)||0;
+  vwComps.textContent = fmtMoney(comps);
+  vwVoids.textContent = fmtMoney(voids);
+  vwLastWeek.textContent = fmtMoney(Number(ovr.last_week_sales)||0);
+  vwProjSales.textContent = fmtMoney(t.projSales);
+
+  const pFood   = Number(settings.budget_pct_food)||0;
+  const pWine   = Number(settings.budget_pct_wine)||0;
+  const pLiquor = Number(settings.budget_pct_liquor)||0;
+  const pBeer   = Number(settings.budget_pct_beer)||0;
+
+  const bdg = (pct)=> t.projSales * pct;  // t.projSales already scaled
+  bdgFood.textContent   = fmtMoney(bdg(pFood));
+  bdgWine.textContent   = fmtMoney(bdg(pWine));
+  bdgLiquor.textContent = fmtMoney(bdg(pLiquor));
+  bdgBeer.textContent   = fmtMoney(bdg(pBeer));
+}
+
 
     // ---------------------- PDF GENERATOR ----------------------
     const LOC_LABEL = { beacon:"BEACON", tulia:"TULIA", cesoir:"CE SOIR", prohibition:"PROHIBITION" };
