@@ -1,0 +1,111 @@
+name: Refresh week → Labour (7shifts) + Sales (Silverware) → Firestore
+
+on:
+  workflow_dispatch:
+    inputs:
+      week_of:
+        description: "Week Monday (YYYY-MM-DD). Optional; defaults to current week."
+        required: false
+  schedule:
+    - cron: "10 10 * * *"   # 10:10 UTC ≈ 06:10 Toronto
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app_key: beacon
+            # 7shifts (existing secrets)
+            token_secret: BEACON_TOKEN
+            company_id_secret: BEACON_COMPANY_ID
+            location_id_secret: BEACON_LOCATION_ID
+            # Silverware (new secrets)
+            sw_base_secret: SILVERWARE_BASE_BEACON
+            sw_token_secret: SILVERWARE_TOKEN_BEACON
+
+          - app_key: tulia
+            token_secret: TULIA_TOKEN
+            company_id_secret: TULIA_COMPANY_ID
+            location_id_secret: TULIA_LOCATION_ID
+            sw_base_secret: SILVERWARE_BASE_TULIA
+            sw_token_secret: SILVERWARE_TOKEN_TULIA
+
+          - app_key: prohibition
+            token_secret: PROHIBITION_TOKEN
+            company_id_secret: PROHIBITION_COMPANY_ID
+            location_id_secret: PROHIBITION_LOCATION_ID
+            sw_base_secret: SILVERWARE_BASE_PROHIBITION
+            sw_token_secret: SILVERWARE_TOKEN_PROHIBITION
+
+          - app_key: cesoir
+            token_secret: CESOIR_TOKEN
+            company_id_secret: CESOIR_COMPANY_ID
+            location_id_secret: CESOIR_LOCATION_ID
+            sw_base_secret: SILVERWARE_BASE_CESOIR
+            sw_token_secret: SILVERWARE_TOKEN_CESOIR
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install deps
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          # Keep axios for your existing labour script, firebase-admin for Firestore
+          npm i axios firebase-admin
+
+      # -------------------- 7shifts LABOUR (existing) --------------------
+      - name: Run 7shifts labour for ${{ matrix.app_key }}
+        env:
+          FIREBASE_SA_JSON:       ${{ secrets.FIREBASE_SA_JSON }}
+          FIREBASE_PROJECT_ID:    ${{ secrets.FIREBASE_PROJECT_ID }}
+          SEVENSHIFTS_TOKEN:      ${{ secrets[matrix.token_secret] }}
+          COMPANY_ID:             ${{ secrets[matrix.company_id_secret] }}
+          LOCATION_ID:            ${{ secrets[matrix.location_id_secret] }}
+          APP_KEY:                ${{ matrix.app_key }}
+          WEEK_OF:                ${{ github.event.inputs.week_of }}
+        run: node scripts/fetch_7shifts_labour_single.js
+
+      # -------------------- SILVERWARE SALES (new) -----------------------
+      # This step primes env vars so the Silverware script only runs for the current matrix location.
+      - name: Select Silverware env for ${{ matrix.app_key }}
+        env:
+          SELECTED_SW_BASE:  ${{ secrets[matrix.sw_base_secret] }}
+          SELECTED_SW_TOKEN: ${{ secrets[matrix.sw_token_secret] }}
+        run: |
+          case "${{ matrix.app_key }}" in
+            beacon)
+              echo "SILVERWARE_BASE_BEACON=${SELECTED_SW_BASE}"  >> $GITHUB_ENV
+              echo "SILVERWARE_TOKEN_BEACON=${SELECTED_SW_TOKEN}" >> $GITHUB_ENV
+              ;;
+            tulia)
+              echo "SILVERWARE_BASE_TULIA=${SELECTED_SW_BASE}"   >> $GITHUB_ENV
+              echo "SILVERWARE_TOKEN_TULIA=${SELECTED_SW_TOKEN}"  >> $GITHUB_ENV
+              ;;
+            prohibition)
+              echo "SILVERWARE_BASE_PROHIBITION=${SELECTED_SW_BASE}"   >> $GITHUB_ENV
+              echo "SILVERWARE_TOKEN_PROHIBITION=${SELECTED_SW_TOKEN}" >> $GITHUB_ENV
+              ;;
+            cesoir)
+              echo "SILVERWARE_BASE_CESOIR=${SELECTED_SW_BASE}"   >> $GITHUB_ENV
+              echo "SILVERWARE_TOKEN_CESOIR=${SELECTED_SW_TOKEN}" >> $GITHUB_ENV
+              ;;
+          esac
+
+      - name: Run Silverware sales (Food/Voids/Promos) for ${{ matrix.app_key }}
+        # Uses the multi-location script you saved earlier; we only set vars for this location
+        env:
+          # The Silverware script expects FIREBASE_SERVICE_ACCOUNT_JSON
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SA_JSON }}
+          WEEK_OF: ${{ github.event.inputs.week_of }}
+          # Optional tuning (uncomment and adjust as needed)
+          # FOOD_CATEGORY_HINTS: "Food,Kitchen"
+          # SILVERWARE_TZ_OFFSET_MINUTES: "-240"
+        run: node scripts/fetch_silverware_week.mjs
