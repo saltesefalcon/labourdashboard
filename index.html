@@ -523,7 +523,6 @@
       // Render managers
       mgrList.innerHTML = "";
       const mgrs = Array.isArray(s.salaried_mgrs) ? s.salaried_mgrs.slice() : [];
-      // Back-compat: if legacy single number exists, show it as a row
       if ((!mgrs || mgrs.length===0) && isNum(s.salaried_mgmt) && s.salaried_mgmt>0){
         mgrs.push({ name: "Salaried Mgmt", weekly: Number(s.salaried_mgmt) });
       }
@@ -543,7 +542,6 @@
     settingsSave.onclick = async () => {
       settingsMsg.textContent = "Saving…";
       try{
-        // Collect managers
         const rows = Array.from(mgrList.querySelectorAll(".mgr-row"));
         const salaried_mgrs = rows.map(r => {
           const [nameEl, amtEl] = r.children;
@@ -565,7 +563,7 @@
       }
     };
 
-    // Load + Render
+    // -------------- LOAD + RENDER (with safe integrations read) --------------
     async function load(){
       saveMsg.textContent = "";
       const weekISO = weekInput.value;
@@ -575,16 +573,23 @@
       const ovrPath  = `companies/aidan/locations/${locKey}/overrides/${weekISO}`;
       const integPath= `companies/aidan/locations/${locKey}/integrations/${weekISO}`;
 
-      const [baseSnap, ovrSnap, settings, integSnap] = await Promise.all([
+      // These reads should be safe
+      const [baseSnap, ovrSnap, settings] = await Promise.all([
         getDoc(doc(db, basePath)),
         getDoc(doc(db, ovrPath)),
-        loadSettingsFor(locKey),
-        getDoc(doc(db, integPath))
+        loadSettingsFor(locKey)
       ]);
+
+      let integ = null;
+      try {
+        const s = await getDoc(doc(db, integPath));
+        integ = s.exists() ? s.data() : null;
+      } catch (e) {
+        console.warn("Integrations read failed (continuing without it):", e);
+      }
 
       const base = baseSnap.exists()? baseSnap.data(): null;
       const ovr  = ovrSnap.exists()? ovrSnap.data(): {};
-      const integ= integSnap.exists()? integSnap.data(): null;
 
       inFoodSales.value      = ovr.food_sales ?? "";
       inComps.value         = ovr.comps ?? "";
@@ -626,7 +631,6 @@
       const days = data?.days ?? [];
       const SCALE = detectCurrencyScale(days);
 
-      // Raw totals from days
       const t = { projSales:0, actSales:0, projLab:0, actLab:0, projMin:0, actMin:0 };
 
       const tbody = document.querySelector("#dailyTable tbody");
@@ -659,7 +663,7 @@
         tbody.appendChild(tr);
       }
 
-      // Choose effective Actual Sales for week (manual > integration > daily sum)
+      // Effective Actual Sales (manual > integration > day-sum)
       const autoSales = isNum(integ?.sales_7shifts_total) ? integ.sales_7shifts_total
                       : (isNum(integ?.food_sales_total) ? integ.food_sales_total : null);
       const effActSales = pickVal(Number(ovr.food_sales), (autoSales!=null?autoSales:t.actSales));
@@ -672,7 +676,7 @@
       const weekPct   = (adjustedActLab && effActSales) ? adjustedActLab / effActSales : null;
       const weekDelta = (weekPct!=null && target!=null) ? (weekPct - target) : null;
 
-      // Totals (use effective sales in footer & KPIs to match labour %)
+      // Totals & KPIs
       document.getElementById("tProjSales").textContent = fmtMoney(t.projSales);
       document.getElementById("tActSales").textContent  = fmtMoney(effActSales);
       document.getElementById("tProjLabour").textContent= fmtMoney(t.projLab);
@@ -682,7 +686,6 @@
       document.getElementById("tLabourPct").textContent = fmtPct(weekPct);
       document.getElementById("tDelta").innerHTML = `<span class="pill ${weekDelta!=null?(weekDelta<=0?"good":"bad"):""}">${weekDelta!=null? (weekDelta*100).toFixed(1)+" pp":"—"}</span>`;
 
-      // KPIs
       if (kpiProjSales) kpiProjSales.textContent = fmtMoney(t.projSales);
       if (kpiActSales)  kpiActSales.textContent  = fmtMoney(effActSales);
       const projPct = (t.projLab && t.projSales) ? (t.projLab / t.projSales) : null;
@@ -696,7 +699,6 @@
       else if (typeof syncAt === "string") { const dt = new Date(syncAt); syncTxt = isNaN(dt) ? syncAt : dt.toLocaleString(); }
       syncLine.textContent = "Last sync: " + (syncTxt || "—");
 
-      // Sales source line
       let salesSrc = "Days";
       if (isNum(ovr.food_sales) && ovr.food_sales > 0) salesSrc = "Manual override";
       else if (integ?.source_sales) salesSrc = `Auto: ${integ.source_sales}`;
@@ -720,7 +722,7 @@
       pill(srcVoids,  (isNum(ovr.voids)  && ovr.voids>0)  ? "Manual" : (integ?.source_extras ? `Auto: ${integ.source_extras}` : "—"));
       pill(srcPromos, (isNum(ovr.promos) && ovr.promos>0) ? "Manual" : (integ?.source_extras ? `Auto: ${integ.source_extras}` : "—"));
 
-      // Last week & budgets widget (budgets from settings)
+      // Last week & budgets widget
       vwLastWeek.textContent  = fmtMoney(Number(ovr.last_week_sales)||0);
       vwProjSales.textContent = fmtMoney(t.projSales);
 
@@ -729,7 +731,7 @@
       const pLiquor = Number(settings.budget_pct_liquor)||0;
       const pBeer   = Number(settings.budget_pct_beer)||0;
 
-      const bdg = (pct)=> t.projSales * pct;  // already scaled to dollars
+      const bdg = (pct)=> t.projSales * pct;
       bdgFood.textContent   = fmtMoney(bdg(pFood));
       bdgWine.textContent   = fmtMoney(bdg(pWine));
       bdgLiquor.textContent = fmtMoney(bdg(pLiquor));
@@ -765,7 +767,6 @@
         actMin    += d.actual_labor_minutes ?? 0;
       }
 
-      // PDF uses manual food_sales if provided; otherwise the day-sum
       const effActSales = (isNum(ovr.food_sales) && ovr.food_sales>0) ? Number(ovr.food_sales) : actSalesDays;
 
       const salaried = sumSalaried(settings);
