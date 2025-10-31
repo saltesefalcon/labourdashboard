@@ -260,7 +260,7 @@
   <!-- Firebase (modular SDK) -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
-    import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteField } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
     import {
       getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
       setPersistence, browserSessionPersistence
@@ -528,29 +528,39 @@
     };
     addMgrBtn.onclick = () => mgrList.appendChild(mgrRowTemplate());
 
-    settingsSave.onclick = async () => {
-      settingsMsg.textContent = "Saving…";
-      try{
-        const rows = Array.from(mgrList.querySelectorAll(".mgr-row"));
-        const salaried_mgrs = rows.map(r => {
-          const [nameEl, amtEl] = r.children;
-          return { name: (nameEl.value||"").trim(), weekly: num(amtEl.value) };
-        }).filter(m => m.name && isFinite(m.weekly) && m.weekly>=0);
+settingsSave.onclick = async () => {
+  settingsMsg.textContent = "Saving…";
+  try{
+    const rows = Array.from(mgrList.querySelectorAll(".mgr-row"));
+    const salaried_mgrs = rows.map(r => {
+      const [nameEl, amtEl] = r.children;
+      return { name: (nameEl.value||"").trim(), weekly: Number(amtEl.value)||0 };
+    }).filter(m => m.name && m.weekly >= 0);
 
-        await saveSettingsFor(locationSel.value, {
-          salaried_mgrs,
-          remit_pct:     num(setRemitPct.value),
-          budget_pct_food:   num(setPctFood.value),
-          budget_pct_wine:   num(setPctWine.value),
-          budget_pct_liquor: num(setPctLiquor.value),
-          budget_pct_beer:   num(setPctBeer.value)
-        });
-        settingsMsg.textContent = "Saved ✓";
-        await load();
-      }catch(e){
-        settingsMsg.textContent = "Save failed: " + (e.message || e);
-      }
-    };
+    const loc = locationSel.value;
+    const ref = doc(db, getSettingsPath(loc));
+
+    // Save new settings and zero out the legacy field
+    await setDoc(ref, {
+      salaried_mgrs,
+      remit_pct:        num(setRemitPct.value),
+      budget_pct_food:  num(setPctFood.value),
+      budget_pct_wine:  num(setPctWine.value),
+      budget_pct_liquor:num(setPctLiquor.value),
+      budget_pct_beer:  num(setPctBeer.value),
+      salaried_mgmt: 0
+    }, { merge:true });
+
+    // Then delete the legacy field so it can’t repopulate on load
+    try { await updateDoc(ref, { salaried_mgmt: deleteField() }); } catch {}
+
+    settingsMsg.textContent = "Saved ✓";
+    await load();
+  }catch(e){
+    settingsMsg.textContent = "Save failed: " + (e.message || e);
+  }
+};
+
 
     // -------- helpers to compute effective sales for any week (for "Last Week Sales") -----
     function effSalesFrom(base, ovr, integ){
