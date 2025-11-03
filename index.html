@@ -383,12 +383,6 @@ window.addEventListener("error", e => {
         )
       );
     }
-    function sumSalaried(settings){
-      const arr = Array.isArray(settings?.salaried_mgrs) ? settings.salaried_mgrs : [];
-      const fromRows = arr.reduce((a,m)=> a + (Number(m?.weekly)||0), 0);
-      const legacy   = Number(settings?.salaried_mgmt) || 0;
-      return fromRows > 0 ? fromRows : legacy;
-    }
 
     function num(v){ const n=parseFloat(v); return isNaN(n)?0:n; }
     const isNum = v => typeof v === "number" && isFinite(v);
