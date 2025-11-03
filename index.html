@@ -384,6 +384,13 @@ window.addEventListener("error", e => {
       );
     }
 
+    function sumSalaried(settings){
+      const arr = Array.isArray(settings?.salaried_mgrs) ? settings.salaried_mgrs : [];
+      const totalFromArr = arr.reduce((acc, m) => acc + (Number(m?.weekly)||0), 0);
+      const legacy = Number(settings?.salaried_mgmt)||0;
+      return totalFromArr > 0 ? totalFromArr : legacy;
+    }
+    
     function num(v){ const n=parseFloat(v); return isNaN(n)?0:n; }
     const isNum = v => typeof v === "number" && isFinite(v);
     const pickVal = (manual, auto) => (isNum(manual) && manual > 0 ? manual : (isNum(auto) ? auto : 0));
@@ -691,14 +698,7 @@ settingsSave.onclick = async () => {
       };
     }
 
-    function sumSalaried(settings){
-      const arr = Array.isArray(settings?.salaried_mgrs) ? settings.salaried_mgrs : [];
-      const totalFromArr = arr.reduce((acc, m) => acc + (Number(m?.weekly)||0), 0);
-      const legacy = Number(settings?.salaried_mgmt)||0;
-      return totalFromArr > 0 ? totalFromArr : legacy;
-    }
-
-    function render(data, ovr={}, settings={}, integ=null, weekISO, lastWeekSales){
+      function render(data, ovr={}, settings={}, integ=null, weekISO, lastWeekSales){
       const target = data?.target_labour_pct ?? null;
       document.getElementById("targetPill").textContent = target!=null ? fmtPct(target) : "—";
 
