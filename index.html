@@ -293,6 +293,11 @@
       "9aQ5evQ3nbYt0kjw91ruil5Igq52"
     ]);
 
+const on = (el, type, fn) => { if (el) el.addEventListener(type, fn); };
+window.addEventListener("error", e => {
+  if (authMsg) { authMsg.textContent = e.message || String(e); authMsg.style.display = ""; }
+});
+    
     // Elements
     const appEl = document.getElementById("app");
     const gateEl = document.getElementById("authGate");
@@ -486,13 +491,22 @@
     window.addEventListener("beforeunload", () => { if (auth.currentUser) signOut(auth).catch(()=>{}); });
 
     // Auth
-    signinBtn.onclick = () => { gateEl.scrollIntoView({behavior:"smooth",block:"center"}); emailEl.focus(); };
-    signoutBtn.onclick = async () => { await signOut(auth); };
-    doSignin.onclick = async () => {
-      authMsg.style.display="none";
-      try { await signInWithEmailAndPassword(auth, emailEl.value.trim(), passEl.value); emailEl.value=""; passEl.value=""; }
-      catch(e){ authMsg.textContent = e.message || "Sign-in failed"; authMsg.style.display=""; }
-    };
+    on(signinBtn, "click", () => {
+  gateEl.scrollIntoView({behavior:"smooth",block:"center"});
+  emailEl && emailEl.focus();
+});
+    on(signoutBtn, "click", async () => { await signOut(auth); });
+on(doSignin, "click", async () => {
+  if (!emailEl || !passEl) return;
+  authMsg.style.display = "none";
+  try {
+    await signInWithEmailAndPassword(auth, emailEl.value.trim(), passEl.value);
+    emailEl.value = ""; passEl.value = "";
+  } catch (e) {
+    authMsg.textContent = e.message || "Sign-in failed";
+    authMsg.style.display = "";
+  }
+});
 
     let IS_ADMIN = false;
 
