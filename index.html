@@ -378,6 +378,13 @@
         )
       );
     }
+    function sumSalaried(settings){
+      const arr = Array.isArray(settings?.salaried_mgrs) ? settings.salaried_mgrs : [];
+      const fromRows = arr.reduce((a,m)=> a + (Number(m?.weekly)||0), 0);
+      const legacy   = Number(settings?.salaried_mgmt) || 0;
+      return fromRows > 0 ? fromRows : legacy;
+    }
+
     function num(v){ const n=parseFloat(v); return isNaN(n)?0:n; }
     const isNum = v => typeof v === "number" && isFinite(v);
     const pickVal = (manual, auto) => (isNum(manual) && manual > 0 ? manual : (isNum(auto) ? auto : 0));
@@ -727,10 +734,12 @@ settingsSave.onclick = async () => {
                       : (isNum(integ?.food_sales_total) ? integ.food_sales_total : null);
       const effActSales = pickVal(Number(ovr.food_sales), (autoSales!=null?autoSales:t.actSales));
 
-      // Salaried & remit adjustments
-      const salaried = sumSalaried(settings);
-      const remit    = (Number(settings.remit_pct) || 0) * (effActSales || 0);
-      const adjustedActLab = t.actLab + salaried + remit;
+// Salaried & remit adjustments (remit based on GROSS LABOUR, not sales)
+const salaried     = sumSalaried(settings);           // weekly $ from Settings
+const grossLabour  = (t.actLab || 0) + salaried;      // hourly + salaried
+const remit        = (Number(settings.remit_pct) || 0) * grossLabour;
+const adjustedActLab = grossLabour + remit;
+
 
       const weekPct   = (adjustedActLab && effActSales) ? adjustedActLab / effActSales : null;
       const weekDelta = (weekPct!=null && target!=null) ? (weekPct - target) : null;
@@ -827,10 +836,11 @@ settingsSave.onclick = async () => {
       }
 
       const effActSales = (isNum(ovr.food_sales) && ovr.food_sales>0) ? Number(ovr.food_sales) : actSalesDays;
-
-      const salaried = sumSalaried(settings);
-      const remit    = (Number(settings.remit_pct)||0) * (effActSales || 0);
-      const adjActLab = actLab + salaried + remit;
+      
+      const salaried     = sumSalaried(settings);
+      const grossLabour  = (actLab || 0) + salaried;
+      const remit        = (Number(settings.remit_pct)||0) * grossLabour;
+      const adjActLab    = grossLabour + remit;
 
       const target = base?.target_labour_pct ?? null;
       const projPct = (projLab && projSales) ? projLab/projSales : null;
