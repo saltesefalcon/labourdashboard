@@ -30,6 +30,8 @@ function mondayISO(d = new Date()){
 function isoAddDays(iso, days){
   const d = new Date(iso+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+days); return d.toISOString().slice(0,10);
 }
+function round2(n){ return Math.round((n ?? 0) * 100) / 100; }
+function round1pct(n){ return Math.round((n ?? 0) * 10) / 10; }
 
 async function main(){
   const svc = parseServiceAccount();
