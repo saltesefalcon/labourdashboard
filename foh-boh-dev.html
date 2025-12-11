@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Labour Dashboard V2 — FOH / BOH Optimizer (Dev)</title>
+
+  <style>
+    :root{
+      --bg:#0f172a;
+      --panel:#111827;
+      --ink:#e5e7eb;
+      --muted:#9ca3af;
+      --accent:#22c55e;
+      --warn:#ef4444;
+      --brand:#0ea5e9;
+      --line:#1f2937;
+    }
+    html,body{
+      margin:0;
+      padding:0;
+      background:var(--bg);
+      color:var(--ink);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;
+    }
+    .wrap{max-width:1100px;margin:24px auto;padding:16px}
+    h1{font-size:1.6rem;margin:0 0 2px}
+    .sub{color:var(--muted);font-size:.95rem;margin:0 0 18px}
+
+    .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .authbox{display:flex;gap:8px;align-items:center}
+    .avatar{width:28px;height:28px;border-radius:50%;background:#0b1220;border:1px solid var(--line)}
+
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+    .small{font-size:.85rem;color:var(--muted)}
+
+    button,select,input{
+      background:#0b1220;
+      color:var(--ink);
+      border:1px solid var(--line);
+      border-radius:10px;
+      padding:8px 10px;
+      font-size:.95rem;
+    }
+    button.primary{background:var(--brand);border-color:transparent;color:#001827;font-weight:600;cursor:pointer}
+    button[disabled]{opacity:.5;cursor:not-allowed}
+
+    .bar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:12px 0 16px}
+    .controls{display:flex;flex-direction:column;gap:6px}
+    .controls-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+    select,input[type="date"]{min-width:160px}
+
+    .kpis{
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:12px;
+      margin-top:8px;
+    }
+    @media (max-width:900px){
+      .kpis{grid-template-columns:repeat(2,1fr);}
+    }
+    .kpi h3{font-size:.9rem;color:var(--muted);margin:0 0 4px}
+    .kpi .v{font-size:1.5rem;font-weight:600;margin-bottom:2px}
+
+    .pill{
+      display:inline-block;
+      padding:2px 8px;
+      border-radius:999px;
+      background:#0b1220;
+      border:1px solid var(--line);
+      font-size:.8rem;
+      white-space:nowrap;
+    }
+    .pill.good{border-color:#1d3f2a;color:#8fe2a8}
+    .pill.bad{border-color:#4c1f1f;color:#f39a9a}
+    .pill.warn{border-color:#423312;color:#fbbf24}
+
+    .pct-good{color:#22c55e}
+    .pct-warn{color:#f59e0b}
+    .pct-bad{color:#ef4444}
+
+    .footer{margin-top:24px;color:var(--muted);font-size:.85rem}
+
+    /* auth cards */
+    .denied{border:1px solid #4c1f1f;background:#1b1515;max-width:520px;margin:48px auto 0}
+    #authGate{max-width:520px;margin:48px auto 0}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1>Labour Dashboard V2 — FOH / BOH Optimizer (Dev)</h1>
+        <p class="sub">Secure • Sign-in required • Experimental view</p>
+      </div>
+      <div class="authbox">
+        <div id="authStatus" class="small">Not signed in</div>
+        <img class="avatar" id="userAvatar" alt="" hidden />
+        <button id="signinBtn" class="primary">Sign in</button>
+        <button id="signoutBtn" style="display:none">Sign out</button>
+      </div>
+    </div>
+
+    <!-- AUTH GATE -->
+    <div id="authGate" class="card">
+      <h2>Sign in to view data</h2>
+      <div class="small" style="margin-bottom:10px">Use your email and password.</div>
+      <div class="controls-row" style="margin-bottom:10px">
+        <input id="email" type="email" placeholder="Email" autocomplete="username" />
+        <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
+      </div>
+      <div class="controls-row" style="margin-bottom:10px;align-items:center">
+        <button id="doSignin" class="primary">Sign in</button>
+        <span id="authMsg" style="color:#fca5a5;display:none"></span>
+      </div>
+      <div class="small">Same accounts & permissions as the main Labour Dashboard.</div>
+    </div>
+
+    <!-- ACCESS DENIED -->
+    <div id="denied" class="card denied" style="display:none;">
+      <h2>Access denied</h2>
+      <div class="small">Your account is signed in, but not authorized for this dashboard.</div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="app" hidden>
+      <div class="card">
+        <div style="font-weight:600;margin-bottom:4px">FOH / BOH Labour Optimizer (Prototype)</div>
+        <div class="small" style="margin-bottom:10px">
+          This dev page uses your weekly sales & labour totals plus a separate FOH/BOH document in Firestore.
+          It is safe to experiment here without touching the main dashboard.
+        </div>
+
+        <div class="bar">
+          <div class="controls">
+            <label class="small">Location</label>
+            <select id="locationSel">
+              <option value="beacon">Beacon</option>
+              <option value="tulia">Tulia</option>
+              <option value="cesoir">Ce Soir</option>
+              <option value="prohibition">Prohibition</option>
+            </select>
+          </div>
+
+          <div class="controls">
+            <label class="small">Week of (Monday)</label>
+            <div class="controls-row">
+              <input id="weekInput" type="date" />
+              <button id="prevBtn">&#9664;</button>
+              <button id="nextBtn">&#9654;</button>
+            </div>
+          </div>
+
+          <div class="controls">
+            <label class="small">Status</label>
+            <span id="statusLine" class="small">Waiting for sign-in…</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI CARDS -->
+      <div class="kpis">
+        <div class="card kpi">
+          <h3>FOH Labour %</h3>
+          <div class="v" id="fohPctVal">—</div>
+          <div class="small" id="fohCaption">FOH labour ÷ total sales</div>
+        </div>
+
+        <div class="card kpi">
+          <h3>BOH Labour %</h3>
+          <div class="v" id="bohPctVal">—</div>
+          <div class="small" id="bohCaption">BOH labour ÷ total sales</div>
+        </div>
+
+        <div class="card kpi">
+          <h3>Over / Under Target</h3>
+          <div class="v" id="optDeltaVal">—</div>
+          <div class="small" id="optDeltaHelp">Combined vs FOH + BOH targets</div>
+        </div>
+
+        <div class="card kpi">
+          <h3>Hours to Cut (approx)</h3>
+          <div class="v" id="optHoursVal">—</div>
+          <div class="small" id="optHoursHelp">Based on adjusted labour & avg hourly rate</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <div style="font-weight:600;margin-bottom:4px">How this dev view works</div>
+        <ul class="small" style="padding-left:18px;margin:6px 0 0">
+          <li>Reads the same weekly labour data as the main dashboard.</li>
+          <li>Adds salaried management and remittance % from <code>settings/app</code>.</li>
+          <li>Looks for a FOH/BOH doc at
+            <code>companies/aidan/locations/{location}/fohBoh/{weekISO}</code>.</li>
+          <li>That doc should contain numbers like <code>foh_labor</code>, <code>boh_labor</code>,
+            <code>foh_target_pct</code>, <code>boh_target_pct</code> (targets as decimals, e.g. <code>0.18</code>).</li>
+          <li>If the FOH/BOH doc is missing, the cards will show dashes and a hint.</li>
+        </ul>
+      </div>
+
+      <p class="footer">
+        Dev-only page. Safe to change without affecting the main Labour Dashboard or its PDF generator.
+      </p>
+    </div>
+  </div>
+
+  <!-- Firebase (modular SDK) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
+    import {
+      getFirestore, doc, getDoc
+    } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+    import {
+      getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
+      setPersistence, browserSessionPersistence
+    } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+
+    // --- Firebase init (same project as main app) ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyDVULptnW9wPbhH6Qn7ys8RGmLqIxUwuCI",
+      authDomain: "labour-dashboard.firebaseapp.com",
+      projectId: "labour-dashboard",
+      storageBucket: "labour-dashboard.appspot.com",
+      messagingSenderId: "174483804575",
+      appId: "1:174483804575:web:84f6858e812c9705fe6daa"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    setPersistence(auth, browserSessionPersistence).catch(() => {});
+
+    // --- Same access lists as main dashboard ---
+    const ALLOWED_UIDS = new Set([
+      "e0G8FBe3xlYExc3HvSGtIk5Osgw1",
+      "BslFJsAMikSucxwbL8S7qPXcC6r2",
+      "9aQ5evQ3nbYt0kjw91ruil5Igq52"
+    ]);
+
+    // ------------- DOM refs -------------
+    const appEl       = document.getElementById("app");
+    const gateEl      = document.getElementById("authGate");
+    const deniedEl    = document.getElementById("denied");
+
+    const signinBtn   = document.getElementById("signinBtn");
+    const signoutBtn  = document.getElementById("signoutBtn");
+    const authStatus  = document.getElementById("authStatus");
+    const userAvatar  = document.getElementById("userAvatar");
+
+    const emailEl     = document.getElementById("email");
+    const passEl      = document.getElementById("password");
+    const doSignin    = document.getElementById("doSignin");
+    const authMsg     = document.getElementById("authMsg");
+
+    const locationSel = document.getElementById("locationSel");
+    const weekInput   = document.getElementById("weekInput");
+    const prevBtn     = document.getElementById("prevBtn");
+    const nextBtn     = document.getElementById("nextBtn");
+    const statusLine  = document.getElementById("statusLine");
+
+    // FOH / BOH KPI elements
+    const fohPctVal    = document.getElementById("fohPctVal");
+    const bohPctVal    = document.getElementById("bohPctVal");
+    const optDeltaVal  = document.getElementById("optDeltaVal");
+    const optHoursVal  = document.getElementById("optHoursVal");
+    const optDeltaHelp = document.getElementById("optDeltaHelp");
+    const optHoursHelp = document.getElementById("optHoursHelp");
+
+    // ------------- Helpers -------------
+    const fmtMoney = n => (n == null ? "—" :
+      n.toLocaleString(undefined,{style:"currency",currency:"CAD",maximumFractionDigits:0}));
+    const fmtInt   = n => (n == null ? "—" : Math.round(n).toLocaleString());
+    const fmtPct   = n => (n == null ? "—" : (n*100).toFixed(1) + "%");
+
+    function getMondayISO(d=new Date()){
+      const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+      const day=dt.getUTCDay()||7;
+      if(day!==1) dt.setUTCDate(dt.getUTCDate()-(day-1));
+      return dt.toISOString().slice(0,10);
+    }
+    function shiftDays(iso,delta){
+      const d=new Date(iso+"T00:00:00Z");
+      d.setUTCDate(d.getUTCDate()+delta);
+      return d.toISOString().slice(0,10);
+    }
+
+    function detectCurrencyScale(days = []) {
+      for (const d of days) {
+        const a = typeof d?.actual_sales === "number" ? d.actual_sales : null;
+        const p = typeof d?.projected_sales === "number" ? d.projected_sales : null;
+        if ((a != null && a >= 100000) || (p != null && p >= 100000)) return 0.01;
+      }
+      return 1;
+    }
+
+    function sumSalaried(settings){
+      const arr = Array.isArray(settings?.salaried_mgrs) ? settings.salaried_mgrs : [];
+      const totalFromArr = arr.reduce((acc, m) => acc + (Number(m?.weekly)||0), 0);
+      const legacy = Number(settings?.salaried_mgmt)||0;
+      return totalFromArr > 0 ? totalFromArr : legacy;
+    }
+
+    const isNum = v => typeof v === "number" && isFinite(v);
+    function num(v){ const n=parseFloat(v); return isNaN(n)?0:n; }
+    const pickVal = (manual, auto) =>
+      (isNum(manual) && manual > 0 ? manual : (isNum(auto) ? auto : 0));
+
+    function gradePct(p){
+      if (p == null) return null;
+      const x = p * 100;
+      if (x <= 30.7) return "good";
+      if (x <= 31.9) return "warn";
+      return "bad";
+    }
+    function applyPctClass(el, p){
+      if (!el) return;
+      el.classList.remove("pct-good","pct-warn","pct-bad");
+      const g = gradePct(p);
+      if (g==="good") el.classList.add("pct-good");
+      else if (g==="warn") el.classList.add("pct-warn");
+      else if (g==="bad") el.classList.add("pct-bad");
+    }
+
+    // ------------- Idle sign-out (copied from main app, shortened) -------------
+    const IDLE_MS = 7 * 60 * 1000;
+    let idleTimer = null;
+    const activityEvents = ["mousemove","keydown","click","touchstart"];
+
+    function resetIdleTimer(){
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => { signOut(auth).catch(()=>{}); }, IDLE_MS);
+    }
+    function attachIdle(){
+      activityEvents.forEach(ev => window.addEventListener(ev, resetIdleTimer,{passive:true}));
+      resetIdleTimer();
+    }
+    function detachIdle(){
+      activityEvents.forEach(ev => window.removeEventListener(ev, resetIdleTimer));
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = null;
+    }
+    window.addEventListener("beforeunload", () => {
+      if (auth.currentUser) signOut(auth).catch(()=>{});
+    });
+
+    // ------------- Auth wiring -------------
+    signinBtn.addEventListener("click", () => {
+      gateEl.scrollIntoView({behavior:"smooth",block:"center"});
+      if (emailEl) emailEl.focus();
+    });
+    signoutBtn.addEventListener("click", async () => { await signOut(auth); });
+
+    doSignin.addEventListener("click", async () => {
+      if (!emailEl || !passEl) return;
+      authMsg.style.display = "none";
+      try{
+        await signInWithEmailAndPassword(auth, emailEl.value.trim(), passEl.value);
+        emailEl.value = ""; passEl.value = "";
+      }catch(e){
+        authMsg.textContent = e.message || "Sign-in failed";
+        authMsg.style.display = "";
+      }
+    });
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user){
+        detachIdle();
+        authStatus.textContent = "Not signed in";
+        userAvatar.hidden = true;
+        signoutBtn.style.display = "none";
+        signinBtn.style.display = "";
+        gateEl.style.display = "";
+        appEl.hidden = true;
+        deniedEl.style.display = "none";
+        statusLine.textContent = "Waiting for sign-in…";
+        return;
+      }
+
+      attachIdle();
+      authStatus.textContent = user.email || "Signed in";
+      signinBtn.style.display = "none";
+      signoutBtn.style.display = "";
+      gateEl.style.display = "none";
+
+      userAvatar.hidden = !user.photoURL;
+      if (user.photoURL) userAvatar.src = user.photoURL;
+
+      if (!ALLOWED_UIDS.has(user.uid)){
+        appEl.hidden = true;
+        deniedEl.style.display = "";
+        statusLine.textContent = "Signed in but not authorized.";
+        return;
+      }
+
+      deniedEl.style.display = "none";
+      appEl.hidden = false;
+      statusLine.textContent = "Loading week…";
+      await load();
+    });
+
+    // ------------- Week + location controls -------------
+    weekInput.value = getMondayISO(new Date());
+    locationSel.value = "beacon";
+
+    prevBtn.addEventListener("click", () => {
+      weekInput.value = shiftDays(weekInput.value, -7);
+      load();
+    });
+    nextBtn.addEventListener("click", () => {
+      weekInput.value = shiftDays(weekInput.value, +7);
+      load();
+    });
+    locationSel.addEventListener("change", load);
+    weekInput.addEventListener("change", load);
+
+    // ------------- Core load + render -------------
+    async function load(){
+      if (!auth.currentUser || !ALLOWED_UIDS.has(auth.currentUser.uid)) return;
+
+      const weekISO = weekInput.value;
+      const locKey  = locationSel.value;
+
+      statusLine.textContent = `Loading ${locKey} • ${weekISO}…`;
+
+      const basePath   = `companies/aidan/locations/${locKey}/labour/${weekISO}`;
+      const ovrPath    = `companies/aidan/locations/${locKey}/overrides/${weekISO}`;
+      const settingsPath = `companies/aidan/locations/${locKey}/settings/app`;
+      const integPath  = `companies/aidan/locations/${locKey}/integrations/${weekISO}`;
+      const fohBohPath = `companies/aidan/locations/${locKey}/fohBoh/${weekISO}`;
+
+      try{
+        const [baseSnap, ovrSnap, settingsSnap, integSnap, fohBohSnap] = await Promise.all([
+          getDoc(doc(db, basePath)),
+          getDoc(doc(db, ovrPath)),
+          getDoc(doc(db, settingsPath)),
+          getDoc(doc(db, integPath)).catch(()=>null),
+          getDoc(doc(db, fohBohPath)).catch(()=>null)
+        ]);
+
+        const base     = baseSnap.exists()     ? baseSnap.data()     : null;
+        const ovr      = ovrSnap.exists()      ? ovrSnap.data()      : {};
+        const settings = settingsSnap.exists() ? settingsSnap.data() : {};
+        const integ    = integSnap && integSnap.exists() ? integSnap.data() : null;
+        const fohBoh   = fohBohSnap && fohBohSnap.exists() ? fohBohSnap.data() : null;
+
+        renderFohBoh(base, ovr, settings, integ, fohBoh, weekISO, locKey);
+      }catch(e){
+        console.error("Load failed", e);
+        statusLine.textContent = "Error loading data – see console.";
+      }
+    }
+
+    function renderFohBoh(base, ovr, settings, integ, fohBoh, weekISO, locKey){
+      const days = base?.days || [];
+      const SCALE = detectCurrencyScale(days);
+
+      let actSalesFromDays = 0;
+      let actLabFromDays   = 0;
+      let actMinutes       = 0;
+
+      for (const d of days){
+        actSalesFromDays += (d.actual_sales ?? 0) * SCALE;
+        actLabFromDays   += (d.actual_labor_cost ?? 0) * SCALE;
+        actMinutes       += d.actual_labor_minutes ?? 0;
+      }
+
+      // Effective sales: manual override > integration > day-sum
+      const autoSales = isNum(integ?.sales_7shifts_total)
+        ? integ.sales_7shifts_total
+        : (isNum(integ?.food_sales_total) ? integ.food_sales_total : null);
+
+      const effActSales = pickVal(
+        isNum(ovr.food_sales) ? Number(ovr.food_sales) : NaN,
+        autoSales != null ? autoSales : actSalesFromDays
+      );
+
+      // Salaried + remittance
+      const salaried   = sumSalaried(settings);
+      const grossLabour = (actLabFromDays || 0) + salaried;
+      const remitPct    = Number(settings.remit_pct) || 0;
+      const remit       = remitPct * grossLabour;
+      const adjActLab   = grossLabour + remit;
+
+      const weekPct = (effActSales && adjActLab) ? adjActLab / effActSales : null;
+
+      // FOH / BOH doc (dev path)
+      const fohLabor   = fohBoh ? Number(fohBoh.foh_labor)      || 0 : 0;
+      const bohLabor   = fohBoh ? Number(fohBoh.boh_labor)      || 0 : 0;
+      const fohTarget  = fohBoh ? Number(fohBoh.foh_target_pct) || 0.18 : 0.18;
+      const bohTarget  = fohBoh ? Number(fohBoh.boh_target_pct) || 0.23 : 0.23;
+
+      const fohPct = effActSales ? (fohLabor / effActSales) : null;
+      const bohPct = effActSales ? (bohLabor / effActSales) : null;
+
+      const combinedLabour = (fohLabor + bohLabor) || adjActLab;
+      const combinedPct = effActSales ? (combinedLabour / effActSales) : null;
+      const overallTarget = fohTarget + bohTarget;
+      const deltaPts = (combinedPct != null && overallTarget)
+        ? ((combinedPct - overallTarget) * 100)
+        : null;
+
+      const totalHours = actMinutes ? (actMinutes / 60) : null;
+      const avgRate    = (totalHours && adjActLab) ? (adjActLab / totalHours) : null;
+
+      const hoursToCut = (deltaPts != null && deltaPts > 0 && avgRate && effActSales)
+        ? ((deltaPts/100) * effActSales / avgRate)
+        : 0;
+
+      // --- Update UI ---
+      if (!fohBoh){
+        statusLine.textContent =
+          `No FOH/BOH doc yet for ${locKey} • ${weekISO}. Add one at /fohBoh/${weekISO} to see real values.`;
+      }else{
+        statusLine.textContent = `Showing ${locKey} • ${weekISO} (FOH/BOH doc found).`;
+      }
+
+      fohPctVal.textContent = fmtPct(fohPct);
+      bohPctVal.textContent = fmtPct(bohPct);
+      applyPctClass(fohPctVal, fohPct);
+      applyPctClass(bohPctVal, bohPct);
+
+      optDeltaVal.textContent =
+        (deltaPts == null ? "—" : (deltaPts >=0 ? "+" : "") + deltaPts.toFixed(1) + " pts");
+      applyPctClass(optDeltaVal, combinedPct);
+
+      optHoursVal.textContent = hoursToCut ? hoursToCut.toFixed(1) + " h" : "0.0 h";
+
+      optDeltaHelp.textContent =
+        `Combined labour (${fmtPct(combinedPct)}) vs FOH+BOH targets (${fmtPct(overallTarget)})`;
+      optHoursHelp.textContent =
+        avgRate ? `Approximate hours above ideal at ~${fmtMoney(avgRate)}/hr` :
+                  "Set FOH/BOH doc and ensure minutes are present for a better estimate.";
+    }
+  </script>
+</body>
+</html>

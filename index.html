@@ -11,8 +11,8 @@
   .wrap{max-width:1100px;margin:24px auto;padding:16px}
   h1{font-size:1.6rem;margin:0 0 2px}
   .sub{color:var(--muted);font-size:.95rem;margin:0 0 18px}
-  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-  .authbox{display:flex;gap:8px;align-items:center}
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:16px;flex-wrap:wrap}
+  .authbox{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .avatar{width:28px;height:28px;border-radius:50%;background:#0b1220;border:1px solid var(--line)}
   .bar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:12px 0 16px}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
@@ -50,6 +50,42 @@
   .mgr-row{display:grid;grid-template-columns:1fr 140px 36px;gap:8px;align-items:center;margin-bottom:8px}
   .mgr-row input[type="text"]{width:100%}
   .mgr-row input[type="number"]{width:100%}
+
+  /* --- helpers for Target Labour pill placement --- */
+#targetCtrl{ align-self:flex-end; }
+@media (max-width:900px){
+  #targetCtrl{ margin-left:0; }
+}
+
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:700px){.settings-grid{grid-template-columns:1fr}}
+
+/* --- Layout widen + align with Data bar ---------------------------------- */
+
+/* Give the whole page a wider working area */
+.wrap{
+  /* use a responsive clamp so big screens get more room but it still looks tight on smaller ones */
+  max-width: clamp(1100px, 92vw, 1320px);
+}
+
+/* Make KPI row stretch fully across with no intrinsic min-width shrink */
+.kpis{
+  width: 100%;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* Ensure the Daily breakdown card spans full width of the wrap */
+.grid{ width: 100%; }
+.grid > .card{ width: 100%; }
+
+/* Keep the Data bar growing nicely while the other controls stay compact */
+#refreshWrap{
+  flex: 1 1 900px;   /* grow to fill the row */
+}
+
+/* Tiny cosmetic spacing so rows visually align left/right */
+.bar{ gap: 12px; }
+
 </style>
 </head>
 <body>
@@ -65,6 +101,8 @@
         <button id="signinBtn" class="primary">Sign in</button>
         <button id="signoutBtn" style="display:none">Sign out</button>
         <button id="settingsBtn" style="display:none">Settings</button>
+        <!-- This button JUST navigates to foh-boh.html -->
+        <button id="optimizerToggleBtn" style="display:none">FOH / BOH Optimizer</button>
       </div>
     </div>
 
@@ -89,26 +127,32 @@
           <span class="small">Weekly amounts; include only managers affecting this location’s weekly labour.</span>
         </div>
 
-        <div class="row">
-          <label>Remittance % of Gross Labour<br>
-            <input id="setRemitPct" type="number" step="0.0001" placeholder="0.0000">
-          </label>
-        </div>
+<div class="settings-grid" style="margin-top:6px">
+  <label>Remittance % of Gross Labour<br>
+    <input id="setRemitPct" type="number" step="0.0001" placeholder="0.0000">
+  </label>
 
-        <div class="row">
-          <label>Budget % Food<br>
-            <input id="setPctFood" type="number" step="0.01" placeholder="0.00">
-          </label>
-          <label>Budget % Wine<br>
-            <input id="setPctWine" type="number" step="0.01" placeholder="0.00">
-          </label>
-          <label>Budget % Liquor<br>
-            <input id="setPctLiquor" type="number" step="0.01" placeholder="0.00">
-          </label>
-          <label>Budget % Beer<br>
-            <input id="setPctBeer" type="number" step="0.01" placeholder="0.00">
-          </label>
-        </div>
+  <label>Target Labour % (fallback)<br>
+    <input id="setTargetPct" type="number" step="0.0001" placeholder="0.0000">
+  </label>
+
+  <label>Budget % Food<br>
+    <input id="setPctFood" type="number" step="0.01" placeholder="0.00">
+  </label>
+
+  <label>Budget % Wine<br>
+    <input id="setPctWine" type="number" step="0.01" placeholder="0.00">
+  </label>
+
+  <label>Budget % Liquor<br>
+    <input id="setPctLiquor" type="number" step="0.01" placeholder="0.00">
+  </label>
+
+  <label>Budget % Beer<br>
+    <input id="setPctBeer" type="number" step="0.01" placeholder="0.00">
+  </label>
+</div>
+
 
         <div class="row" style="margin-top:10px">
           <button id="settingsSave" class="primary">Save Settings</button>
@@ -138,7 +182,7 @@
       <div class="small">Your account is signed in, but not authorized for this dashboard.</div>
     </div>
 
-    <!-- MAIN APP -->
+    <!-- MAIN APP (Dashboard view only) -->
     <div id="app" hidden>
       <div class="bar">
         <div class="controls card">
@@ -157,22 +201,32 @@
           <button id="prevBtn">◀</button><button id="nextBtn">▶</button>
         </div>
 
-        <div class="controls card" id="refreshWrap" style="min-width:280px">
+        <div class="controls card" id="refreshWrap" style="min-width:320px; flex:1 1 680px">
           <label style="display:block;font-size:.8rem;color:var(--muted);margin-bottom:6px">Data</label>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
-            <button id="refreshBtn" class="primary">Refresh week</button>
-            <button id="pdfBtn">Download PDF (all locations)</button>
-          </div>
+<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px">
+<!-- left group: actions -->
+<div style="display:flex; gap:6px; flex-wrap:wrap">
+  <button id="refreshBtn" class="primary">Refresh week</button>
+  <button id="pdfBtn">Download PDF (all locations)</button>
+
+  <!-- lock controls (admin button + status pill) -->
+  <div id="lockWrap" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center">
+    <button id="lockBtn" title="Freeze this week so totals don’t change">Lock week</button>
+    <span id="lockPill" class="pill">Unfrozen</span>
+  </div>
+</div>
+
+  <!-- right group: target labour -->
+  <div style="margin-left:auto; display:flex; align-items:center; gap:8px">
+    <label class="small">Target Labour %</label>
+    <span id="targetPill" class="pill">—</span>
+  </div>
+</div>
+
           <div class="small" id="refreshMsg"></div>
           <div class="small" id="syncLine" style="margin-top:4px">Last sync: —</div>
           <div class="small" id="sourceLine">Sales: <span id="salesSource">—</span> • Extras: <span id="extrasSource">—</span></div>
         </div>
-
-        <div class="controls card">
-          <label class="small">Target Labour %</label>
-          <span id="targetPill" class="pill">—</span>
-        </div>
-      </div>
 
       <!-- KPIs -->
       <div class="kpis">
@@ -260,7 +314,7 @@
   <!-- Firebase (modular SDK) -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
-    import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteField } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteField, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
     import {
       getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
       setPersistence, browserSessionPersistence
@@ -293,11 +347,32 @@
       "9aQ5evQ3nbYt0kjw91ruil5Igq52"
     ]);
 
-const on = (el, type, fn) => { if (el) el.addEventListener(type, fn); };
-window.addEventListener("error", e => {
-  if (authMsg) { authMsg.textContent = e.message || String(e); authMsg.style.display = ""; }
-});
-    
+    const on = (el, type, fn) => { if (el) el.addEventListener(type, fn); };
+    window.addEventListener("error", e => {
+      if (authMsg) { authMsg.textContent = e.message || String(e); authMsg.style.display = ""; }
+    });
+
+    // --- DEBUG HELPERS (safe to keep) -------------------------------------------
+window._dbg = {
+  async readInteg(locKey, weekISO) {
+    // companies/aidan/locations/{locKey}/integrations/{weekISO}
+    const ref = doc(db, `companies/aidan/locations/${locKey}/integrations/${weekISO}`);
+    const snap = await getDoc(ref);
+    const data = snap.exists() ? snap.data() : null;
+    console.log("[integ]", locKey, weekISO, data);
+    return data;
+  },
+  async readAll(locKey, weekISO) {
+    const base = (await getDoc(doc(db, `companies/aidan/locations/${locKey}/labour/${weekISO}`))).data() || null;
+    const ovr  = (await getDoc(doc(db, `companies/aidan/locations/${locKey}/overrides/${weekISO}`))).data() || null;
+    const integ= (await getDoc(doc(db, `companies/aidan/locations/${locKey}/integrations/${weekISO}`))).data() || null;
+    console.log({ base, ovr, integ });
+    return { base, ovr, integ };
+  }
+};
+// ---------------------------------------------------------------------------
+
+
     // Elements
     const appEl = document.getElementById("app");
     const gateEl = document.getElementById("authGate");
@@ -305,6 +380,7 @@ window.addEventListener("error", e => {
     const signinBtn = document.getElementById("signinBtn");
     const signoutBtn = document.getElementById("signoutBtn");
     const settingsBtn = document.getElementById("settingsBtn");
+    const optimizerBtn = document.getElementById("optimizerToggleBtn");
     const doSignin = document.getElementById("doSignin");
     const emailEl = document.getElementById("email");
     const passEl = document.getElementById("password");
@@ -313,8 +389,12 @@ window.addEventListener("error", e => {
     const userAvatar = document.getElementById("userAvatar");
     const refreshBtn = document.getElementById("refreshBtn");
     const refreshMsg = document.getElementById("refreshMsg");
-    const pdfBtn = document.getElementById("pdfBtn");
-
+    const pdfBtn  = document.getElementById("pdfBtn");
+    const lockWrap = document.getElementById("lockWrap");
+    const lockBtn  = document.getElementById("lockBtn");
+    const lockPill = document.getElementById("lockPill");
+    let CUR_USER   = null;
+    let   FROZEN   = false;
     const locationSel = document.getElementById("locationSel");
     const weekInput = document.getElementById("weekInput");
     const prevBtn = document.getElementById("prevBtn");
@@ -331,6 +411,7 @@ window.addEventListener("error", e => {
     const settingsSave = document.getElementById("settingsSave");
     const settingsMsg = document.getElementById("settingsMsg");
     const setRemitPct = document.getElementById("setRemitPct");
+    const setTargetPct = document.getElementById("setTargetPct");
     const setPctFood = document.getElementById("setPctFood");
     const setPctWine = document.getElementById("setPctWine");
     const setPctLiquor = document.getElementById("setPctLiquor");
@@ -364,6 +445,13 @@ window.addEventListener("error", e => {
     const kpiProjPct   = document.getElementById("kpiProjPct");
     const kpiActPct    = document.getElementById("kpiActPct");
 
+    // FOH/BOH nav button: just go to foh-boh.html
+    if (optimizerBtn) {
+      on(optimizerBtn, "click", () => {
+        window.location.href = "foh-boh.html";
+      });
+    }
+
     // Helpers
     const fmtMoney = n => (n==null? "—" : n.toLocaleString(undefined,{style:"currency",currency:"CAD",maximumFractionDigits:0}));
     const fmtInt   = n => (n==null? "—" : Math.round(n).toLocaleString());
@@ -371,9 +459,9 @@ window.addEventListener("error", e => {
     function getMondayISO(d=new Date()){ const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())); const day=dt.getUTCDay()||7; if(day!==1) dt.setUTCDate(dt.getUTCDate()-(day-1)); return dt.toISOString().slice(0,10); }
     function shiftDays(iso,delta){ const d=new Date(iso+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+delta); return d.toISOString().slice(0,10); }
     function todayISO(){
-    const d = new Date();
-    const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-    return dt.toISOString().slice(0,10);
+      const d = new Date();
+      const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      return dt.toISOString().slice(0,10);
     }
     function hasSunday(days, weekISO){
       const want = shiftDays(weekISO, 6);            // Sunday of that week
@@ -396,6 +484,20 @@ window.addEventListener("error", e => {
     const pickVal = (manual, auto) => (isNum(manual) && manual > 0 ? manual : (isNum(auto) ? auto : 0));
     const pill = (el, txt, g) => { el.textContent = txt || "—"; el.classList.remove("good","bad","warn"); if (g) el.classList.add(g); };
 
+    // Coerce anything numeric-looking to a number; return null if not finite
+const toNum = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+// Prefer a non-zero primary; otherwise use fallback if it exists
+const preferNonZero = (primary, fallback) => {
+  const p = toNum(primary);
+  const f = toNum(fallback);
+  if (p != null && p > 0) return p;
+  if (f != null) return f;
+  return p ?? f ?? null;
+};
+    
     // % colour grading
     function gradePct(p){ if(p==null) return null; const x=p*100; if (x<=30.7) return "good"; if (x<=31.9) return "warn"; return "bad"; }
     function applyPctClass(el, p){
@@ -410,7 +512,7 @@ window.addEventListener("error", e => {
     async function loadSettingsFor(locKey){
       const snap = await getDoc(doc(db, getSettingsPath(locKey)));
       return snap.exists() ? snap.data() : {
-        salaried_mgrs: [], salaried_mgmt: 0, remit_pct: 0,
+        salaried_mgrs: [], salaried_mgmt: 0, remit_pct: 0,target_labour_pct: 0,
         budget_pct_food: 0, budget_pct_wine: 0, budget_pct_liquor: 0, budget_pct_beer: 0
       };
     }
@@ -428,6 +530,94 @@ window.addEventListener("error", e => {
       return 1;
     }
 
+    // ----- lock helpers -----
+function weekEndISO(weekISO){ return shiftDays(weekISO, 6); }
+function isWeekComplete(weekISO){ return todayISO() > weekEndISO(weekISO); }
+
+
+    function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+
+function cutoffForWeek(weekISO){
+  const today = todayISO();
+  const end   = shiftDays(weekISO, 6);
+  if (today < weekISO) return weekISO;   // week not started
+  if (today > end)     return end;       // week finished
+  return today;                          // mid-week → today
+}
+
+function isPastMonth(weekISO){
+  const w = new Date(weekISO + "T00:00:00Z");
+  const t = new Date();
+  const wy = w.getUTCFullYear(), wm = w.getUTCMonth();
+  const ty = t.getUTCFullYear(), tm = t.getUTCMonth();
+  return (wy < ty) || (wy === ty && wm < tm);
+}
+
+function updateFrozenUI(frozen){
+  FROZEN = !!frozen;
+  if (lockPill){
+    lockPill.textContent = FROZEN ? "Frozen" : "Unfrozen";
+    lockPill.classList.remove("good","bad","warn");
+    lockPill.classList.add(FROZEN ? "bad" : "good");
+  }
+  if (lockBtn){
+    lockBtn.textContent = FROZEN ? "Unlock week" : "Lock week";
+  }
+  // when frozen, prevent mutating actions (refresh + manual overrides)
+  if (refreshBtn) refreshBtn.disabled = FROZEN;
+  if (saveBtn)    saveBtn.disabled    = FROZEN;
+  if (inFoodSales) inFoodSales.disabled = FROZEN;
+  if (inVoids)     inVoids.disabled    = FROZEN;
+  if (inPromos)    inPromos.disabled   = FROZEN;
+}
+
+async function toggleLock(){
+  const loc   = locationSel.value;
+  const week  = weekInput.value;
+  try{
+    await setDoc(
+      doc(db, `companies/aidan/locations/${loc}/labour/${week}`),
+      {
+        frozen: !FROZEN,
+        frozen_by_uid:   CUR_USER?.uid   || null,
+        frozen_by_email: CUR_USER?.email || null,
+        frozen_at: serverTimestamp()
+      },
+      { merge:true }
+    );
+    updateFrozenUI(!FROZEN);
+    refreshMsg.textContent = FROZEN ? "Week unlocked." : "Week locked.";
+  }catch(e){
+    refreshMsg.textContent = "Lock toggle failed: " + (e.message || e);
+  }
+}
+
+async function maybeAutoLock(base, weekISO){
+  // Auto-lock any week that’s in a past month and is complete, if not already frozen
+  if (!base?.frozen && isPastMonth(weekISO) && isWeekComplete(weekISO) && IS_ADMIN){
+    const loc = locationSel.value;
+    try{
+      await setDoc(
+        doc(db, `companies/aidan/locations/${loc}/labour/${weekISO}`),
+        { frozen:true, frozen_by_uid: CUR_USER?.uid || null, frozen_at: serverTimestamp() },
+        { merge:true }
+      );
+      updateFrozenUI(true);
+    }catch(_){} // best-effort
+  }else{
+    updateFrozenUI(!!base?.frozen);
+  }
+}
+
+
+function daysElapsedInWeek(weekISO, cutoffISO){
+  const a = Date.parse(weekISO + "T00:00:00Z");
+  const b = Date.parse(cutoffISO + "T00:00:00Z");
+  // inclusive count: Mon..Mon = 1, Mon..Tue = 2, … max 7
+  return clamp(Math.floor((b - a) / 86400000) + 1, 1, 7);
+}
+
+
     // Defaults
     weekInput.value = getMondayISO(new Date());
     locationSel.value = "beacon";
@@ -436,20 +626,33 @@ window.addEventListener("error", e => {
     locationSel.onchange = load;
     weekInput.onchange = load;
 
-    async function refreshWeek(){
-      refreshMsg.textContent = "Dispatching update...";
-      try{
-        const call = httpsCallable(functions, "dispatchFetchWeek");
-        await call({ week_of: weekInput.value, include_sales:true, include_extras:true });
-        refreshMsg.textContent = "Update started. Check again shortly.";
-      }catch(e){
-        refreshMsg.textContent = "Refresh failed: " + (e.message || e);
-      }
-    }
+   async function refreshWeek(){
+  const week_of = weekInput.value;
+  const locKey  = locationSel.value; // beacon | tulia | prohibition | cesoir
+  refreshMsg.textContent = "Dispatching update…";
+
+  try {
+    // 7shifts/weekly pulls
+    const call7  = httpsCallable(functions, "dispatchFetchWeek");
+    // Silverware DailyTotals pulls (use the name you deployed)
+    const callSW = httpsCallable(functions, "dispatchSilverwareDailyTotals");
+
+    await Promise.allSettled([
+      call7({ week_of, include_sales:true, include_extras:true }),
+      callSW({ week_of, locations:[locKey] })
+    ]);
+
+    refreshMsg.textContent = "Update started. Check again shortly.";
+    setTimeout(load, 4000); // re-read once the writers finish
+  } catch (e) {
+    refreshMsg.textContent = "Refresh failed: " + (e.message || e);
+  }
+}
+
     refreshBtn.onclick = refreshWeek;
 
-    async function ensureFreshness(base, integ, weekISO){
-  const guardKey = `autoRefresh:${weekISO}`;
+async function ensureFreshness(base, integ, weekISO, locKey){
+  const guardKey = `autoRefresh:${locKey}:${weekISO}`;
   const lastGuard = Number(localStorage.getItem(guardKey) || 0);
   const now = Date.now();
 
@@ -465,18 +668,23 @@ window.addEventListener("error", e => {
   const STALE_MS = 3 * 60 * 60 * 1000; // 3 hours
   const stale = !lastSync || (now - lastSync) > STALE_MS;
 
-  const weekEndISO = shiftDays(weekISO, 6);       // Sunday for that week
-  const afterSunday = todayISO() > weekEndISO;    // we’re past Sunday
+  // const weekEndISO = shiftDays(weekISO, 6);
+  const endISO = shiftDays(weekISO, 6);
+  const afterSunday = todayISO() > endISO;
   const missingSun = !hasSunday(base?.days || [], weekISO);
 
-  // don’t spam – at most once per 30 min per week
+  // don’t spam – at most once per 30 min per loc/week
   if (((missingSun && afterSunday) || stale) && (now - lastGuard > 30 * 60 * 1000)) {
     try{
       refreshMsg.textContent = "Auto-updating…";
-      const call = httpsCallable(functions, "dispatchFetchWeek");
-      await call({ week_of: weekISO, include_sales:true, include_extras:true });
+      const call7  = httpsCallable(functions, "dispatchFetchWeek");
+      const callSW = httpsCallable(functions, "dispatchSilverwareDailyTotals");
+      await Promise.allSettled([
+        call7({ week_of: weekISO, include_sales:true, include_extras:true }),
+        callSW({ week_of: weekISO, locations:[locKey] })
+      ]);
       localStorage.setItem(guardKey, String(now));
-      setTimeout(load, 4000); // re-read after the function finishes writing
+      setTimeout(load, 4000);
     }catch(_){ /* silent */ }
   }
 }
@@ -489,36 +697,41 @@ window.addEventListener("error", e => {
     function resetIdleTimer(){ if (idleTimer) clearTimeout(idleTimer); idleTimer = setTimeout(() => { signOut(auth).catch(()=>{}); }, IDLE_MS); }
     function attachIdle(){ activityEvents.forEach(ev => window.addEventListener(ev, resetIdleTimer, {passive:true})); document.addEventListener("visibilitychange", () => { if (!document.hidden) resetIdleTimer(); }); resetIdleTimer(); }
     function detachIdle(){ activityEvents.forEach(ev => window.removeEventListener(ev, resetIdleTimer)); if (idleTimer) clearTimeout(idleTimer); idleTimer = null; }
-    window.addEventListener("beforeunload", () => { if (auth.currentUser) signOut(auth).catch(()=>{}); });
+    // NOTE: removed beforeunload sign-out so we can navigate to foh-boh.html without killing the session
 
     // Auth
     on(signinBtn, "click", () => {
-  gateEl.scrollIntoView({behavior:"smooth",block:"center"});
-  emailEl && emailEl.focus();
-});
+      gateEl.scrollIntoView({behavior:"smooth",block:"center"});
+      emailEl && emailEl.focus();
+    });
     on(signoutBtn, "click", async () => { await signOut(auth); });
-on(doSignin, "click", async () => {
-  if (!emailEl || !passEl) return;
-  authMsg.style.display = "none";
-  try {
-    await signInWithEmailAndPassword(auth, emailEl.value.trim(), passEl.value);
-    emailEl.value = ""; passEl.value = "";
-  } catch (e) {
-    authMsg.textContent = e.message || "Sign-in failed";
-    authMsg.style.display = "";
-  }
-});
+    on(doSignin, "click", async () => {
+      if (!emailEl || !passEl) return;
+      authMsg.style.display = "none";
+      try {
+        await signInWithEmailAndPassword(auth, emailEl.value.trim(), passEl.value);
+        emailEl.value = ""; passEl.value = "";
+      } catch (e) {
+        authMsg.textContent = e.message || "Sign-in failed";
+        authMsg.style.display = "";
+      }
+    });
 
     let IS_ADMIN = false;
 
     onAuthStateChanged(auth, async (user) => {
       if (!user) {
+        CUR_USER = null;   
+        if (lockBtn) { lockBtn.style.display = "none";
+        lockBtn.disabled = true; }  
         detachIdle();
+        gateEl.style.display = "";          // show login card again
         authStatus.textContent = "Not signed in";
         userAvatar.hidden = true;
         signoutBtn.style.display = "none";
         signinBtn.style.display = "";
         settingsBtn.style.display = "none";
+        if (optimizerBtn) optimizerBtn.style.display = "none";
         appEl.hidden = true;
         deniedEl.style.display = "none";
         if (refreshBtn) refreshBtn.disabled = true;
@@ -544,22 +757,42 @@ on(doSignin, "click", async () => {
         appEl.hidden = true;
         deniedEl.style.display = "";
         settingsBtn.style.display = "none";
+        if (optimizerBtn) optimizerBtn.style.display = "none";
         if (refreshBtn) refreshBtn.disabled = true;
         if (refreshMsg) refreshMsg.textContent = "Not authorized to refresh.";
         if (pdfBtn) { pdfBtn.disabled = true; pdfBtn.onclick = null; }
         return;
       }
 
-      appEl.hidden = false;
-      deniedEl.style.display = "none";
+// user is signed in AND authorized
+appEl.hidden = false;
+deniedEl.style.display = "none";
 
-      IS_ADMIN = ADMIN_UIDS.has(user.uid);
-      settingsBtn.style.display = IS_ADMIN ? "" : "none";
+// who/role
+IS_ADMIN = ADMIN_UIDS.has(user.uid);
+CUR_USER = { uid: user.uid, email: user.email || "", name: user.displayName || "" };
 
-      if (refreshBtn) { refreshBtn.disabled = false; refreshMsg.textContent = ""; }
-      if (pdfBtn) { pdfBtn.disabled = false; pdfBtn.onclick = downloadPdfAll; }
+// Lock UI — everyone sees the pill; only admins see the button
+if (lockWrap) lockWrap.style.display = "";
+if (lockBtn) {
+  lockBtn.style.display = IS_ADMIN ? "" : "none";
+  lockBtn.disabled = !IS_ADMIN;
+  lockBtn.onclick  = IS_ADMIN ? toggleLock : null;  // requires toggleLock()
+}
 
-      load();
+// Other admin UI
+settingsBtn.style.display = IS_ADMIN ? "" : "none";
+if (optimizerBtn) optimizerBtn.style.display = "";
+
+// Enable actions
+if (refreshBtn) { refreshBtn.disabled = false; refreshMsg.textContent = ""; }
+if (pdfBtn)      { pdfBtn.disabled = false; pdfBtn.onclick = downloadPdfAll; }
+
+// finally render
+load();
+
+
+
     });
 
     // ----- Settings modal: managers list -----
@@ -592,52 +825,54 @@ on(doSignin, "click", async () => {
       setPctWine.value  = s.budget_pct_wine ?? 0;
       setPctLiquor.value= s.budget_pct_liquor ?? 0;
       setPctBeer.value  = s.budget_pct_beer ?? 0;
+      setTargetPct.value = s.target_labour_pct ?? 0;
       settingsMsg.textContent = "";
+      setTargetPct.value = s.target_labour_pct ?? 0;
       settingsModal.style.display = "flex";
     };
     addMgrBtn.onclick = () => mgrList.appendChild(mgrRowTemplate());
 
-settingsSave.onclick = async () => {
-  settingsMsg.textContent = "Saving…";
-  try{
-    const rows = Array.from(mgrList.querySelectorAll(".mgr-row"));
-    const salaried_mgrs = rows.map(r => {
-      const [nameEl, amtEl] = r.children;
-      return { name: (nameEl.value||"").trim(), weekly: Number(amtEl.value)||0 };
-    }).filter(m => m.name && m.weekly >= 0);
+    settingsSave.onclick = async () => {
+      settingsMsg.textContent = "Saving…";
+      try{
+        const rows = Array.from(mgrList.querySelectorAll(".mgr-row"));
+        const salaried_mgrs = rows.map(r => {
+          const [nameEl, amtEl] = r.children;
+          return { name: (nameEl.value||"").trim(), weekly: Number(amtEl.value)||0 };
+        }).filter(m => m.name && m.weekly >= 0);
 
-    const loc = locationSel.value;
-    const ref = doc(db, getSettingsPath(loc));
+        const loc = locationSel.value;
+        const ref = doc(db, getSettingsPath(loc));
 
-    // Save new settings and zero out the legacy field
-    await setDoc(ref, {
-      salaried_mgrs,
-      remit_pct:        num(setRemitPct.value),
-      budget_pct_food:  num(setPctFood.value),
-      budget_pct_wine:  num(setPctWine.value),
-      budget_pct_liquor:num(setPctLiquor.value),
-      budget_pct_beer:  num(setPctBeer.value),
-      salaried_mgmt: 0
-    }, { merge:true });
+        // Save new settings and zero out the legacy field
+        await setDoc(ref, {
+          salaried_mgrs,
+          remit_pct:        num(setRemitPct.value),
+          budget_pct_food:  num(setPctFood.value),
+          budget_pct_wine:  num(setPctWine.value),
+          budget_pct_liquor:num(setPctLiquor.value),
+          budget_pct_beer:  num(setPctBeer.value),
+          target_labour_pct: num(setTargetPct.value),
+          salaried_mgmt: 0
+        }, { merge:true });
 
-    // Then delete the legacy field so it can’t repopulate on load
-    try { await updateDoc(ref, { salaried_mgmt: deleteField() }); } catch {}
+        // Then delete the legacy field so it can’t repopulate on load
+        try { await updateDoc(ref, { salaried_mgmt: deleteField() }); } catch {}
 
-    settingsMsg.textContent = "Saved ✓";
-    await load();
-  }catch(e){
-    settingsMsg.textContent = "Save failed: " + (e.message || e);
-  }
-};
-
+        settingsMsg.textContent = "Saved ✓";
+        await load();
+      }catch(e){
+        settingsMsg.textContent = "Save failed: " + (e.message || e);
+      }
+    };
 
     // -------- helpers to compute effective sales for any week (for "Last Week Sales") -----
     function effSalesFrom(base, ovr, integ){
       const days = base?.days ?? [];
       const SCALE = detectCurrencyScale(days);
       const daySum = days.reduce((a,d)=> a + ((d.actual_sales ?? 0) * SCALE), 0);
-      const autoSales = isNum(integ?.sales_7shifts_total) ? integ.sales_7shifts_total
-                      : (isNum(integ?.food_sales_total) ? integ.food_sales_total : null);
+const autoSales = isNum(integ?.sales_7shifts_total) ? integ.sales_7shifts_total
+                    : (isNum(integ?.total_sales_silverware) ? integ.total_sales_silverware : null);
       return pickVal(Number(ovr?.food_sales), (autoSales!=null?autoSales:daySum));
     }
 
@@ -680,7 +915,7 @@ settingsSave.onclick = async () => {
       inPromos.value    = ovr.promos ?? "";
 
       render(base, ovr, settings, integ, weekISO, lastWeekSales);
-      ensureFreshness(base, integ, weekISO);
+      ensureFreshness(base, integ, weekISO, locKey);
 
       saveBtn.onclick = async () => {
         const newOvr = {
@@ -698,9 +933,13 @@ settingsSave.onclick = async () => {
       };
     }
 
-      function render(data, ovr={}, settings={}, integ=null, weekISO, lastWeekSales){
-      const target = data?.target_labour_pct ?? null;
-      document.getElementById("targetPill").textContent = target!=null ? fmtPct(target) : "—";
+    function render(data, ovr={}, settings={}, integ=null, weekISO, lastWeekSales){
+const weekTarget   = (typeof data?.target_labour_pct === "number") ? data.target_labour_pct : null;
+const fallbackTgt  = (typeof settings?.target_labour_pct === "number" && settings.target_labour_pct > 0) ? settings.target_labour_pct : null;
+const effTarget    = (weekTarget != null ? weekTarget : fallbackTgt);
+
+document.getElementById("targetPill").textContent = (effTarget != null) ? fmtPct(effTarget) : "—";
+
 
       const days = data?.days ?? [];
       const SCALE = detectCurrencyScale(days);
@@ -720,7 +959,8 @@ settingsSave.onclick = async () => {
         const pct = (d.actual_labor_cost && d.actual_sales)
           ? ((d.actual_labor_cost * SCALE) / (d.actual_sales * SCALE))
           : null;
-        const delta = (pct!=null && target!=null) ? (pct - target) : null;
+        const delta = (pct!=null && effTarget!=null) ? (pct - effTarget) : null;
+
 
         const tr = document.createElement("tr");
         tr.innerHTML = `
@@ -738,19 +978,27 @@ settingsSave.onclick = async () => {
       }
 
       // Effective Actual Sales (manual > integration > day-sum)
-      const autoSales = isNum(integ?.sales_7shifts_total) ? integ.sales_7shifts_total
-                      : (isNum(integ?.food_sales_total) ? integ.food_sales_total : null);
+const autoSales = isNum(integ?.sales_7shifts_total) ? integ.sales_7shifts_total
+                    : (isNum(integ?.total_sales_silverware) ? integ.total_sales_silverware : null);
       const effActSales = pickVal(Number(ovr.food_sales), (autoSales!=null?autoSales:t.actSales));
 
-// Salaried & remit adjustments (remit based on GROSS LABOUR, not sales)
-const salaried     = sumSalaried(settings);           // weekly $ from Settings
-const grossLabour  = (t.actLab || 0) + salaried;      // hourly + salaried
-const remit        = (Number(settings.remit_pct) || 0) * grossLabour;
-const adjustedActLab = grossLabour + remit;
+      // Salaried & remit adjustments (remit based on GROSS LABOUR, not sales)
+// Salaried & remit adjustments (prorate salaried to days completed this week)
+const weekCutoffISO  = cutoffForWeek(weekISO);                     // today or Sunday if finished
+const elapsedDays    = daysElapsedInWeek(weekISO, weekCutoffISO);  // 1..7
+const weekComplete   = (weekCutoffISO === shiftDays(weekISO, 6));
+
+const salariedWeek   = sumSalaried(settings);                      // full weekly $ from Settings
+const salariedToDate = salariedWeek * (weekComplete ? 1 : (elapsedDays / 7));
+
+const grossLabourToDate = (t.actLab || 0) + salariedToDate;        // hourly (to-date) + salaried (to-date)
+const remit              = (Number(settings.remit_pct) || 0) * grossLabourToDate;
+const adjustedActLab     = grossLabourToDate + remit;
 
 
       const weekPct   = (adjustedActLab && effActSales) ? adjustedActLab / effActSales : null;
-      const weekDelta = (weekPct!=null && target!=null) ? (weekPct - target) : null;
+      const weekDelta = (weekPct!=null && effTarget!=null) ? (weekPct - effTarget) : null;
+
 
       // Totals & KPIs
       document.getElementById("tProjSales").textContent = fmtMoney(t.projSales);
@@ -783,6 +1031,7 @@ const adjustedActLab = grossLabour + remit;
       salesSource.textContent = salesSrc;
 
       // Extras (manual > integration)
+      console.log("[render integ]", integ);
       const autoVoids  = isNum(integ?.voids_silverware)  ? integ.voids_silverware  : (isNum(integ?.voids)  ? integ.voids  : null);
       const autoPromos = isNum(integ?.promos_silverware) ? integ.promos_silverware : (isNum(integ?.promos) ? integ.promos : null);
       const effVoids  = pickVal(Number(ovr.voids),  autoVoids);
@@ -850,7 +1099,10 @@ const adjustedActLab = grossLabour + remit;
       const remit        = (Number(settings.remit_pct)||0) * grossLabour;
       const adjActLab    = grossLabour + remit;
 
-      const target = base?.target_labour_pct ?? null;
+      const target = isNum(base?.target_labour_pct)
+  ? base.target_labour_pct
+  : (isNum(settings?.target_labour_pct) ? Number(settings.target_labour_pct) : null);
+
       const projPct = (projLab && projSales) ? projLab/projSales : null;
       const actPct  = (adjActLab && effActSales) ? adjActLab/effActSales : null;
       const delta   = (actPct!=null && target!=null) ? (actPct-target) : null;
@@ -970,13 +1222,12 @@ const adjustedActLab = grossLabour + remit;
       </head><body><div class="wrap">
         <div class="title">Labour Dashboard — Week of ${weekISO}</div>
         ${sections}
-      </div></body></html>`
-      );
-w.document.close();
-w.focus();
-w.print();
-} // end downloadPdfAll
-// -------------------- end PDF GENERATOR --------------------
+      </div></body></html>`);
+      w.document.close();
+      w.focus();
+      w.print();
+    } // end downloadPdfAll
+    // -------------------- end PDF GENERATOR --------------------
   </script>
 </body>
 </html>

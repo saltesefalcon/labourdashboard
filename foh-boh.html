@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Labour Dashboard V2 — FOH / BOH Optimizer</title>
+
+  <style>
+    :root{
+      --bg:#0f172a;--panel:#111827;--ink:#e5e7eb;--muted:#9ca3af;
+      --accent:#22c55e;--warn:#f97316;--bad:#ef4444;--brand:#0ea5e9;
+      --line:#1f2937;
+    }
+    html,body{
+      margin:0;padding:0;background:var(--bg);color:var(--ink);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;
+    }
+    .wrap{max-width:1100px;margin:24px auto;padding:16px}
+    h1{font-size:1.6rem;margin:0 0 2px}
+    .sub{color:var(--muted);font-size:.95rem;margin:0 0 18px}
+    .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:12px}
+    .authbox{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .avatar{width:28px;height:28px;border-radius:50%;background:#0b1220;border:1px solid var(--line)}
+    button,select,input{
+      background:#0b1220;color:var(--ink);border:1px solid var(--line);
+      border-radius:999px;padding:8px 12px;font-size:.9rem;
+    }
+    button{cursor:pointer}
+    button.primary{background:var(--brand);border-color:transparent;color:#001827;font-weight:600}
+    .navtabs{display:flex;gap:6px;margin:12px 0}
+    .navtabs button{
+      border-radius:999px;padding:8px 16px;background:#020617;border:1px solid var(--line);
+    }
+    .navtabs button.active{background:var(--brand);color:#001827;border-color:transparent;font-weight:600}
+    .card{
+      background:var(--panel);border:1px solid var(--line);
+      border-radius:14px;padding:14px;
+    }
+    .small{font-size:.85rem;color:var(--muted)}
+    .section-title{margin:4px 0 8px;font-size:1.05rem;color:var(--muted)}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .row > *{flex:1}
+    .filters{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 6px}
+    .pill-toggle{display:inline-flex;border-radius:999px;background:#020617;border:1px solid var(--line);overflow:hidden}
+    .pill-toggle button{
+      border-radius:0;border:none;background:transparent;padding:6px 12px;font-size:.8rem;color:var(--muted);
+    }
+    .pill-toggle button.active{background:var(--brand);color:#001827;font-weight:600}
+    .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:10px}
+    .kpi-card{padding:14px;border-radius:14px;background:#020617;border:1px solid var(--line)}
+    .kpi-title{font-size:.85rem;color:var(--muted);margin-bottom:6px}
+    .kpi-value{font-size:1.6rem;font-weight:600}
+    .kpi-foot{font-size:.8rem;color:var(--muted);margin-top:4px}
+    .kpi-good .kpi-value{color:var(--accent)}
+    .kpi-warn .kpi-value{color:var(--warn)}
+    .kpi-bad  .kpi-value{color:var(--bad)}
+    .footer{margin-top:24px;color:var(--muted);font-size:.85rem}
+    .trend-card{margin-top:14px}
+    @media(max-width:900px){
+      .kpi-grid{grid-template-columns:repeat(2,1fr);}
+    }
+
+    /* Simple messages */
+    #signedOutMsg{max-width:520px;margin:60px auto 0}
+    #denied{max-width:520px;margin:60px auto 0}
+
+    /* Admin edit section */
+    .admin-card{margin-top:20px}
+    .admin-card input[type="number"]{width:100%;border-radius:10px}
+    .admin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px}
+    @media(max-width:900px){ .admin-grid{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1>Labour Dashboard V2</h1>
+        <p class="sub">Secure • Sign-in required</p>
+      </div>
+      <div class="authbox">
+        <div id="authStatus" class="small">Checking sign-in…</div>
+        <img class="avatar" id="userAvatar" alt="" hidden>
+        <button id="backBtn">Main Dashboard</button>
+        <button id="signoutBtn" style="display:none">Sign out</button>
+      </div>
+    </div>
+
+    <!-- View switcher -->
+    <div class="navtabs">
+      <button onclick="window.location.href='index.html'">Main Dashboard</button>
+      <button class="active">FOH / BOH Optimizer</button>
+    </div>
+
+    <!-- Signed-out message -->
+    <div id="signedOutMsg" class="card" style="display:none">
+      <h2>Sign in required</h2>
+      <div class="small" style="margin-bottom:8px">
+        Please sign in from the main Labour Dashboard first. Once you’re signed in,
+        you can return to this page directly.
+      </div>
+      <button class="primary" onclick="window.location.href='index.html'">Go to sign-in</button>
+    </div>
+
+    <!-- Access denied -->
+    <div id="denied" class="card" style="display:none;background:#1b1515;border-color:#4c1f1f">
+      <h2>Access denied</h2>
+      <div class="small">Your account is signed in, but not authorized for this dashboard.</div>
+    </div>
+
+    <!-- APP -->
+    <div id="app" hidden>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+          <div>
+            <div style="font-weight:600;margin-bottom:4px">FOH / BOH Labour Optimizer (Prototype)</div>
+            <div class="small">Uses weekly FOH/BOH data from Firestore (<code>fohBoh</code> collection). Targets and hours to cut are approximate.</div>
+          </div>
+          <div class="small" id="statusMsg"></div>
+        </div>
+
+        <div class="filters">
+          <div class="pill-toggle" id="timeToggle">
+            <button data-tf="day">Day</button>
+            <button data-tf="week" class="active">Week</button>
+            <button data-tf="month">Month</button>
+          </div>
+
+          <div class="row" style="flex:2;min-width:260px">
+            <label class="small" style="display:block">
+              Week of (Monday)
+              <input id="weekInput" type="date" style="width:100%;border-radius:10px;margin-top:4px" />
+            </label>
+          </div>
+
+          <div class="row" style="flex:1;min-width:180px">
+            <label class="small" style="display:block">
+              Store
+              <select id="storeSel" style="width:100%;border-radius:10px;margin-top:4px">
+                <option value="all">All Stores</option>
+                <option value="beacon">Beacon</option>
+                <option value="tulia">Tulia</option>
+                <option value="prohibition">Prohibition</option>
+                <option value="cesoir">Ce Soir</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="kpi-grid">
+        <div id="kpiFoh" class="kpi-card">
+          <div class="kpi-title">FOH Labour %</div>
+          <div class="kpi-value" id="fohPct">—</div>
+          <div class="kpi-foot" id="fohFoot">Sign in to load data</div>
+        </div>
+        <div id="kpiBoh" class="kpi-card">
+          <div class="kpi-title">BOH Labour %</div>
+          <div class="kpi-value" id="bohPct">—</div>
+          <div class="kpi-foot" id="bohFoot">Sign in to load data</div>
+        </div>
+        <div id="kpiDelta" class="kpi-card">
+          <div class="kpi-title">Over / Under Target</div>
+          <div class="kpi-value" id="deltaPct">—</div>
+          <div class="kpi-foot" id="deltaFoot">vs combined FOH+BOH targets</div>
+        </div>
+        <div id="kpiHours" class="kpi-card">
+          <div class="kpi-title">Hours to Cut (approx)</div>
+          <div class="kpi-value" id="hoursCut">—</div>
+          <div class="kpi-foot" id="hoursFoot">Based on blended $/hour</div>
+        </div>
+      </div>
+
+      <div class="card trend-card">
+        <div class="section-title">Trend preview</div>
+        <div class="small">
+          Later we can add a FOH vs BOH labour% trend line here using historical <code>fohBoh</code> docs
+          (e.g. last 8 weeks per store).
+        </div>
+      </div>
+
+      <!-- ADMIN EDIT (only shows for admins) -->
+      <div id="adminCard" class="card admin-card" style="display:none">
+        <div class="section-title">Admin: Edit FOH / BOH for this week & store</div>
+        <div class="small">
+          These values are stored in <code>companies/aidan/locations/{store}/fohBoh/{week_of}</code>.
+          Select a single store (not “All Stores”) to edit.
+        </div>
+
+        <div class="admin-grid">
+          <label class="small">
+            Total sales $
+            <input id="admSales" type="number" step="1" placeholder="0" />
+          </label>
+          <label class="small">
+            FOH wages $
+            <input id="admFoh" type="number" step="1" placeholder="0" />
+          </label>
+          <label class="small">
+            BOH wages $
+            <input id="admBoh" type="number" step="1" placeholder="0" />
+          </label>
+        </div>
+
+        <div class="admin-grid" style="margin-top:8px">
+          <label class="small">
+            FOH target %
+            <input id="admFohTgt" type="number" step="0.0001" placeholder="0.18" />
+          </label>
+          <label class="small">
+            BOH target %
+            <input id="admBohTgt" type="number" step="0.0001" placeholder="0.23" />
+          </label>
+          <div class="small" style="align-self:flex-end">
+            Values are decimals (e.g. <code>0.18</code> for 18%).
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:10px">
+          <button id="admSaveBtn" class="primary" style="flex:2">Save FOH / BOH</button>
+          <button id="admCopyPrevBtn" style="flex:2">Copy previous week</button>
+          <span id="admMsg" class="small" style="flex:3"></span>
+        </div>
+      </div>
+
+      <p class="footer">
+        Data source: Firestore <code>companies/aidan/locations/{location}/fohBoh/{week_of}</code> (weekly totals).
+        Targets and hours are approximations for planning only.
+      </p>
+    </div>
+  </div>
+
+  <!-- Firebase (modular SDK) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
+    import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+    import {
+      getAuth, onAuthStateChanged, signOut,
+      setPersistence, browserSessionPersistence
+    } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js";
+
+    // --- Firebase config ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyDVULptnW9wPbhH6Qn7ys8RGmLqIxUwuCI",
+      authDomain: "labour-dashboard.firebaseapp.com",
+      projectId: "labour-dashboard",
+      storageBucket: "labour-dashboard.appspot.com",
+      messagingSenderId: "174483804575",
+      appId: "1:174483804575:web:84f6858e812c9705fe6daa"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+    const auth = getAuth(app);
+    setPersistence(auth, browserSessionPersistence).catch(()=>{});
+
+    // Allowed / admin UIDs (same as index)
+    const ALLOWED_UIDS = new Set([
+      "e0G8FBe3xlYExc3HvSGtIk5Osgw1",
+      "BslFJsAMikSucxwbL8S7qPXcC6r2",
+      "9aQ5evQ3nbYt0kjw91ruil5Igq52"
+    ]);
+    const ADMIN_UIDS = new Set([
+      "e0G8FBe3xlYExc3HvSGtIk5Osgw1",
+      "BslFJsAMikSucxwbL8S7qPXcC6r2",
+      "9aQ5evQ3nbYt0kjw91ruil5Igq52"
+    ]);
+
+    // --- DOM refs ---
+    const appEl      = document.getElementById("app");
+    const signedOutMsg = document.getElementById("signedOutMsg");
+    const deniedEl   = document.getElementById("denied");
+    const signoutBtn = document.getElementById("signoutBtn");
+    const backBtn    = document.getElementById("backBtn");
+    const authStatus = document.getElementById("authStatus");
+    const userAvatar = document.getElementById("userAvatar");
+
+    const timeToggle = document.getElementById("timeToggle");
+    const weekInput  = document.getElementById("weekInput");
+    const storeSel   = document.getElementById("storeSel");
+    const statusMsg  = document.getElementById("statusMsg");
+
+    const fohPctEl   = document.getElementById("fohPct");
+    const bohPctEl   = document.getElementById("bohPct");
+    const deltaPctEl = document.getElementById("deltaPct");
+    const hoursCutEl = document.getElementById("hoursCut");
+    const fohFootEl  = document.getElementById("fohFoot");
+    const bohFootEl  = document.getElementById("bohFoot");
+    const deltaFootEl= document.getElementById("deltaFoot");
+    const hoursFootEl= document.getElementById("hoursFoot");
+
+    const kpiFoh     = document.getElementById("kpiFoh");
+    const kpiBoh     = document.getElementById("kpiBoh");
+    const kpiDelta   = document.getElementById("kpiDelta");
+    const kpiHours   = document.getElementById("kpiHours");
+
+    // Admin UI
+    const adminCard    = document.getElementById("adminCard");
+    const admSales     = document.getElementById("admSales");
+    const admFoh       = document.getElementById("admFoh");
+    const admBoh       = document.getElementById("admBoh");
+    const admFohTgt    = document.getElementById("admFohTgt");
+    const admBohTgt    = document.getElementById("admBohTgt");
+    const admSaveBtn   = document.getElementById("admSaveBtn");
+    const admCopyPrevBtn = document.getElementById("admCopyPrevBtn");
+    const admMsg       = document.getElementById("admMsg");
+
+    // --- helpers ---
+    const fmtPct   = n => (n==null || !isFinite(n) ? "—" : (n*100).toFixed(1) + "%");
+    const fmtPts   = n => (n==null || !isFinite(n) ? "—" : (n>=0? "+" : "") + n.toFixed(1) + " pts");
+    const fmtHours = n => (n==null || !isFinite(n) ? "—" : n.toFixed(1) + " h");
+
+    function getMondayISO(d=new Date()){
+      const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+      const day=dt.getUTCDay()||7;
+      if(day!==1) dt.setUTCDate(dt.getUTCDate()-(day-1));
+      return dt.toISOString().slice(0,10);
+    }
+
+    function shiftDays(iso,delta){
+      const d=new Date(iso+"T00:00:00Z");
+      d.setUTCDate(d.getUTCDate()+delta);
+      return d.toISOString().slice(0,10);
+    }
+
+    function clearKpis(msg="No data"){
+      [kpiFoh,kpiBoh,kpiDelta,kpiHours].forEach(el=>{
+        el.classList.remove("kpi-good","kpi-warn","kpi-bad");
+      });
+      fohPctEl.textContent   = "—";
+      bohPctEl.textContent   = "—";
+      deltaPctEl.textContent = "—";
+      hoursCutEl.textContent = "—";
+      fohFootEl.textContent  = msg;
+      bohFootEl.textContent  = msg;
+      deltaFootEl.textContent= "vs combined FOH+BOH targets";
+      hoursFootEl.textContent= "Based on blended $/hour";
+    }
+
+    function gradePct(p){
+      if (p == null || !isFinite(p)) return null;
+      const x = p*100;
+      if (x <= 30.7) return "good";
+      if (x <= 31.9) return "warn";
+      return "bad";
+    }
+    function applyGrade(el, pct){
+      el.classList.remove("kpi-good","kpi-warn","kpi-bad");
+      const g = gradePct(pct);
+      if (!g) return;
+      if (g==="good") el.classList.add("kpi-good");
+      else if (g==="warn") el.classList.add("kpi-warn");
+      else if (g==="bad") el.classList.add("kpi-bad");
+    }
+
+    const LOC_KEYS = ["beacon","tulia","prohibition","cesoir"];
+
+    async function readFohBohFor(locKey, weekISO){
+      const ref = doc(db, `companies/aidan/locations/${locKey}/fohBoh/${weekISO}`);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return null;
+      const d = snap.data();
+      return {
+        locKey,
+        sales:  Number(d.total_sales)||0,
+        foh:    Number(d.foh_wages)||0,
+        boh:    Number(d.boh_wages)||0,
+        tgtFoh: Number(d.foh_target_pct)||0,
+        tgtBoh: Number(d.boh_target_pct)||0
+      };
+    }
+
+    async function loadOptimizer(){
+      if (appEl.hidden) return;
+      const tfBtn = timeToggle.querySelector("button.active");
+      const tf = tfBtn ? tfBtn.dataset.tf : "week";
+      const weekISO = weekInput.value || getMondayISO(new Date());
+      const store = storeSel.value;
+
+      if (tf !== "week"){
+        clearKpis("Only Week mode currently supported");
+        statusMsg.textContent = "Only Week view is implemented right now.";
+        return;
+      }
+
+      clearKpis("Loading…");
+      statusMsg.textContent = "Loading FOH/BOH data…";
+
+      try{
+        let docs = [];
+        if (store === "all"){
+          docs = (await Promise.all(LOC_KEYS.map(l=>readFohBohFor(l, weekISO)))).filter(Boolean);
+        } else {
+          const single = await readFohBohFor(store, weekISO);
+          if (single) docs = [single];
+        }
+
+        if (!docs.length){
+          clearKpis("No FOH/BOH data found for this week");
+          statusMsg.textContent = "No data in fohBoh for selected week/store.";
+          // Clear admin fields if no doc
+          admSales.value = "";
+          admFoh.value   = "";
+          admBoh.value   = "";
+          admFohTgt.value= "";
+          admBohTgt.value= "";
+          return;
+        }
+
+        let totalSales = 0, totalFoh = 0, totalBoh = 0;
+        let wTgtFoh = 0, wTgtBoh = 0;
+        for (const d of docs){
+          totalSales += d.sales;
+          totalFoh   += d.foh;
+          totalBoh   += d.boh;
+          wTgtFoh    += d.tgtFoh * d.sales;
+          wTgtBoh    += d.tgtBoh * d.sales;
+        }
+        if (totalSales <= 0){
+          clearKpis("Total sales is zero or missing");
+          statusMsg.textContent = "Total sales is zero; cannot compute labour %.";
+          return;
+        }
+
+        const fohPct = totalFoh / totalSales;
+        const bohPct = totalBoh / totalSales;
+        const tgtFoh = wTgtFoh / totalSales;
+        const tgtBoh = wTgtBoh / totalSales;
+
+        const actualTotal = fohPct + bohPct;
+        const targetTotal = tgtFoh + tgtBoh;
+        const delta = actualTotal - targetTotal;
+
+        const BLENDED_RATE = 20;
+        let hours = 0;
+        if (delta > 0){
+          const extraDollars = delta * totalSales;
+          hours = extraDollars / BLENDED_RATE;
+        }
+
+        fohPctEl.textContent   = fmtPct(fohPct);
+        bohPctEl.textContent   = fmtPct(bohPct);
+        // delta is a fraction; convert to percentage points
+        deltaPctEl.textContent = fmtPts(delta * 100);
+        hoursCutEl.textContent = fmtHours(hours);
+
+        fohFootEl.textContent  =
+          `FOH wages ${totalFoh.toLocaleString("en-CA",{style:"currency",currency:"CAD",maximumFractionDigits:0})} / sales ${totalSales.toLocaleString("en-CA",{style:"currency",currency:"CAD",maximumFractionDigits:0})}`;
+        bohFootEl.textContent  =
+          `BOH wages ${totalBoh.toLocaleString("en-CA",{style:"currency",currency:"CAD",maximumFractionDigits:0})} / sales ${totalSales.toLocaleString("en-CA",{style:"currency",currency:"CAD",maximumFractionDigits:0})}`;
+        deltaFootEl.textContent= `Actual ${fmtPct(actualTotal)} vs target ${fmtPct(targetTotal)}`;
+        hoursFootEl.textContent= `Approx extra $ / ${BLENDED_RATE.toFixed(0)} $/hr`;
+
+        applyGrade(kpiFoh, fohPct);
+        applyGrade(kpiBoh, bohPct);
+        applyGrade(kpiDelta, actualTotal);
+        applyGrade(kpiHours, actualTotal);
+
+        const storeLabel = store === "all" ? "All Stores" : docs[0].locKey.toUpperCase();
+        statusMsg.textContent = `Loaded ${storeLabel} • Week of ${weekISO}`;
+
+        // If admin & a single store is selected, hydrate admin editor with that doc
+        if (adminCard.style.display !== "none" && store !== "all") {
+          const d = docs[0];
+          admSales.value  = d.sales || "";
+          admFoh.value    = d.foh   || "";
+          admBoh.value    = d.boh   || "";
+          admFohTgt.value = d.tgtFoh || "";
+          admBohTgt.value = d.tgtBoh || "";
+        }
+
+      }catch(e){
+        console.error(e);
+        clearKpis("Error loading data");
+        statusMsg.textContent = "Error loading FOH/BOH data: " + (e.message || e);
+      }
+    }
+
+    // --- Admin Save handler ---
+    async function saveFohBoh(){
+      admMsg.textContent = "";
+      const store = storeSel.value;
+      const weekISO = weekInput.value || getMondayISO(new Date());
+
+      if (store === "all"){
+        admMsg.textContent = "Select a single store (not All Stores) before saving.";
+        return;
+      }
+
+      const total_sales   = Number(admSales.value)  || 0;
+      const foh_wages     = Number(admFoh.value)    || 0;
+      const boh_wages     = Number(admBoh.value)    || 0;
+      const foh_target_pct= Number(admFohTgt.value) || 0;
+      const boh_target_pct= Number(admBohTgt.value) || 0;
+
+      try{
+        const ref = doc(db, `companies/aidan/locations/${store}/fohBoh/${weekISO}`);
+        await setDoc(ref, {
+          total_sales,
+          foh_wages,
+          boh_wages,
+          foh_target_pct,
+          boh_target_pct,
+          week_of: weekISO
+        }, { merge:true });
+
+        admMsg.textContent = "Saved ✓";
+        await loadOptimizer();
+      }catch(e){
+        console.error(e);
+        admMsg.textContent = "Save failed: " + (e.code || e.message || e);
+      }
+    }
+
+    // --- Admin: Copy previous week into form (does NOT save) ---
+    async function copyPreviousWeek(){
+      admMsg.textContent = "";
+      const store = storeSel.value;
+      const weekISO = weekInput.value || getMondayISO(new Date());
+
+      if (store === "all"){
+        admMsg.textContent = "Select a single store (not All Stores) before copying.";
+        return;
+      }
+
+      const prevISO = shiftDays(weekISO, -7);
+
+      try{
+        const ref = doc(db, `companies/aidan/locations/${store}/fohBoh/${prevISO}`);
+        const snap = await getDoc(ref);
+        if (!snap.exists()){
+          admMsg.textContent = `No FOH/BOH doc found for previous week (${prevISO}).`;
+          return;
+        }
+        const d = snap.data();
+        admSales.value  = d.total_sales ?? "";
+        admFoh.value    = d.foh_wages ?? "";
+        admBoh.value    = d.boh_wages ?? "";
+        admFohTgt.value = d.foh_target_pct ?? "";
+        admBohTgt.value = d.boh_target_pct ?? "";
+        admMsg.textContent = `Loaded values from previous week (${prevISO}). Click Save to store them for ${weekISO}.`;
+      }catch(e){
+        console.error(e);
+        admMsg.textContent = "Copy failed: " + (e.code || e.message || e);
+      }
+    }
+
+    // --- Auth wiring ---
+    backBtn.addEventListener("click", () => {
+      window.location.href = "index.html";
+    });
+    signoutBtn.addEventListener("click", async () => {
+      await signOut(auth).catch(()=>{});
+      window.location.href = "index.html";
+    });
+
+    onAuthStateChanged(auth, user => {
+      if (!user){
+        authStatus.textContent = "Not signed in";
+        userAvatar.hidden = true;
+        signoutBtn.style.display = "none";
+        appEl.hidden = true;
+        deniedEl.style.display = "none";
+        signedOutMsg.style.display = "";
+        clearKpis("Sign in to load data");
+        return;
+      }
+
+      authStatus.textContent = user.email || "Signed in";
+      signoutBtn.style.display = "";
+      signedOutMsg.style.display = "none";
+      userAvatar.hidden = !user.photoURL;
+      if (user.photoURL) userAvatar.src = user.photoURL;
+
+      if (!ALLOWED_UIDS.has(user.uid)){
+        appEl.hidden = true;
+        deniedEl.style.display = "";
+        clearKpis("Not authorized");
+        return;
+      }
+
+      // Allowed
+      deniedEl.style.display = "none";
+      appEl.hidden = false;
+
+      const isAdmin = ADMIN_UIDS.has(user.uid);
+      adminCard.style.display = isAdmin ? "" : "none";
+
+      if (isAdmin){
+        admSaveBtn.onclick = saveFohBoh;
+        admCopyPrevBtn.onclick = copyPreviousWeek;
+      }
+
+      // init week input and wire up controls
+      weekInput.value = getMondayISO(new Date());
+      weekInput.addEventListener("change", loadOptimizer);
+      storeSel.addEventListener("change", loadOptimizer);
+      timeToggle.addEventListener("click", (e)=>{
+        const btn = e.target.closest("button");
+        if (!btn) return;
+        [...timeToggle.querySelectorAll("button")].forEach(b=>b.classList.remove("active"));
+        btn.classList.add("active");
+        const tf = btn.dataset.tf;
+        if (tf !== "week"){
+          statusMsg.textContent = "Only Week view is implemented right now. Using weekly totals.";
+        } else {
+          statusMsg.textContent = "";
+        }
+        loadOptimizer();
+      });
+
+      loadOptimizer(); // initial
+    });
+  </script>
+</body>
+</html>
+

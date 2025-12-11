@@ -1,0 +1,13 @@
+# Node + dependencies
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Env / secrets
+.env
+FIREBASE_SA.json
+service-account.labour-dashboard.json
+
+# OS cruft
+.DS_Store
+Thumbs.db
