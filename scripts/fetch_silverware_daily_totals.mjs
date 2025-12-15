@@ -82,24 +82,36 @@ const db = admin.firestore();
 // ---------- env mapping per location ----------
 function envFor(loc) {
   const key = loc.toUpperCase(); // BEACON / TULIA / CESOIR / PROHIBITION
-  // Allow a forgiving fallback for CESOIR in case of different casing that existed earlier
-  const base = process.env[`SILVERWARE_BASE_${key}`] ?? (loc === "cesoir" ? process.env.SILVERWARE_BASE_CESOIR : undefined);
-  const token = process.env[`SILVERWARE_TOKEN_${key}`] ?? (loc === "cesoir" ? process.env.SILVERWARE_TOKEN_CESOIR : undefined);
+  let base = process.env[`SILVERWARE_BASE_${key}`];
+  let token = process.env[`SILVERWARE_TOKEN_${key}`];
+
+  if (loc === "cesoir") {
+    base  = base  ?? process.env.SILVERWARE_BASE_CESOIR ?? process.env.SILVERWARE_BASE_CESOR;
+    token = token ?? process.env.SILVERWARE_TOKEN_CESOIR ?? process.env.SILVERWARE_TOKEN_CESOR;
+  }
   return { base, token };
 }
 
 // ---------- Silverware fetch ----------
 async function postDailyTotals(base, token, bizFrom, bizTo) {
   const endpoint = `${base}/api/ThirdParty/DailyTotals`;
+  const body = { BusinessDateFrom: bizFrom, BusinessDateTo: bizTo };
+
   const res = await fetch(endpoint, {
     method: "POST",
     headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ BusinessDateFrom: bizFrom, BusinessDateTo: bizTo })
+    body: JSON.stringify(body),
   });
+
   const txt = await res.text();
-  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}: ${txt.slice(0,200)}`);
+  if (!res.ok) {
+    throw new Error(
+      `HTTP ${res.status} ${res.statusText} @ ${endpoint} body=${JSON.stringify(body)}: ${txt.slice(0,200)}`
+    );
+  }
   try { return JSON.parse(txt); } catch { return txt; }
 }
+
 
 function toArrayDays(payload) {
   if (Array.isArray(payload)) return payload;
@@ -159,15 +171,10 @@ function integDocPath(locKey, weekISO) {
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 const payload = {
-  // NEW: total net sales (all categories)
   total_sales_silverware: round2(sums.totalNet),
-
-  // existing fields
-  food_sales_total:  round2(sums.food),
-  promos_silverware: round2(sums.promos),
-  voids_silverware:  round2(sums.voids),
-
-  // clarify that sales source is TOTALS, not food-only
+  food_sales_total:       round2(sums.food),
+  promos_silverware:      round2(sums.promos),
+  voids_silverware:       round2(sums.voids),
   source_sales:  "Silverware DailyTotals (Total)",
   source_extras: "Silverware DailyTotals",
   synced_at: admin.firestore.FieldValue.serverTimestamp(),
