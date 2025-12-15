@@ -126,6 +126,13 @@
           <button id="addMgrBtn">+ Add Manager</button>
           <span class="small">Weekly amounts; include only managers affecting this location’s weekly labour.</span>
         </div>
+<!-- Salary periods (beta) -->
+<div style="margin:14px 0 6px;font-weight:600">Salary Periods (beta)</div>
+<div id="periodList"></div>
+<div class="row" style="align-items:center;margin-bottom:12px">
+  <button id="addPeriodBtn">+ Add Period</button>
+  <span class="small">Each row = name, weekly $, start date, end date (leave end blank for ongoing).</span>
+</div>
 
 <div class="settings-grid" style="margin-top:6px">
   <label>Remittance % of Gross Labour<br>
@@ -338,13 +345,17 @@
 
     const ALLOWED_UIDS = new Set([
       "e0G8FBe3xlYExc3HvSGtIk5Osgw1",
-      "BslFJsAMikSucxwbL8S7qPXcC6r2",
-      "9aQ5evQ3nbYt0kjw91ruil5Igq52"
+          "BslFJsAMikSucxwbL8S7qPXcC6r2",
+          "nW1IbxeaZJT0hAoORZhDtgOlAdd2",
+          "zbpmXxrpweXQzf7Z7JMx8kUblQi1",
+          "9aQ5evQ3nbYt0kjw91ruil5Igq52"
     ]);
     const ADMIN_UIDS = new Set([
       "e0G8FBe3xlYExc3HvSGtIk5Osgw1",
-      "BslFJsAMikSucxwbL8S7qPXcC6r2",
-      "9aQ5evQ3nbYt0kjw91ruil5Igq52"
+          "BslFJsAMikSucxwbL8S7qPXcC6r2",
+          "nW1IbxeaZJT0hAoORZhDtgOlAdd2",
+          "zbpmXxrpweXQzf7Z7JMx8kUblQi1",
+          "9aQ5evQ3nbYt0kjw91ruil5Igq52"
     ]);
 
     const on = (el, type, fn) => { if (el) el.addEventListener(type, fn); };
@@ -418,6 +429,9 @@ window._dbg = {
     const setPctBeer = document.getElementById("setPctBeer");
     const mgrList = document.getElementById("mgrList");
     const addMgrBtn = document.getElementById("addMgrBtn");
+    const periodList = document.getElementById("periodList");
+const addPeriodBtn = document.getElementById("addPeriodBtn");
+
 
     // Weekly overrides (editable here)
     const inFoodSales = document.getElementById("inFoodSales");
@@ -471,13 +485,115 @@ window._dbg = {
         )
       );
     }
+    function parseISODate(iso){ return new Date(iso + "T00:00:00Z"); }
+function dayDiff(aISO, bISO){ return Math.floor((parseISODate(bISO) - parseISODate(aISO))/86400000); }
+function isoMin(aISO, bISO){ return (aISO <= bISO) ? aISO : bISO; }
+function isoMax(aISO, bISO){ return (aISO >= bISO) ? aISO : bISO; }
 
-    function sumSalaried(settings){
-      const arr = Array.isArray(settings?.salaried_mgrs) ? settings.salaried_mgrs : [];
-      const totalFromArr = arr.reduce((acc, m) => acc + (Number(m?.weekly)||0), 0);
-      const legacy = Number(settings?.salaried_mgmt)||0;
-      return totalFromArr > 0 ? totalFromArr : legacy;
+// inclusive overlap (returns 0..7)
+function overlapDaysInWeek(aStartISO, aEndISO, weekStartISO, weekEndISO){
+  // treat null end as far future
+  const aEnd = aEndISO && aEndISO !== "" ? aEndISO : "9999-12-31";
+  const start = isoMax(aStartISO, weekStartISO);
+  const end   = isoMin(aEnd, weekEndISO);
+  const days  = dayDiff(start, end) + 1; // inclusive
+  return Math.max(0, Math.min(7, days));
+}
+
+// Compute salaried dollars for (a) full week and (b) to-date in the week (cutoff)
+function salaryFromPeriods(periods=[], weekISO, cutoffISO){
+  if (!Array.isArray(periods) || periods.length===0) return null;
+  const weekStart = weekISO;
+  const weekEnd   = shiftDays(weekISO, 6);
+  const cutoff    = isoMin(cutoffISO || weekEnd, weekEnd);
+
+  let fullWeek = 0;
+  let toDate   = 0;
+
+  for (const p of periods){
+    const w = Number(p?.weekly) || 0;
+    const s = (p?.start || "").trim();
+    if (!w || !s) continue;
+    const e = (p?.end || null);
+
+    // overlap for whole week
+    const dFull = overlapDaysInWeek(s, e, weekStart, weekEnd);
+    if (dFull > 0) fullWeek += w * (dFull / 7);
+
+    // overlap up to cutoff (today or Sunday, whichever is earlier)
+    const dTo   = overlapDaysInWeek(s, e, weekStart, cutoff);
+    if (dTo > 0) toDate += w * (dTo / 7);
+  }
+  // round to cents
+  const r2 = n => Math.round(n * 100) / 100;
+  return { fullWeek: r2(fullWeek), toDate: r2(toDate) };
+}
+
+
+// ----- Salaried management: period-aware helpers -----
+// Data model (preferred):
+// settings.mgr_salary_periods = [
+//   { name: "Alice", periods: [
+//       { start:"2025-01-01", weekly:1200 },                  // open-ended
+//       { start:"2025-05-15", weekly:1400 },                  // raise (from this date)
+//       { start:"2025-10-01", weekly:1400, end:"2025-12-31"}  // termination (closed period)
+//   ]}
+// ]
+//
+// Back-compat fallback (no periods configured):
+// settings.salaried_mgrs = [{ name:"Alice", weekly:1200 }, ...]
+//
+const FAR_FUTURE = "9999-12-31";
+
+function getMgrPeriods(settings){
+  const advanced = Array.isArray(settings?.mgr_salary_periods) ? settings.mgr_salary_periods : null;
+  if (advanced && advanced.length) return advanced;
+
+  // fallback: map existing weekly-only list to one open-ended period
+  const legacyList = Array.isArray(settings?.salaried_mgrs) ? settings.salaried_mgrs : [];
+  return legacyList.map(m => ({
+    name: m?.name || "",
+    periods: [{ start: "1970-01-01", weekly: Number(m?.weekly)||0 }]
+  }));
+}
+
+function overlapDaysInRange(startISO, endISO, rangeStartISO, rangeEndISO){
+  const s = (startISO && startISO > rangeStartISO) ? startISO : rangeStartISO;
+  const e = (endISO   && endISO   < rangeEndISO)   ? endISO   : rangeEndISO;
+  if (e < s) return 0;
+  const A = Date.parse(s+"T00:00:00Z");
+  const B = Date.parse(e+"T00:00:00Z");
+  return Math.floor((B - A) / 86400000) + 1; // inclusive days
+}
+
+function sumSalariedFullWeek(settings, weekISO){
+  const wkStart = weekISO;
+  const wkEnd   = shiftDays(weekISO, 6);
+  const list = getMgrPeriods(settings);
+  let total = 0;
+  for (const mgr of list){
+    const periods = Array.isArray(mgr?.periods) ? mgr.periods : [];
+    for (const p of periods){
+      const days = overlapDaysInRange(p.start, p.end || FAR_FUTURE, wkStart, wkEnd);
+      if (days>0) total += (Number(p.weekly)||0) * (days/7);
     }
+  }
+  return total;
+}
+
+function sumSalariedToDate(settings, weekISO, cutoffISO){
+  const wkStart = weekISO;
+  const list = getMgrPeriods(settings);
+  let total = 0;
+  for (const mgr of list){
+    const periods = Array.isArray(mgr?.periods) ? mgr.periods : [];
+    for (const p of periods){
+      const days = overlapDaysInRange(p.start, p.end || FAR_FUTURE, wkStart, cutoffISO);
+      if (days>0) total += (Number(p.weekly)||0) * (days/7);
+    }
+  }
+  return total;
+}
     
     function num(v){ const n=parseFloat(v); return isNaN(n)?0:n; }
     const isNum = v => typeof v === "number" && isFinite(v);
@@ -820,6 +936,19 @@ load();
       if (!mgrs || mgrs.length===0) mgrs.push({name:"", weekly:""});
       mgrs.forEach(m => mgrList.appendChild(mgrRowTemplate(m.name||"", m.weekly??"")));
 
+      // Render salary periods (beta)
+periodList.innerHTML = "";
+const ps = Array.isArray(s.mgr_salary_periods) ? s.mgr_salary_periods : [];
+if (ps.length === 0) {
+  periodList.appendChild(periodRowTemplate("", "", "", ""));
+} else {
+  ps.forEach(p => {
+    periodList.appendChild(periodRowTemplate(p.name||"", p.weekly??"", p.start||"", p.end||""));
+  });
+}
+addPeriodBtn.onclick = () => periodList.appendChild(periodRowTemplate());
+
+
       setRemitPct.value = s.remit_pct ?? 0;
       setPctFood.value  = s.budget_pct_food ?? 0;
       setPctWine.value  = s.budget_pct_wine ?? 0;
@@ -844,9 +973,21 @@ load();
         const loc = locationSel.value;
         const ref = doc(db, getSettingsPath(loc));
 
+// Build periods array from UI rows
+const periods = Array.from(periodList.children).map(r => {
+  const ins = r.querySelectorAll("input");
+  const name  = (ins[0].value || "").trim();
+  const weekly= Number(ins[1].value) || 0;
+  const start = (ins[2].value || "").trim();   // YYYY-MM-DD
+  const end   = (ins[3].value || "").trim();   // "" means ongoing
+  return { name, weekly, start, end: end || null };
+}).filter(p => p.name && p.weekly > 0 && p.start);
+
+
         // Save new settings and zero out the legacy field
         await setDoc(ref, {
           salaried_mgrs,
+          mgr_salary_periods: periods,  
           remit_pct:        num(setRemitPct.value),
           budget_pct_food:  num(setPctFood.value),
           budget_pct_wine:  num(setPctWine.value),
@@ -865,6 +1006,26 @@ load();
         settingsMsg.textContent = "Save failed: " + (e.message || e);
       }
     };
+
+    // Row for salary periods: name | weekly | start | end | 🗑
+function periodRowTemplate(name="", weekly="", start="", end=""){
+  const row = document.createElement("div");
+  row.style.display = "grid";
+  row.style.gridTemplateColumns = "1fr 120px 140px 140px 36px";
+  row.style.gap = "8px";
+  row.style.alignItems = "center";
+  row.style.marginBottom = "8px";
+  row.innerHTML = `
+    <input type="text" placeholder="Manager name" value="${name||""}">
+    <input type="number" step="0.01" placeholder="0.00" value="${weekly!==""?weekly:""}">
+    <input type="date" value="${start||""}">
+    <input type="date" value="${end||""}">
+    <button title="Remove">🗑</button>
+  `;
+  row.querySelector("button").onclick = () => row.remove();
+  return row;
+}
+
 
     // -------- helpers to compute effective sales for any week (for "Last Week Sales") -----
     function effSalesFrom(base, ovr, integ){
@@ -976,28 +1137,30 @@ document.getElementById("targetPill").textContent = (effTarget != null) ? fmtPct
         tbody.appendChild(tr);
       }
 
-      // Effective Actual Sales (manual > integration > day-sum)
-// Actual Sales (TOTAL) from Silverware; Food-only is separate
-const autoSales = isNum(integ?.total_sales_silverware) ? integ.total_sales_silverware : null;
-const autoFood  = isNum(integ?.food_sales_total)       ? integ.food_sales_total       : null;
-const effActSales = pickVal(Number(ovr?.food_sales), (autoSales!=null?autoSales:t.actSales));
+// Salaried & remit using periods (with legacy fallback)
+const weekCutoffISO  = cutoffForWeek(weekISO);
+const weekEndISO     = shiftDays(weekISO, 6);
 
-      // Salaried & remit adjustments (remit based on GROSS LABOUR, not sales)
-// Salaried & remit adjustments (prorate salaried to days completed this week)
-const weekCutoffISO  = cutoffForWeek(weekISO);                     // today or Sunday if finished
-const elapsedDays    = daysElapsedInWeek(weekISO, weekCutoffISO);  // 1..7
-const weekComplete   = (weekCutoffISO === shiftDays(weekISO, 6));
+let salariedToDate = 0;
+let salariedWeekFull = 0;
 
-const salariedWeek   = sumSalaried(settings);                      // full weekly $ from Settings
-const salariedToDate = salariedWeek * (weekComplete ? 1 : (elapsedDays / 7));
+const sal = salaryFromPeriods(settings?.mgr_salary_periods, weekISO, weekCutoffISO);
+if (sal) {
+  salariedToDate = sal.toDate;
+  salariedWeekFull = sal.fullWeek;
+} else {
+  // fallback to legacy single weekly number (salaried_mgrs or legacy salaried_mgmt)
+  const legacyWeekly = sumSalaried(settings);
+  const elapsedDays  = daysElapsedInWeek(weekISO, weekCutoffISO);
+  const weekComplete = (weekCutoffISO === weekEndISO);
+  salariedToDate     = legacyWeekly * (weekComplete ? 1 : (elapsedDays / 7));
+  salariedWeekFull   = legacyWeekly; // for any places that need full-week numbers
+}
 
-const grossLabourToDate = (t.actLab || 0) + salariedToDate;        // hourly (to-date) + salaried (to-date)
+const grossLabourToDate = (t.actLab || 0) + salariedToDate;
 const remit              = (Number(settings.remit_pct) || 0) * grossLabourToDate;
 const adjustedActLab     = grossLabourToDate + remit;
 
-
-      const weekPct   = (adjustedActLab && effActSales) ? adjustedActLab / effActSales : null;
-      const weekDelta = (weekPct!=null && effTarget!=null) ? (weekPct - effTarget) : null;
 
 
       // Totals & KPIs
@@ -1094,8 +1257,13 @@ const adjustedActLab     = grossLabourToDate + remit;
 
       const effActSales = (isNum(ovr.food_sales) && ovr.food_sales>0) ? Number(ovr.food_sales) : actSalesDays;
       
-      const salaried     = sumSalaried(settings);
-      const grossLabour  = (actLab || 0) + salaried;
+let salaried = 0;
+const salPdf = salaryFromPeriods(settings?.mgr_salary_periods, weekISO, shiftDays(weekISO, 6));
+if (salPdf) salaried = salPdf.fullWeek;
+else        salaried = sumSalaried(settings);
+
+const grossLabour  = (actLab || 0) + salaried;
+
       const remit        = (Number(settings.remit_pct)||0) * grossLabour;
       const adjActLab    = grossLabour + remit;
 
