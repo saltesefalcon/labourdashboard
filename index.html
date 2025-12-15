@@ -288,7 +288,7 @@
           <div class="section-title">Last Week, Auto Feeds & Purchasing Budgets</div>
           <table>
             <tbody>
-              <tr><td style="text-align:left">Auto Food Sales (7shifts/Silverware)</td><td id="vwAutoSales" style="text-align:right">—</td></tr>
+              <tr><td style="text-align:left">Auto Food Sales (Silverware)</td><td id="vwAutoSales" style="text-align:right">—</td></tr>
               <tr><td style="text-align:left">Promos/Discounts <span id="srcPromos" class="pill" style="margin-left:6px">—</span></td><td id="vwPromos" style="text-align:right">—</td></tr>
               <tr><td style="text-align:left">Voids <span id="srcVoids" class="pill" style="margin-left:6px">—</span></td><td id="vwVoids" style="text-align:right">—</td></tr>
 
@@ -871,8 +871,7 @@ load();
       const days = base?.days ?? [];
       const SCALE = detectCurrencyScale(days);
       const daySum = days.reduce((a,d)=> a + ((d.actual_sales ?? 0) * SCALE), 0);
-const autoSales = isNum(integ?.sales_7shifts_total) ? integ.sales_7shifts_total
-                    : (isNum(integ?.total_sales_silverware) ? integ.total_sales_silverware : null);
+      const autoSales = isNum(integ?.total_sales_silverware) ? integ.total_sales_silverware : null;
       return pickVal(Number(ovr?.food_sales), (autoSales!=null?autoSales:daySum));
     }
 
@@ -978,9 +977,10 @@ document.getElementById("targetPill").textContent = (effTarget != null) ? fmtPct
       }
 
       // Effective Actual Sales (manual > integration > day-sum)
-const autoSales = isNum(integ?.sales_7shifts_total) ? integ.sales_7shifts_total
-                    : (isNum(integ?.total_sales_silverware) ? integ.total_sales_silverware : null);
-      const effActSales = pickVal(Number(ovr.food_sales), (autoSales!=null?autoSales:t.actSales));
+// Actual Sales (TOTAL) from Silverware; Food-only is separate
+const autoSales = isNum(integ?.total_sales_silverware) ? integ.total_sales_silverware : null;
+const autoFood  = isNum(integ?.food_sales_total)       ? integ.food_sales_total       : null;
+const effActSales = pickVal(Number(ovr?.food_sales), (autoSales!=null?autoSales:t.actSales));
 
       // Salaried & remit adjustments (remit based on GROSS LABOUR, not sales)
 // Salaried & remit adjustments (prorate salaried to days completed this week)
@@ -1037,7 +1037,7 @@ const adjustedActLab     = grossLabourToDate + remit;
       const effVoids  = pickVal(Number(ovr.voids),  autoVoids);
       const effPromos = pickVal(Number(ovr.promos), autoPromos);
 
-      vwAutoSales.textContent = fmtMoney(autoSales);
+      vwAutoSales.textContent = fmtMoney(autoFood);
       vwVoids.textContent  = fmtMoney(effVoids);
       vwPromos.textContent = fmtMoney(effPromos);
 
