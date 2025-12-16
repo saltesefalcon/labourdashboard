@@ -1025,17 +1025,11 @@ if (ps.length === 0) {
 }
 // hook changes so the total stays live
 recalcMgrTotals();
-mgrList.addEventListener("input", recalcMgrTotals);
-periodList.addEventListener("input", recalcMgrTotals);
+periodList.oninput = recalcMgrTotals;
 showInactivePeriods?.addEventListener("change", recalcMgrTotals);
 
 
 // when adding new rows, also refresh totals
-addMgrBtn.onclick = () => {
-  const row = mgrRowTemplate();
-  mgrList.appendChild(row);
-  recalcMgrTotals();
-};
 addPeriodBtn.onclick = () => {
   periodList.appendChild(periodRowTemplate());
   recalcMgrTotals();
