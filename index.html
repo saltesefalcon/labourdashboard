@@ -594,6 +594,15 @@ function sumSalariedToDate(settings, weekISO, cutoffISO){
   }
   return total;
 }
+
+// Legacy weekly-sum fallback (when no period table is used)
+function sumLegacyWeekly(settings){
+  const list = Array.isArray(settings?.salaried_mgrs) ? settings.salaried_mgrs : [];
+  const sumList = list.reduce((a,m)=> a + (Number(m?.weekly)||0), 0);
+  const legacy  = Number(settings?.salaried_mgmt) || 0; // old single number
+  return sumList > 0 ? sumList : legacy;
+}
+
     
     function num(v){ const n=parseFloat(v); return isNaN(n)?0:n; }
     const isNum = v => typeof v === "number" && isFinite(v);
@@ -924,6 +933,45 @@ load();
       delBtn.onclick = () => row.remove();
       return row;
     }
+    function ensureMgrTotalsEl(){
+  let el = document.getElementById("mgrTotalsLine");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "mgrTotalsLine";
+    el.className = "small";
+    // place it just under the "+ Add Manager" row
+    addMgrBtn?.parentElement?.appendChild(el);
+  }
+  return el;
+}
+function recalcMgrTotals(){
+  // plain managers list weekly sum
+  const rows = Array.from(mgrList.querySelectorAll(".mgr-row"));
+  const weeklySum = rows.reduce((a,r)=>{
+    const amt = Number(r.querySelector('input[type="number"]')?.value) || 0;
+    return a + amt;
+  }, 0);
+
+  // optional: period-aware total for THIS selected week
+  const periods = Array.from(periodList.children).map(r=>{
+    const ins = r.querySelectorAll("input");
+    return {
+      name:  (ins[0]?.value || "").trim(),
+      weekly:Number(ins[1]?.value) || 0,
+      start: (ins[2]?.value || "").trim(),
+      end:   (ins[3]?.value || "").trim() || null
+    };
+  }).filter(p => p.name && p.weekly > 0 && p.start);
+
+  let periodTotal = 0;
+  const sal = salaryFromPeriods(periods, weekInput.value, shiftDays(weekInput.value, 6));
+  if (sal) periodTotal = sal.fullWeek;
+
+  const el = ensureMgrTotalsEl();
+  el.textContent =
+    `Total weekly (Managers list): ${fmtMoney(weeklySum)}  •  Periods total (this week): ${fmtMoney(periodTotal)}`;
+}
+
     settingsClose.onclick = () => settingsModal.style.display = "none";
     settingsBtn.onclick = async () => {
       const s = await loadSettingsFor(locationSel.value);
@@ -946,8 +994,21 @@ if (ps.length === 0) {
     periodList.appendChild(periodRowTemplate(p.name||"", p.weekly??"", p.start||"", p.end||""));
   });
 }
-addPeriodBtn.onclick = () => periodList.appendChild(periodRowTemplate());
+// hook changes so the total stays live
+recalcMgrTotals();
+mgrList.addEventListener("input", recalcMgrTotals);
+periodList.addEventListener("input", recalcMgrTotals);
 
+// when adding new rows, also refresh totals
+addMgrBtn.onclick = () => {
+  const row = mgrRowTemplate();
+  mgrList.appendChild(row);
+  recalcMgrTotals();
+};
+addPeriodBtn.onclick = () => {
+  periodList.appendChild(periodRowTemplate());
+  recalcMgrTotals();
+};
 
       setRemitPct.value = s.remit_pct ?? 0;
       setPctFood.value  = s.budget_pct_food ?? 0;
@@ -959,8 +1020,7 @@ addPeriodBtn.onclick = () => periodList.appendChild(periodRowTemplate());
       setTargetPct.value = s.target_labour_pct ?? 0;
       settingsModal.style.display = "flex";
     };
-    addMgrBtn.onclick = () => mgrList.appendChild(mgrRowTemplate());
-
+    
     settingsSave.onclick = async () => {
       settingsMsg.textContent = "Saving…";
       try{
@@ -1093,136 +1153,166 @@ function periodRowTemplate(name="", weekly="", start="", end=""){
       };
     }
 
-    function render(data, ovr={}, settings={}, integ=null, weekISO, lastWeekSales){
-const weekTarget   = (typeof data?.target_labour_pct === "number") ? data.target_labour_pct : null;
-const fallbackTgt  = (typeof settings?.target_labour_pct === "number" && settings.target_labour_pct > 0) ? settings.target_labour_pct : null;
-const effTarget    = (weekTarget != null ? weekTarget : fallbackTgt);
+   function render(data, ovr={}, settings={}, integ=null, weekISO, lastWeekSales){
+  // effective target %
+  const weekTarget  = (typeof data?.target_labour_pct === "number") ? data.target_labour_pct : null;
+  const fallbackTgt = (typeof settings?.target_labour_pct === "number" && settings.target_labour_pct > 0)
+    ? settings.target_labour_pct : null;
+  const effTarget   = (weekTarget != null ? weekTarget : fallbackTgt);
+  document.getElementById("targetPill").textContent = (effTarget != null) ? fmtPct(effTarget) : "—";
 
-document.getElementById("targetPill").textContent = (effTarget != null) ? fmtPct(effTarget) : "—";
+  // days + scale
+  const days  = data?.days ?? [];
+  const SCALE = detectCurrencyScale(days);
 
+  // table totals (raw)
+  const t = { projSales:0, actSalesDays:0, projLab:0, actLab:0, projMin:0, actMin:0 };
 
-      const days = data?.days ?? [];
-      const SCALE = detectCurrencyScale(days);
+  const tbody = document.querySelector("#dailyTable tbody");
+  tbody.innerHTML = "";
+  for (const d of days){
+    const ps = (d.projected_sales ?? 0)      * SCALE;
+    const as = (d.actual_sales ?? 0)         * SCALE;
+    const pl = (d.projected_labor_cost ?? 0) * SCALE;
+    const al = (d.actual_labor_cost ?? 0)    * SCALE;
 
-      const t = { projSales:0, actSales:0, projLab:0, actLab:0, projMin:0, actMin:0 };
+    t.projSales   += ps;
+    t.actSalesDays+= as;
+    t.projLab     += pl;
+    t.actLab      += al;
+    t.projMin     += d.projected_labor_minutes ?? 0;
+    t.actMin      += d.actual_labor_minutes ?? 0;
 
-      const tbody = document.querySelector("#dailyTable tbody");
-      tbody.innerHTML = "";
-      for (const d of days){
-        t.projSales += (d.projected_sales ?? 0)       * SCALE;
-        t.actSales  += (d.actual_sales ?? 0)          * SCALE;
-        t.projLab   += (d.projected_labor_cost ?? 0)  * SCALE;
-        t.actLab    += (d.actual_labor_cost ?? 0)     * SCALE;
-        t.projMin   += d.projected_labor_minutes ?? 0;
-        t.actMin    += d.actual_labor_minutes ?? 0;
+    const pct   = (al && as) ? (al / as) : null;
+    const delta = (pct!=null && effTarget!=null) ? (pct - effTarget) : null;
 
-        const pct = (d.actual_labor_cost && d.actual_sales)
-          ? ((d.actual_labor_cost * SCALE) / (d.actual_sales * SCALE))
-          : null;
-        const delta = (pct!=null && effTarget!=null) ? (pct - effTarget) : null;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${d.date || "—"}</td>
+      <td>${fmtMoney(ps)}</td>
+      <td>${fmtMoney(as)}</td>
+      <td>${fmtMoney(pl)}</td>
+      <td>${fmtMoney(al)}</td>
+      <td>${fmtInt(d.projected_labor_minutes)}</td>
+      <td>${fmtInt(d.actual_labor_minutes)}</td>
+      <td>${fmtPct(pct)}</td>
+      <td><span class="pill ${delta!=null?(delta<=0?"good":"bad"):""}">${delta!=null? (delta*100).toFixed(1)+" pp":"—"}</span></td>
+    `;
+    tbody.appendChild(tr);
+  }
 
+  // ----- Effective ACTUAL SALES (auto vs manual override) -----
+  const autoFood = (typeof integ?.total_sales_silverware === "number")
+    ? Number(integ.total_sales_silverware)
+    : t.actSalesDays;
+  const effActSales = (typeof ovr?.food_sales === "number" && ovr.food_sales > 0)
+    ? Number(ovr.food_sales)
+    : autoFood;
 
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${d.date || "—"}</td>
-          <td>${fmtMoney((d.projected_sales ?? 0) * SCALE)}</td>
-          <td>${fmtMoney((d.actual_sales ?? 0) * SCALE)}</td>
-          <td>${fmtMoney((d.projected_labor_cost ?? 0) * SCALE)}</td>
-          <td>${fmtMoney((d.actual_labor_cost ?? 0) * SCALE)}</td>
-          <td>${fmtInt(d.projected_labor_minutes)}</td>
-          <td>${fmtInt(d.actual_labor_minutes)}</td>
-          <td>${fmtPct(pct)}</td>
-          <td><span class="pill ${delta!=null?(delta<=0?"good":"bad"):""}">${delta!=null? (delta*100).toFixed(1)+" pp":"—"}</span></td>
-        `;
-        tbody.appendChild(tr);
-      }
+  // ----- Salaried + remit for “to-date”, then week % and delta -----
+  const weekCutoffISO = cutoffForWeek(weekISO);
+  const weekEndISO_   = shiftDays(weekISO, 6);
 
-// Salaried & remit using periods (with legacy fallback)
-const weekCutoffISO  = cutoffForWeek(weekISO);
-const weekEndISO     = shiftDays(weekISO, 6);
+  let salariedToDate = 0;
+  let salariedWeekFull = 0;
+  const sal = salaryFromPeriods(settings?.mgr_salary_periods, weekISO, weekCutoffISO);
+  if (sal) {
+    salariedToDate  = sal.toDate;
+    salariedWeekFull= sal.fullWeek;
+  } else {
+    const legacyWeekly = sumLegacyWeekly(settings);
+    const elapsedDays  = daysElapsedInWeek(weekISO, weekCutoffISO);
+    const weekComplete = (weekCutoffISO === weekEndISO_);
+    salariedToDate     = legacyWeekly * (weekComplete ? 1 : (elapsedDays / 7));
+    salariedWeekFull   = legacyWeekly;
+  }
 
-let salariedToDate = 0;
-let salariedWeekFull = 0;
+  const grossLabourToDate = (t.actLab || 0) + salariedToDate;
+  const remit             = (Number(settings.remit_pct) || 0) * grossLabourToDate;
+  const adjustedActLab    = grossLabourToDate + remit;
 
-const sal = salaryFromPeriods(settings?.mgr_salary_periods, weekISO, weekCutoffISO);
-if (sal) {
-  salariedToDate = sal.toDate;
-  salariedWeekFull = sal.fullWeek;
-} else {
-  // fallback to legacy single weekly number (salaried_mgrs or legacy salaried_mgmt)
-  const legacyWeekly = sumSalaried(settings);
-  const elapsedDays  = daysElapsedInWeek(weekISO, weekCutoffISO);
-  const weekComplete = (weekCutoffISO === weekEndISO);
-  salariedToDate     = legacyWeekly * (weekComplete ? 1 : (elapsedDays / 7));
-  salariedWeekFull   = legacyWeekly; // for any places that need full-week numbers
+  const weekPct   = effActSales > 0 ? (adjustedActLab / effActSales) : null;
+  const weekDelta = (weekPct!=null && effTarget!=null) ? (weekPct - effTarget) : null;
+
+  // ----- Totals & KPIs -----
+  document.getElementById("tProjSales").textContent  = fmtMoney(t.projSales);
+  document.getElementById("tActSales").textContent   = fmtMoney(effActSales);
+  document.getElementById("tProjLabour").textContent = fmtMoney(t.projLab);
+  document.getElementById("tActLabour").textContent  = fmtMoney(adjustedActLab);
+
+  const tPctEl = document.getElementById("tLabourPct");
+  tPctEl.textContent = fmtPct(weekPct);
+  applyPctClass(tPctEl, weekPct);
+
+  document.getElementById("tProjMin").textContent = fmtInt(t.projMin);
+  document.getElementById("tActMin").textContent  = fmtInt(t.actMin);
+  document.getElementById("tDelta").innerHTML     =
+    `<span class="pill ${weekDelta!=null?(weekDelta<=0?"good":"bad"):""}">${weekDelta!=null? (weekDelta*100).toFixed(1)+" pp":"—"}</span>`;
+
+  if (kpiProjSales) kpiProjSales.textContent = fmtMoney(t.projSales);
+  if (kpiActSales)  kpiActSales.textContent  = fmtMoney(effActSales);
+  const projPct = (t.projLab && t.projSales) ? (t.projLab / t.projSales) : null;
+  if (kpiProjPct)  kpiProjPct.textContent = fmtPct(projPct);
+  if (kpiActPct)   { kpiActPct.textContent = fmtPct(weekPct); applyPctClass(kpiActPct, weekPct); }
+
+  // ----- Integration status & sources + extras view -----
+  const syncAt = integ?.synced_at;
+  let syncTxt = "—";
+  if (syncAt?.toDate)      syncTxt = integ.synced_at.toDate().toLocaleString();
+  else if (typeof syncAt==="string"){ const dt=new Date(syncAt); syncTxt = isNaN(dt)? syncAt : dt.toLocaleString(); }
+  syncLine.textContent = "Last sync: " + (syncTxt || "—");
+
+  let salesSrc = "Days";
+if (typeof ovr.food_sales === "number" && ovr.food_sales > 0) {
+  salesSrc = "Manual override";
+} else if (integ?.source_sales) {
+  salesSrc = `Auto: ${integ.source_sales}`;
+} else if (typeof integ?.total_sales_silverware === "number") {
+  salesSrc = "Auto: Silverware";
 }
-
-const grossLabourToDate = (t.actLab || 0) + salariedToDate;
-const remit              = (Number(settings.remit_pct) || 0) * grossLabourToDate;
-const adjustedActLab     = grossLabourToDate + remit;
+salesSource.textContent = salesSrc;
 
 
+  // Extras (manual > integration)
+  const autoVoids  = isNum(integ?.voids_silverware)  ? integ.voids_silverware  : (isNum(integ?.voids)  ? integ.voids  : null);
+  const autoPromos = isNum(integ?.promos_silverware) ? integ.promos_silverware : (isNum(integ?.promos) ? integ.promos : null);
+  const effVoids   = pickVal(Number(ovr.voids),  autoVoids);
+  const effPromos  = pickVal(Number(ovr.promos), autoPromos);
 
-      // Totals & KPIs
-      document.getElementById("tProjSales").textContent = fmtMoney(t.projSales);
-      document.getElementById("tActSales").textContent  = fmtMoney(effActSales);
-      document.getElementById("tProjLabour").textContent= fmtMoney(t.projLab);
-      document.getElementById("tActLabour").textContent = fmtMoney(adjustedActLab);
-      const tPctEl = document.getElementById("tLabourPct");
-      tPctEl.textContent = fmtPct(weekPct);
-      applyPctClass(tPctEl, weekPct);
-      document.getElementById("tProjMin").textContent   = fmtInt(t.projMin);
-      document.getElementById("tActMin").textContent    = fmtInt(t.actMin);
-      document.getElementById("tDelta").innerHTML = `<span class="pill ${weekDelta!=null?(weekDelta<=0?"good":"bad"):""}">${weekDelta!=null? (weekDelta*100).toFixed(1)+" pp":"—"}</span>`;
+  if (vwAutoSales) vwAutoSales.textContent = fmtMoney(autoFood);
+  if (vwVoids)     vwVoids.textContent     = fmtMoney(effVoids);
+  if (vwPromos)    vwPromos.textContent    = fmtMoney(effPromos);
 
-      if (kpiProjSales) kpiProjSales.textContent = fmtMoney(t.projSales);
-      if (kpiActSales)  kpiActSales.textContent  = fmtMoney(effActSales);
-      const projPct = (t.projLab && t.projSales) ? (t.projLab / t.projSales) : null;
-      if (kpiProjPct)   kpiProjPct.textContent   = fmtPct(projPct);
-      if (kpiActPct)    { kpiActPct.textContent = fmtPct(weekPct); applyPctClass(kpiActPct, weekPct); }
+  pill(srcVoids,
+       (isNum(ovr.voids)  && ovr.voids  > 0) ? "Manual"
+         : (integ?.source_extras ? `Auto: ${integ.source_extras}` : "—"),
+       (isNum(ovr.voids) && ovr.voids>0) ? "bad" : null);
+  pill(srcPromos,
+       (isNum(ovr.promos) && ovr.promos > 0) ? "Manual"
+         : (integ?.source_extras ? `Auto: ${integ.source_extras}` : "—"));
 
-      // Integration status & sources
-      const syncAt = integ?.synced_at;
-      let syncTxt = "—";
-      if (syncAt?.toDate) { syncTxt = integ.synced_at.toDate().toLocaleString(); }
-      else if (typeof syncAt === "string") { const dt = new Date(syncAt); syncTxt = isNaN(dt) ? syncAt : dt.toLocaleString(); }
-      syncLine.textContent = "Last sync: " + (syncTxt || "—");
+  if (extrasSource) {
+  const manualExtras = (isNum(ovr.voids) && ovr.voids > 0) || (isNum(ovr.promos) && ovr.promos > 0);
+  extrasSource.textContent = manualExtras
+    ? "Manual override"
+    : (integ?.source_extras ? `Auto: ${integ.source_extras}` : "—");
+}
+  
+  // Last week (auto) & budgets
+  if (vwLastWeek)   vwLastWeek.textContent  = fmtMoney(isNum(lastWeekSales)? lastWeekSales : null);
+  if (vwProjSales)  vwProjSales.textContent = fmtMoney(t.projSales);
 
-      let salesSrc = "Days";
-      if (isNum(ovr.food_sales) && ovr.food_sales > 0) salesSrc = "Manual override";
-      else if (integ?.source_sales) salesSrc = `Auto: ${integ.source_sales}`;
-      salesSource.textContent = salesSrc;
+  const pFood   = Number(settings.budget_pct_food)||0;
+  const pWine   = Number(settings.budget_pct_wine)||0;
+  const pLiquor = Number(settings.budget_pct_liquor)||0;
+  const pBeer   = Number(settings.budget_pct_beer)||0;
 
-      // Extras (manual > integration)
-      console.log("[render integ]", integ);
-      const autoVoids  = isNum(integ?.voids_silverware)  ? integ.voids_silverware  : (isNum(integ?.voids)  ? integ.voids  : null);
-      const autoPromos = isNum(integ?.promos_silverware) ? integ.promos_silverware : (isNum(integ?.promos) ? integ.promos : null);
-      const effVoids  = pickVal(Number(ovr.voids),  autoVoids);
-      const effPromos = pickVal(Number(ovr.promos), autoPromos);
-
-      vwAutoSales.textContent = fmtMoney(autoFood);
-      vwVoids.textContent  = fmtMoney(effVoids);
-      vwPromos.textContent = fmtMoney(effPromos);
-
-      pill(srcVoids,  (isNum(ovr.voids)  && ovr.voids>0)  ? "Manual" : (integ?.source_extras ? `Auto: ${integ.source_extras}` : "—"),
-           (isNum(ovr.voids)&&ovr.voids>0)?"bad":null);
-      pill(srcPromos, (isNum(ovr.promos) && ovr.promos>0) ? "Manual" : (integ?.source_extras ? `Auto: ${integ.source_extras}` : "—"));
-
-      // Last week (auto) & budgets
-      vwLastWeek.textContent  = fmtMoney(isNum(lastWeekSales)? lastWeekSales : null);
-      vwProjSales.textContent = fmtMoney(t.projSales);
-
-      const pFood   = Number(settings.budget_pct_food)||0;
-      const pWine   = Number(settings.budget_pct_wine)||0;
-      const pLiquor = Number(settings.budget_pct_liquor)||0;
-      const pBeer   = Number(settings.budget_pct_beer)||0;
-
-      const bdg = (pct)=> t.projSales * pct;
-      bdgFood.textContent   = fmtMoney(bdg(pFood));
-      bdgWine.textContent   = fmtMoney(bdg(pWine));
-      bdgLiquor.textContent = fmtMoney(bdg(pLiquor));
-      bdgBeer.textContent   = fmtMoney(bdg(pBeer));
-    }
+  const bdg = (pct)=> t.projSales * pct;
+  bdgFood.textContent   = fmtMoney(bdg(pFood));
+  bdgWine.textContent   = fmtMoney(bdg(pWine));
+  bdgLiquor.textContent = fmtMoney(bdg(pLiquor));
+  bdgBeer.textContent   = fmtMoney(bdg(pBeer));
+}
 
     // ---------------------- PDF GENERATOR ----------------------
     const LOC_LABEL = { beacon:"BEACON", tulia:"TULIA", cesoir:"CE SOIR", prohibition:"PROHIBITION" };
@@ -1260,7 +1350,8 @@ const adjustedActLab     = grossLabourToDate + remit;
 let salaried = 0;
 const salPdf = salaryFromPeriods(settings?.mgr_salary_periods, weekISO, shiftDays(weekISO, 6));
 if (salPdf) salaried = salPdf.fullWeek;
-else        salaried = sumSalaried(settings);
+else        salaried = sumLegacyWeekly(settings);
+
 
 const grossLabour  = (actLab || 0) + salaried;
 
