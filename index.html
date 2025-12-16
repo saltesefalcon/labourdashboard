@@ -1085,16 +1085,74 @@ function periodRowTemplate(name="", weekly="", start="", end=""){
   row.querySelector("button").onclick = () => row.remove();
   return row;
 }
+// --- Helpers for robust food-only extraction ---
+function normalizeCurrency(n){
+  const v = Number(n);
+  if (!Number.isFinite(v)) return null;
+  return v >= 100000 ? v * 0.01 : v; // treat very large values as cents
+}
 
-
-    // -------- helpers to compute effective sales for any week (for "Last Week Sales") -----
-    function effSalesFrom(base, ovr, integ){
-      const days = base?.days ?? [];
-      const SCALE = detectCurrencyScale(days);
-      const daySum = days.reduce((a,d)=> a + ((d.actual_sales ?? 0) * SCALE), 0);
-      const autoSales = isNum(integ?.total_sales_silverware) ? integ.total_sales_silverware : null;
-      return pickVal(Number(ovr?.food_sales), (autoSales!=null?autoSales:daySum));
+function deepFindFoodSales(integ){
+  if (!integ || typeof integ !== "object") return null;
+  const candidates = [];
+  const walk = (o) => {
+    if (!o || typeof o !== "object") return;
+    if (Array.isArray(o)) { o.forEach(walk); return; }
+    for (const [k,v] of Object.entries(o)){
+      if (v && typeof v === "object") { walk(v); continue; }
+      if (typeof v !== "number" || !isFinite(v)) continue;
+      const kl = String(k).toLowerCase();
+      // score: prefer keys that look like food + sales, net over gross, silverware names
+      let score = 0;
+      if (/food/.test(kl)) score += 3;
+      if (/sale/.test(kl)) score += 3;
+      if (/net/.test(kl))  score += 2;
+      if (/gross/.test(kl)) score -= 1;
+      if (/silverware|avrio|sw_/.test(kl)) score += 1;
+      if (score > 0) candidates.push({score, value:v});
     }
+  };
+  walk(integ);
+  if (!candidates.length) return null;
+  candidates.sort((a,b)=> b.score - a.score);
+  return candidates[0].value;
+}
+
+// Prefer a food-only number from integrations; fall back to daily sum if missing
+function getAutoFoodSales(integ, daySum) {
+  // Fast-path known field shapes
+  const known = [
+    integ?.food_sales_silverware,
+    integ?.net_food_sales_silverware,
+    integ?.food_net_sales,
+    integ?.food_sales,
+    (typeof integ?.sales_breakdown?.food === "number" ? integ.sales_breakdown.food
+      : (typeof integ?.sales_breakdown?.food?.net === "number" ? integ.sales_breakdown.food.net
+      : (typeof integ?.sales_breakdown?.food?.gross === "number" ? integ.sales_breakdown.food.gross : null))),
+    (typeof integ?.categories?.food === "number" ? integ.categories.food : null),
+  ].find(v => Number.isFinite(v) && v > 0);
+
+  let val = known ?? deepFindFoodSales(integ);
+  if (val != null) {
+    const src = (integ?.source_sales || "Silverware DailyTotals").replace("(Total)","(Food)");
+    return { value: normalizeCurrency(val), label: `Auto: ${src}` };
+  }
+  return { value: normalizeCurrency(daySum), label: "Days" };
+}
+
+
+function effSalesFrom(base, ovr, integ){
+  const days = base?.days ?? [];
+  const SCALE = detectCurrencyScale(days);
+  const daySum = days.reduce((a,d)=> a + ((d.actual_sales ?? 0) * SCALE), 0);
+
+  if (isNum(ovr?.food_sales) && ovr.food_sales > 0) {
+    return Number(ovr.food_sales);
+  }
+  // Prefer food-only from integrations; fallback to daySum
+  return getAutoFoodSales(integ || {}, daySum).value;
+}
+
 
     // -------------- LOAD + RENDER (safe integrations read + prev week) --------------
     async function load(){
@@ -1201,13 +1259,13 @@ function periodRowTemplate(name="", weekly="", start="", end=""){
     tbody.appendChild(tr);
   }
 
-  // ----- Effective ACTUAL SALES (auto vs manual override) -----
-  const autoFood = (typeof integ?.total_sales_silverware === "number")
-    ? Number(integ.total_sales_silverware)
-    : t.actSalesDays;
-  const effActSales = (typeof ovr?.food_sales === "number" && ovr.food_sales > 0)
-    ? Number(ovr.food_sales)
-    : autoFood;
+// ----- Effective ACTUAL SALES (auto vs manual override) -----
+const autoFoodInfo = getAutoFoodSales(integ || {}, t.actSalesDays);
+const autoFood = autoFoodInfo.value;
+const effActSales = (typeof ovr?.food_sales === "number" && ovr.food_sales > 0)
+  ? Number(ovr.food_sales)
+  : autoFood;
+
 
   // ----- Salaried + remit for “to-date”, then week % and delta -----
   const weekCutoffISO = cutoffForWeek(weekISO);
@@ -1262,16 +1320,13 @@ function periodRowTemplate(name="", weekly="", start="", end=""){
   else if (typeof syncAt==="string"){ const dt=new Date(syncAt); syncTxt = isNaN(dt)? syncAt : dt.toLocaleString(); }
   syncLine.textContent = "Last sync: " + (syncTxt || "—");
 
-  let salesSrc = "Days";
+let salesSrc = "Days";
 if (typeof ovr.food_sales === "number" && ovr.food_sales > 0) {
   salesSrc = "Manual override";
-} else if (integ?.source_sales) {
-  salesSrc = `Auto: ${integ.source_sales}`;
-} else if (typeof integ?.total_sales_silverware === "number") {
-  salesSrc = "Auto: Silverware";
+} else {
+  salesSrc = autoFoodInfo.label; // e.g., "Auto: Silverware DailyTotals (Food)"
 }
 salesSource.textContent = salesSrc;
-
 
   // Extras (manual > integration)
   const autoVoids  = isNum(integ?.voids_silverware)  ? integ.voids_silverware  : (isNum(integ?.voids)  ? integ.voids  : null);
@@ -1325,12 +1380,14 @@ salesSource.textContent = salesSrc;
       const ovrPath  = `companies/aidan/locations/${locKey}/overrides/${weekISO}`;
       const settings = await loadSettingsFor(locKey);
 
-      const [baseSnap, ovrSnap] = await Promise.all([
-        getDoc(doc(db, basePath)),
-        getDoc(doc(db, ovrPath)),
-      ]);
-      const base = baseSnap.exists()? baseSnap.data(): null;
-      const ovr  = ovrSnap.exists()? ovrSnap.data(): {};
+const [baseSnap, ovrSnap, integSnap] = await Promise.all([
+  getDoc(doc(db, basePath)),
+  getDoc(doc(db, ovrPath)),
+  getDoc(doc(db, integPath)),
+]);
+const base = baseSnap.exists()? baseSnap.data(): null;
+const ovr  = ovrSnap.exists()? ovrSnap.data(): {};
+const integ= integSnap.exists()? integSnap.data(): null;
 
       const days = base?.days || [];
       const SCALE = detectCurrencyScale(days);
@@ -1345,7 +1402,11 @@ salesSource.textContent = salesSrc;
         actMin    += d.actual_labor_minutes ?? 0;
       }
 
-      const effActSales = (isNum(ovr.food_sales) && ovr.food_sales>0) ? Number(ovr.food_sales) : actSalesDays;
+      const autoFoodInfo = getAutoFoodSales(integ || {}, actSalesDays);
+const effActSales  = (isNum(ovr.food_sales) && ovr.food_sales>0)
+  ? Number(ovr.food_sales)
+  : autoFoodInfo.value;
+
       
 let salaried = 0;
 const salPdf = salaryFromPeriods(settings?.mgr_salary_periods, weekISO, shiftDays(weekISO, 6));
@@ -1379,10 +1440,13 @@ const grossLabour  = (actLab || 0) + salaried;
         getDoc(doc(db, `companies/aidan/locations/${locKey}/labour/${prevISO}`)),
         getDoc(doc(db, `companies/aidan/locations/${locKey}/overrides/${prevISO}`))
       ]);
-      let lastWeek = null;
-      if (pBaseSnap.exists()){
-        lastWeek = effSalesFrom(pBaseSnap.data(), pOvrSnap.exists()?pOvrSnap.data():null, null);
-      }
+let lastWeek = null;
+if (pBaseSnap.exists()){
+  const pIntegSnap = await getDoc(doc(db, `companies/aidan/locations/${locKey}/integrations/${prevISO}`));
+  const prevInteg  = pIntegSnap.exists()? pIntegSnap.data() : null;
+  lastWeek = effSalesFrom(pBaseSnap.data(), pOvrSnap.exists()?pOvrSnap.data():null, prevInteg);
+}
+
 
       return {
         locKey,
