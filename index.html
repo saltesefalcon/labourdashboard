@@ -1086,117 +1086,67 @@ function periodRowTemplate(name="", weekly="", start="", end=""){
   return row;
 }
 // --- Helpers for robust food-only extraction ---
+// Normalize "cents-y" numbers into dollars if needed
 function normalizeCurrency(n){
   const v = Number(n);
   if (!Number.isFinite(v)) return null;
   return v >= 100000 ? v * 0.01 : v; // treat very large values as cents
 }
 
-function deepFindFoodSales(integ){
-  if (!integ || typeof integ !== "object") return null;
-  const candidates = [];
-  const walk = (o) => {
-    if (!o || typeof o !== "object") return;
-    if (Array.isArray(o)) { o.forEach(walk); return; }
-    for (const [k,v] of Object.entries(o)){
-      if (v && typeof v === "object") { walk(v); continue; }
-      if (typeof v !== "number" || !isFinite(v)) continue;
-      const kl = String(k).toLowerCase();
-      // score: prefer keys that look like food + sales, net over gross, silverware names
-      let score = 0;
-      if (/food/.test(kl)) score += 3;
-      if (/sale/.test(kl)) score += 3;
-      if (/net/.test(kl))  score += 2;
-      if (/gross/.test(kl)) score -= 1;
-      if (/silverware|avrio|sw_/.test(kl)) score += 1;
-      if (score > 0) candidates.push({score, value:v});
-    }
-  };
-  walk(integ);
-  if (!candidates.length) return null;
-  candidates.sort((a,b)=> b.score - a.score);
-  return candidates[0].value;
-}
-// Prefer Silverware FOOD net (Name: "FOOD" or InterfaceID "5000"); otherwise fall back
 function getAutoFoodSales(integ, daySum) {
   const asNum = v => {
     const n = Number(v);
     return Number.isFinite(n) ? n : null;
   };
+
+  // Always label clearly that this is FOOD-only from Silverware
   const autoLabel = () => {
     const base = (integ?.source_sales || "Silverware DailyTotals");
     return `Auto: ${String(base).replace("(Total)", "(Food)")}`;
   };
 
-  // 1) Simple numeric fields some writers store
-  const direct = [
-    integ?.food_sales_silverware,
-    integ?.net_food_sales_silverware,
-    integ?.food_net_sales,
-    integ?.food_sales,
-    integ?.food
-  ].map(asNum).find(v => v && v > 0);
-  if (direct) return { value: direct, label: autoLabel() };
+  // 1) Straight numeric fields some writers store
+  {
+    const direct = [
+      integ?.food_sales_silverware,
+      integ?.net_food_sales_silverware,
+      integ?.food_net_sales,
+      integ?.food_sales,
+      integ?.food
+    ].map(asNum).find(v => v && v > 0);
+    if (direct) return { value: normalizeCurrency(direct), label: autoLabel() };
+  }
 
-  // 2) Common breakdown shapes
-  const fromBreakdown = (obj) => {
-    if (!obj || typeof obj !== "object") return null;
-    const tries = [
-      obj?.sales_breakdown,
-      obj?.categories,
-      obj
-    ];
-    for (const o of tries) {
-      if (!o) continue;
-      const v =
-        asNum(o?.food?.net) ??
-        asNum(o?.FOOD?.net) ??
-        asNum(o?.food?.gross) ??    // if net missing, gross is better than total fallback
-        asNum(o?.FOOD?.gross) ??
-        asNum(o?.food) ??
-        asNum(o?.FOOD);
-      if (v && v > 0) return v;
-    }
-    return null;
-  };
-  const bd = fromBreakdown(integ);
-  if (bd) return { value: bd, label: autoLabel() };
+  // 2) Structured breakdowns (food/net preferred)
+  {
+    const pickFrom = (obj) => {
+      if (!obj || typeof obj !== "object") return null;
+      const tries = [obj?.sales_breakdown, obj?.categories, obj];
+      for (const o of tries) {
+        if (!o) continue;
+        const v =
+          asNum(o?.food?.net) ??
+          asNum(o?.FOOD?.net) ??
+          asNum(o?.food?.gross) ??
+          asNum(o?.FOOD?.gross) ??
+          asNum(o?.food) ??
+          asNum(o?.FOOD);
+        if (v && v > 0) return normalizeCurrency(v);
+      }
+      return null;
+    };
+    const bd = pickFrom(integ);
+    if (bd) return { value: bd, label: autoLabel() };
+  }
 
-  // 3) Read Silverware "Sales -> Items" and sum FOOD NetAmount
-  //    Works whether the doc is a weekly blob or organized by day.
-  const isFoodItem = (it) => {
+  // 3) Silverware DailyTotals: sum FOOD NetAmount from *Sales.Items* (NOT Gratuities)
+  function isFoodItem(it) {
     const name = String(it?.Name ?? it?.name ?? "").toUpperCase();
     const id   = String(it?.InterfaceID ?? it?.interfaceId ?? it?.interfaceID ?? "");
     return name === "FOOD" || id === "5000";
-  };
-
-  // Find the first Items array that looks like a Silverware category list
-  const findItemsArray = (node) => {
-    const stack = [node];
-    while (stack.length) {
-      const cur = stack.pop();
-      if (!cur || typeof cur !== "object") continue;
-      if (Array.isArray(cur)) {
-        for (const v of cur) if (v && typeof v === "object") stack.push(v);
-        continue;
-      }
-      for (const [k, v] of Object.entries(cur)) {
-        if (k.toLowerCase() === "items" && Array.isArray(v) &&
-            v.some(x => (x && typeof x === "object" && ("Name" in x || "InterfaceID" in x)))) {
-          return v; // use the first plausible Items block we find
-        }
-        if (v && typeof v === "object") stack.push(v);
-      }
-    }
-    return null;
-  };
-
-  const items =
-    findItemsArray(integ?.silverware_daily_totals) ||
-    findItemsArray(integ?.silverware) ||
-    findItemsArray(integ);
-
-  if (items && Array.isArray(items)) {
+  }
+  function sumFoodFromItems(items) {
+    if (!Array.isArray(items)) return 0;
     let sum = 0;
     for (const it of items) {
       if (isFoodItem(it)) {
@@ -1204,10 +1154,45 @@ function getAutoFoodSales(integ, daySum) {
         if (n) sum += n;
       }
     }
-    if (sum > 0) return { value: sum, label: autoLabel() };
+    return sum;
+  }
+  // Prefer objects that look like { Sales: { Items: [...] } }
+  function collectSalesItemsBlocks(root) {
+    const out = [];
+    const stack = [root];
+    while (stack.length) {
+      const cur = stack.pop();
+      if (!cur || typeof cur !== "object") continue;
+
+      // direct known nests
+      const salesBlocks = [
+        cur?.Sales?.Items,
+        cur?.silverware_daily_totals?.Sales?.Items,
+        cur?.silverware?.Sales?.Items,
+        cur?.RAW?.Sales?.Items
+      ];
+      for (const blk of salesBlocks) if (Array.isArray(blk)) out.push(blk);
+
+      // generic DFS
+      for (const v of Object.values(cur)) {
+        if (v && typeof v === "object") stack.push(v);
+      }
+    }
+    return out;
   }
 
-  // 4) Fallback = sum of daily actual_sales (total) if nothing else available
+  {
+    const blocks = collectSalesItemsBlocks(integ);
+    // Score blocks by how much FOOD they contain and pick the best
+    let best = 0;
+    for (const b of blocks) {
+      const s = sumFoodFromItems(b);
+      if (s > best) best = s;
+    }
+    if (best > 0) return { value: normalizeCurrency(best), label: autoLabel() };
+  }
+
+  // 4) Absolute fallback = sum of per-day total actual_sales (so UI never blanks)
   return { value: daySum, label: "Days (fallback)" };
 }
 
@@ -1449,6 +1434,7 @@ salesSource.textContent = salesSrc;
     async function readWeekForLocation(locKey, weekISO){
       const basePath = `companies/aidan/locations/${locKey}/labour/${weekISO}`;
       const ovrPath  = `companies/aidan/locations/${locKey}/overrides/${weekISO}`;
+      const integPath = `companies/aidan/locations/${locKey}/integrations/${weekISO}`; 
       const settings = await loadSettingsFor(locKey);
 
 const [baseSnap, ovrSnap, integSnap] = await Promise.all([
