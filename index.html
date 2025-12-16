@@ -1118,26 +1118,48 @@ function deepFindFoodSales(integ){
   return candidates[0].value;
 }
 
-// Prefer a food-only number from integrations; fall back to daily sum if missing
+// Prefer food-only from integrations *only if plausible* vs day sum.
+// Otherwise fall back to day-sum to avoid nonsense KPIs.
 function getAutoFoodSales(integ, daySum) {
-  // Fast-path known field shapes
-  const known = [
+  const pick = (...xs) => {
+    for (const v of xs) {
+      const n = Number(v);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    return null;
+  };
+
+  const cand = pick(
     integ?.food_sales_silverware,
     integ?.net_food_sales_silverware,
     integ?.food_net_sales,
     integ?.food_sales,
-    (typeof integ?.sales_breakdown?.food === "number" ? integ.sales_breakdown.food
-      : (typeof integ?.sales_breakdown?.food?.net === "number" ? integ.sales_breakdown.food.net
-      : (typeof integ?.sales_breakdown?.food?.gross === "number" ? integ.sales_breakdown.food.gross : null))),
-    (typeof integ?.categories?.food === "number" ? integ.categories.food : null),
-  ].find(v => Number.isFinite(v) && v > 0);
+    (typeof integ?.sales_breakdown?.food?.net   === "number" ? integ.sales_breakdown.food.net   : null),
+    (typeof integ?.sales_breakdown?.food?.gross === "number" ? integ.sales_breakdown.food.gross : null),
+    (typeof integ?.sales_breakdown?.food        === "number" ? integ.sales_breakdown.food        : null),
+    (typeof integ?.categories?.food             === "number" ? integ.categories.food             : null)
+  );
 
-  let val = known ?? deepFindFoodSales(integ);
-  if (val != null) {
-    const src = (integ?.source_sales || "Silverware DailyTotals").replace("(Total)","(Food)");
-    return { value: normalizeCurrency(val), label: `Auto: ${src}` };
+  // If daySum is known, sanity-check the integration value.
+  // Food should usually be 30%–105% of the total day sum (upper bound allows small rounding diffs).
+  if (Number.isFinite(daySum) && daySum > 0 && Number.isFinite(cand) && cand > 0) {
+    const r = cand / daySum;
+    if (r >= 0.30 && r <= 1.05) {
+      const src = (integ?.source_sales || "Silverware DailyTotals").replace("(Total)", "(Food)");
+      return { value: cand, label: `Auto: ${src}` };
+    }
+    // suspicious → ignore the integration number
+    return { value: daySum, label: "Days" };
   }
-  return { value: normalizeCurrency(daySum), label: "Days" };
+
+  // If we don’t have a good daySum, but we do have a positive candidate, use it.
+  if (Number.isFinite(cand) && cand > 0) {
+    const src = (integ?.source_sales || "Silverware DailyTotals").replace("(Total)", "(Food)");
+    return { value: cand, label: `Auto: ${src}` };
+  }
+
+  // Fallback
+  return { value: daySum, label: "Days" };
 }
 
 
@@ -1402,10 +1424,11 @@ const integ= integSnap.exists()? integSnap.data(): null;
         actMin    += d.actual_labor_minutes ?? 0;
       }
 
-      const autoFoodInfo = getAutoFoodSales(integ || {}, actSalesDays);
-const effActSales  = (isNum(ovr.food_sales) && ovr.food_sales>0)
+const foodInfo = getAutoFoodSales(integ || {}, actSalesDays);
+const effActSales = (isNum(ovr.food_sales) && ovr.food_sales > 0)
   ? Number(ovr.food_sales)
-  : autoFoodInfo.value;
+  : foodInfo.value;
+
 
       
 let salaried = 0;
