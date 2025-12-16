@@ -1086,113 +1086,129 @@ function periodRowTemplate(name="", weekly="", start="", end=""){
   return row;
 }
 // --- Helpers for robust food-only extraction ---
-// Normalize "cents-y" numbers into dollars if needed
 function normalizeCurrency(n){
   const v = Number(n);
   if (!Number.isFinite(v)) return null;
   return v >= 100000 ? v * 0.01 : v; // treat very large values as cents
 }
+const asNum = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+function pickCaseInsensitive(obj, ...keys){
+  if (!obj || typeof obj !== "object") return null;
+  const map = new Map(Object.keys(obj).map(k => [k.toLowerCase(), k]));
+  for (const k of keys){
+    const real = map.get(String(k).toLowerCase());
+    if (real != null) return obj[real];
+  }
+  return null;
+}
 
+// --- MAIN: return { value:number, label:string } ---
 function getAutoFoodSales(integ, daySum) {
-  const asNum = v => {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-  };
-
-  // Always label clearly that this is FOOD-only from Silverware
-  const autoLabel = () => {
+  const autoLabel = (kind="Food") => {
     const base = (integ?.source_sales || "Silverware DailyTotals");
-    return `Auto: ${String(base).replace("(Total)", "(Food)")}`;
+    return `Auto: ${String(base).replace("(Total)","").trim()} (${kind})`;
   };
 
-  // 1) Straight numeric fields some writers store
+  // 1) Direct fields some writers store
   {
     const direct = [
       integ?.food_sales_silverware,
       integ?.net_food_sales_silverware,
       integ?.food_net_sales,
       integ?.food_sales,
-      integ?.food
+      integ?.food,
+      integ?.auto_food_sales,
+      integ?.netFood, integ?.foodNet
     ].map(asNum).find(v => v && v > 0);
-    if (direct) return { value: normalizeCurrency(direct), label: autoLabel() };
+    if (direct) return { value: normalizeCurrency(direct), label: autoLabel("Food") };
   }
 
-  // 2) Structured breakdowns (food/net preferred)
+  // 2) Structured breakdowns like { sales_breakdown: { food:{net}, wine:{net}, ... } }
   {
-    const pickFrom = (obj) => {
-      if (!obj || typeof obj !== "object") return null;
-      const tries = [obj?.sales_breakdown, obj?.categories, obj];
-      for (const o of tries) {
-        if (!o) continue;
-        const v =
-          asNum(o?.food?.net) ??
-          asNum(o?.FOOD?.net) ??
-          asNum(o?.food?.gross) ??
-          asNum(o?.FOOD?.gross) ??
-          asNum(o?.food) ??
-          asNum(o?.FOOD);
-        if (v && v > 0) return normalizeCurrency(v);
-      }
-      return null;
-    };
-    const bd = pickFrom(integ);
-    if (bd) return { value: bd, label: autoLabel() };
+    const buckets = pickCaseInsensitive(integ, "sales_breakdown", "categories", "breakdown", "salesCategories");
+    if (buckets && typeof buckets === "object"){
+      const food = pickCaseInsensitive(buckets, "food");
+      const v =
+        asNum(pickCaseInsensitive(food||{}, "net","netamount","netsales","amountnet","nettotal")) ??
+        asNum(food);
+      if (v && v > 0) return { value: normalizeCurrency(v), label: autoLabel("Food") };
+    }
   }
 
-  // 3) Silverware DailyTotals: sum FOOD NetAmount from *Sales.Items* (NOT Gratuities)
-  function isFoodItem(it) {
-    const name = String(it?.Name ?? it?.name ?? "").toUpperCase();
-    const id   = String(it?.InterfaceID ?? it?.interfaceId ?? it?.interfaceID ?? "");
-    return name === "FOOD" || id === "5000";
+  // 3) Silverware-style Sales.Items arrays
+  function readNet(it){
+    return (
+      asNum(pickCaseInsensitive(it, "NetAmount","netAmount","Net","net","NetSales","netSales","AmountNet","NetTotal")) ||
+      0
+    );
   }
-  function sumFoodFromItems(items) {
-    if (!Array.isArray(items)) return 0;
-    let sum = 0;
-    for (const it of items) {
-      if (isFoodItem(it)) {
-        const n = asNum(it?.NetAmount ?? it?.netAmount);
-        if (n) sum += n;
-      }
-    }
-    return sum;
+  function readName(it){
+    return (
+      pickCaseInsensitive(it, "Name","name","Category","category","MenuGroup","menuGroup","RevenueClass","GroupName") || ""
+    ) + "";
   }
-  // Prefer objects that look like { Sales: { Items: [...] } }
-  function collectSalesItemsBlocks(root) {
+  function readId(it){
+    return (
+      pickCaseInsensitive(it, "InterfaceID","interfaceId","interfaceID","CategoryID","DepartmentID","MenuGroupID")
+    );
+  }
+  function looksFood(it){
+    const nm = (readName(it) || "").toUpperCase();
+    const id = readId(it);
+    if (nm.includes("FOOD")) return true;
+    // common Silverware mapping: 5000
+    if (id === 5000 || id === "5000") return true;
+    return false;
+  }
+  function looksBeverage(it){
+    const nm = (readName(it) || "").toUpperCase();
+    return nm.includes("WINE") || nm.includes("LIQUOR") || nm.includes("BEER") || nm.includes("ALCOHOL");
+  }
+
+  function collectItems(root){
     const out = [];
     const stack = [root];
-    while (stack.length) {
+    const seen = new Set();
+    while (stack.length){
       const cur = stack.pop();
       if (!cur || typeof cur !== "object") continue;
+      if (seen.has(cur)) continue; seen.add(cur);
 
-      // direct known nests
-      const salesBlocks = [
-        cur?.Sales?.Items,
-        cur?.silverware_daily_totals?.Sales?.Items,
-        cur?.silverware?.Sales?.Items,
-        cur?.RAW?.Sales?.Items
+      const candidates = [
+        pickCaseInsensitive(cur, "Sales"),
+        pickCaseInsensitive(cur, "silverware_daily_totals"),
+        pickCaseInsensitive(cur, "silverware"),
+        pickCaseInsensitive(cur, "RAW")
       ];
-      for (const blk of salesBlocks) if (Array.isArray(blk)) out.push(blk);
+      for (const c of candidates){
+        const items = pickCaseInsensitive(c||{}, "Items");
+        if (Array.isArray(items)) out.push(items);
+      }
 
-      // generic DFS
-      for (const v of Object.values(cur)) {
+      for (const v of Object.values(cur)){
         if (v && typeof v === "object") stack.push(v);
       }
     }
-    return out;
+    return out.flat();
   }
 
-  {
-    const blocks = collectSalesItemsBlocks(integ);
-    // Score blocks by how much FOOD they contain and pick the best
-    let best = 0;
-    for (const b of blocks) {
-      const s = sumFoodFromItems(b);
-      if (s > best) best = s;
+  const items = collectItems(integ);
+  if (items.length){
+    const foodNet = items.reduce((a,it)=> a + (looksFood(it) ? readNet(it) : 0), 0);
+    const bevNet  = items.reduce((a,it)=> a + (looksBeverage(it) ? readNet(it) : 0), 0);
+    const totalNet= items.reduce((a,it)=> a + readNet(it), 0);
+
+    if (foodNet > 0) return { value: normalizeCurrency(foodNet), label: autoLabel("Food") };
+    if (totalNet > 0 && bevNet > 0) {
+      const v = totalNet - bevNet;
+      if (v > 0) return { value: normalizeCurrency(v), label: autoLabel("Food=Total−Beverage") };
     }
-    if (best > 0) return { value: normalizeCurrency(best), label: autoLabel() };
   }
 
-  // 4) Absolute fallback = sum of per-day total actual_sales (so UI never blanks)
+  // 4) Absolute fallback so UI never blanks: day sum (total)
   return { value: daySum, label: "Days (fallback)" };
 }
 
