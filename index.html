@@ -119,34 +119,32 @@
           Percentages are decimals (e.g. <code>0.35</code> for 35%).
         </div>
 
-        <!-- Salaried managers -->
-        <div style="display:flex; align-items:center; justify-content:space-between; margin:8px 0 6px; font-weight:600">
-  <span>Salaried Management (calculated)</span>
-  <span id="salTotalPill" class="pill">—</span>
-</div>
+   <!-- Salaried Management (dated; replaces legacy managers list) -->
+<div style="margin:8px 0 6px;font-weight:600">Salaried Management</div>
+
 <div class="small" style="margin-bottom:10px">
-  Uses <b>Salary Periods</b> for the selected week. (Legacy “Managers list” below is optional.)
+  Weekly salaries with effective dates. This is what the dashboard uses for labour (keeps history correct).
 </div>
 
-        <div id="mgrList"></div>
-        <div class="row" style="align-items:center;margin-bottom:12px">
-          <button id="addMgrBtn">+ Add Manager</button>
-          <span class="small">Weekly amounts; include only managers affecting this location’s weekly labour.</span>
-        </div>
-<!-- Salary periods (beta) -->
-<div style="display:flex; align-items:center; justify-content:space-between; margin:14px 0 6px; font-weight:600">
-  <span>Salary Periods (beta)</span>
-  <label class="small" style="display:flex; align-items:center; gap:6px; font-weight:400">
-    <input type="checkbox" id="showInactivePeriods">
-    Show inactive
+<div class="row" style="align-items:center; justify-content:space-between; margin-bottom:10px">
+  <div class="small">Calculated for selected week</div>
+  <span id="salTotalPill" class="pill">—</span>
+</div>
+
+<div class="row" style="justify-content:flex-end; margin-bottom:8px">
+  <label class="small" style="display:flex; gap:8px; align-items:center; justify-content:flex-end">
+    <input type="checkbox" id="showInactiveChk">
+    Show inactive & future
   </label>
 </div>
 
 <div id="periodList"></div>
+
 <div class="row" style="align-items:center;margin-bottom:12px">
-  <button id="addPeriodBtn">+ Add Period</button>
-  <span class="small">Each row = name, weekly $, start date, end date (leave end blank for ongoing).</span>
+  <button id="addPeriodBtn">+ Add Manager</button>
+  <span class="small">Use “Increase pay” or “End salary” so past weeks don’t change.</span>
 </div>
+
 
 <div class="settings-grid" style="margin-top:6px">
   <label>Remittance % of Gross Labour<br>
@@ -441,14 +439,11 @@ window._dbg = {
     const setPctWine = document.getElementById("setPctWine");
     const setPctLiquor = document.getElementById("setPctLiquor");
     const setPctBeer = document.getElementById("setPctBeer");
-    const mgrList = document.getElementById("mgrList");
-    const addMgrBtn = document.getElementById("addMgrBtn");
     const periodList = document.getElementById("periodList");
 const addPeriodBtn = document.getElementById("addPeriodBtn");
 const salTotalPill = document.getElementById("salTotalPill");
 const showInactivePeriods = document.getElementById("showInactivePeriods");
-
-
+const showInactiveChk = document.getElementById("showInactiveChk");
 
     // Weekly overrides (editable here)
     const inFoodSales = document.getElementById("inFoodSales");
