@@ -1236,49 +1236,59 @@ function effSalesFrom(base, ovr, integ){
   // table totals (raw)
   const t = { projSales:0, actSalesDays:0, projLab:0, actLab:0, projMin:0, actMin:0 };
 
-  const tbody = document.querySelector("#dailyTable tbody");
-  const weekCutoffISO = cutoffForWeek(weekISO);
-const remitPct = Number(settings.remit_pct) || 0;
-  tbody.innerHTML = "";
-  for (const d of days){
-    const ps = (d.projected_sales ?? 0)      * SCALE;
-    const as = (d.actual_sales ?? 0)         * SCALE;
-    const pl = (d.projected_labor_cost ?? 0) * SCALE;
-    const alHourly = (d.actual_labor_cost ?? 0) * SCALE;
+const tbody = document.querySelector("#dailyTable tbody");
 
-const dayISO = d.date || "";
-const salDay = (dayISO && dayISO <= weekCutoffISO)
-  ? salaryForDay(settings?.mgr_salary_periods, dayISO)
-  : 0;
+// IMPORTANT: these must be declared ONCE in render()
+const weekCutoffISO = cutoffForWeek(weekISO);
+const weekEndISO_   = shiftDays(weekISO, 6); // <-- ADD this (you reference weekEndISO_ later)
+const remitPct      = Number(settings.remit_pct) || 0;
 
-const grossLabDay = alHourly + salDay;
-const adjLabDay = grossLabDay + (remitPct * grossLabDay);
+tbody.innerHTML = "";
 
+for (const d of days){
+  const ps = (d.projected_sales ?? 0)      * SCALE;
+  const as = (d.actual_sales ?? 0)         * SCALE;
+  const pl = (d.projected_labor_cost ?? 0) * SCALE;
 
-    t.projSales   += ps;
-    t.actSalesDays+= as;
-    t.projLab     += pl;
-    t.actLab += alHourly;
-    t.projMin     += d.projected_labor_minutes ?? 0;
-    t.actMin      += d.actual_labor_minutes ?? 0;
+  // Hourly labour from 7shifts
+  const alHourly = (d.actual_labor_cost ?? 0) * SCALE;
 
-    const pct = (adjLabDay && as) ? (adjLabDay / as) : null;
-    const delta = (pct!=null && effTarget!=null) ? (pct - effTarget) : null;
+  // Daily salaried portion (weekly/7), only up to cutoff day
+  const dayISO = d.date || "";
+  const salDay = (dayISO && dayISO <= weekCutoffISO)
+    ? salaryForDay(settings?.mgr_salary_periods || [], dayISO)
+    : 0;
 
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${d.date || "—"}</td>
-      <td>${fmtMoney(ps)}</td>
-      <td>${fmtMoney(as)}</td>
-      <td>${fmtMoney(pl)}</td>
-      <td>${fmtMoney(adjLabDay)}</td>
-      <td>${fmtInt(d.projected_labor_minutes)}</td>
-      <td>${fmtInt(d.actual_labor_minutes)}</td>
-      <td>${fmtPct(pct)}</td>
-      <td><span class="pill ${delta!=null?(delta<=0?"good":"bad"):""}">${delta!=null? (delta*100).toFixed(1)+" pp":"—"}</span></td>
-    `;
-    tbody.appendChild(tr);
-  }
+  // Daily gross labour incl salary, then remittance
+  const grossLabDay = alHourly + salDay;
+  const adjLabDay   = grossLabDay + (remitPct * grossLabDay);
+
+  // accumulate totals (keep actLab = hourly only; salary is added later via salariedToDate)
+  t.projSales    += ps;
+  t.actSalesDays += as;
+  t.projLab      += pl;
+  t.actLab       += alHourly;
+  t.projMin      += d.projected_labor_minutes ?? 0;
+  t.actMin       += d.actual_labor_minutes ?? 0;
+
+  const pct   = (adjLabDay && as) ? (adjLabDay / as) : null;
+  const delta = (pct!=null && effTarget!=null) ? (pct - effTarget) : null;
+
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td>${d.date || "—"}</td>
+    <td>${fmtMoney(ps)}</td>
+    <td>${fmtMoney(as)}</td>
+    <td>${fmtMoney(pl)}</td>
+    <td>${fmtMoney(adjLabDay)}</td>
+    <td>${fmtInt(d.projected_labor_minutes)}</td>
+    <td>${fmtInt(d.actual_labor_minutes)}</td>
+    <td>${fmtPct(pct)}</td>
+    <td><span class="pill ${delta!=null?(delta<=0?"good":"bad"):""}">${delta!=null? (delta*100).toFixed(1)+" pp":"—"}</span></td>
+  `;
+  tbody.appendChild(tr);
+}
+
 
 // Food-only for the right panel — totals/KPIs still use TOTAL sales
 const totalActSales = t.actSalesDays; // keep TOTAL for KPIs/table
@@ -1294,10 +1304,6 @@ const autoFood =
     ? normalizeCurrency(autoFoodDirect)
     : (deepSumFoodNet(integ || {}) || totalActSales);
 
-
-  // ----- Salaried + remit for “to-date”, then week % and delta -----
-  const weekCutoffISO = cutoffForWeek(weekISO);
-  const weekEndISO_   = shiftDays(weekISO, 6);
 
   let salariedToDate = 0;
   let salariedWeekFull = 0;
