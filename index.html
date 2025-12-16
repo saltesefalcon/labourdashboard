@@ -540,6 +540,23 @@ function salaryFromPeriods(periods=[], weekISO, cutoffISO){
   return { fullWeek: r2(fullWeek), toDate: r2(toDate) };
 }
 
+function salaryForDay(periods=[], dayISO){
+  if (!Array.isArray(periods) || !dayISO) return 0;
+  let total = 0;
+
+  for (const p of periods){
+    const w = Number(p?.weekly) || 0;
+    const s = (p?.start || "").trim();
+    if (!w || !s) continue;
+
+    const e = (p?.end || "").trim();
+    const endISO = e ? e : "9999-12-31";
+
+    if (dayISO >= s && dayISO <= endISO) total += (w / 7);
+  }
+  return Math.round(total * 100) / 100;
+}
+
 
 // ----- Salaried management: period-aware helpers -----
 // Data model (preferred):
@@ -1220,21 +1237,32 @@ function effSalesFrom(base, ovr, integ){
   const t = { projSales:0, actSalesDays:0, projLab:0, actLab:0, projMin:0, actMin:0 };
 
   const tbody = document.querySelector("#dailyTable tbody");
+  const weekCutoffISO = cutoffForWeek(weekISO);
+const remitPct = Number(settings.remit_pct) || 0;
   tbody.innerHTML = "";
   for (const d of days){
     const ps = (d.projected_sales ?? 0)      * SCALE;
     const as = (d.actual_sales ?? 0)         * SCALE;
     const pl = (d.projected_labor_cost ?? 0) * SCALE;
-    const al = (d.actual_labor_cost ?? 0)    * SCALE;
+    const alHourly = (d.actual_labor_cost ?? 0) * SCALE;
+
+const dayISO = d.date || "";
+const salDay = (dayISO && dayISO <= weekCutoffISO)
+  ? salaryForDay(settings?.mgr_salary_periods, dayISO)
+  : 0;
+
+const grossLabDay = alHourly + salDay;
+const adjLabDay = grossLabDay + (remitPct * grossLabDay);
+
 
     t.projSales   += ps;
     t.actSalesDays+= as;
     t.projLab     += pl;
-    t.actLab      += al;
+    t.actLab += alHourly;
     t.projMin     += d.projected_labor_minutes ?? 0;
     t.actMin      += d.actual_labor_minutes ?? 0;
 
-    const pct   = (al && as) ? (al / as) : null;
+    const pct = (adjLabDay && as) ? (adjLabDay / as) : null;
     const delta = (pct!=null && effTarget!=null) ? (pct - effTarget) : null;
 
     const tr = document.createElement("tr");
@@ -1243,7 +1271,7 @@ function effSalesFrom(base, ovr, integ){
       <td>${fmtMoney(ps)}</td>
       <td>${fmtMoney(as)}</td>
       <td>${fmtMoney(pl)}</td>
-      <td>${fmtMoney(al)}</td>
+      <td>${fmtMoney(adjLabDay)}</td>
       <td>${fmtInt(d.projected_labor_minutes)}</td>
       <td>${fmtInt(d.actual_labor_minutes)}</td>
       <td>${fmtPct(pct)}</td>
