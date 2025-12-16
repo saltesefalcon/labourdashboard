@@ -1141,15 +1141,6 @@ const asNum = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 };
-function pickCaseInsensitive(obj, ...keys){
-  if (!obj || typeof obj !== "object") return null;
-  const map = new Map(Object.keys(obj).map(k => [k.toLowerCase(), k]));
-  for (const k of keys){
-    const real = map.get(String(k).toLowerCase());
-    if (real != null) return obj[real];
-  }
-  return null;
-}
 
 // Returns FOOD-only weekly sales if found; otherwise falls back to daySum
 function getAutoFoodSales(integ, daySum){
