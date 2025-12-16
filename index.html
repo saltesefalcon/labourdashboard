@@ -1117,49 +1117,98 @@ function deepFindFoodSales(integ){
   candidates.sort((a,b)=> b.score - a.score);
   return candidates[0].value;
 }
-
-// Prefer food-only from integrations *only if plausible* vs day sum.
-// Otherwise fall back to day-sum to avoid nonsense KPIs.
+// Prefer Silverware FOOD net (Name: "FOOD" or InterfaceID "5000"); otherwise fall back
 function getAutoFoodSales(integ, daySum) {
-  const pick = (...xs) => {
-    for (const v of xs) {
-      const n = Number(v);
-      if (Number.isFinite(n) && n > 0) return n;
-    }
-    return null;
+  const asNum = v => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const autoLabel = () => {
+    const base = (integ?.source_sales || "Silverware DailyTotals");
+    return `Auto: ${String(base).replace("(Total)", "(Food)")}`;
   };
 
-  const cand = pick(
+  // 1) Simple numeric fields some writers store
+  const direct = [
     integ?.food_sales_silverware,
     integ?.net_food_sales_silverware,
     integ?.food_net_sales,
     integ?.food_sales,
-    (typeof integ?.sales_breakdown?.food?.net   === "number" ? integ.sales_breakdown.food.net   : null),
-    (typeof integ?.sales_breakdown?.food?.gross === "number" ? integ.sales_breakdown.food.gross : null),
-    (typeof integ?.sales_breakdown?.food        === "number" ? integ.sales_breakdown.food        : null),
-    (typeof integ?.categories?.food             === "number" ? integ.categories.food             : null)
-  );
+    integ?.food
+  ].map(asNum).find(v => v && v > 0);
+  if (direct) return { value: direct, label: autoLabel() };
 
-  // If daySum is known, sanity-check the integration value.
-  // Food should usually be 30%–105% of the total day sum (upper bound allows small rounding diffs).
-  if (Number.isFinite(daySum) && daySum > 0 && Number.isFinite(cand) && cand > 0) {
-    const r = cand / daySum;
-    if (r >= 0.30 && r <= 1.05) {
-      const src = (integ?.source_sales || "Silverware DailyTotals").replace("(Total)", "(Food)");
-      return { value: cand, label: `Auto: ${src}` };
+  // 2) Common breakdown shapes
+  const fromBreakdown = (obj) => {
+    if (!obj || typeof obj !== "object") return null;
+    const tries = [
+      obj?.sales_breakdown,
+      obj?.categories,
+      obj
+    ];
+    for (const o of tries) {
+      if (!o) continue;
+      const v =
+        asNum(o?.food?.net) ??
+        asNum(o?.FOOD?.net) ??
+        asNum(o?.food?.gross) ??    // if net missing, gross is better than total fallback
+        asNum(o?.FOOD?.gross) ??
+        asNum(o?.food) ??
+        asNum(o?.FOOD);
+      if (v && v > 0) return v;
     }
-    // suspicious → ignore the integration number
-    return { value: daySum, label: "Days" };
+    return null;
+  };
+  const bd = fromBreakdown(integ);
+  if (bd) return { value: bd, label: autoLabel() };
+
+  // 3) Read Silverware "Sales -> Items" and sum FOOD NetAmount
+  //    Works whether the doc is a weekly blob or organized by day.
+  const isFoodItem = (it) => {
+    const name = String(it?.Name ?? it?.name ?? "").toUpperCase();
+    const id   = String(it?.InterfaceID ?? it?.interfaceId ?? it?.interfaceID ?? "");
+    return name === "FOOD" || id === "5000";
+  };
+
+  // Find the first Items array that looks like a Silverware category list
+  const findItemsArray = (node) => {
+    const stack = [node];
+    while (stack.length) {
+      const cur = stack.pop();
+      if (!cur || typeof cur !== "object") continue;
+      if (Array.isArray(cur)) {
+        for (const v of cur) if (v && typeof v === "object") stack.push(v);
+        continue;
+      }
+      for (const [k, v] of Object.entries(cur)) {
+        if (k.toLowerCase() === "items" && Array.isArray(v) &&
+            v.some(x => (x && typeof x === "object" && ("Name" in x || "InterfaceID" in x)))) {
+          return v; // use the first plausible Items block we find
+        }
+        if (v && typeof v === "object") stack.push(v);
+      }
+    }
+    return null;
+  };
+
+  const items =
+    findItemsArray(integ?.silverware_daily_totals) ||
+    findItemsArray(integ?.silverware) ||
+    findItemsArray(integ);
+
+  if (items && Array.isArray(items)) {
+    let sum = 0;
+    for (const it of items) {
+      if (isFoodItem(it)) {
+        const n = asNum(it?.NetAmount ?? it?.netAmount);
+        if (n) sum += n;
+      }
+    }
+    if (sum > 0) return { value: sum, label: autoLabel() };
   }
 
-  // If we don’t have a good daySum, but we do have a positive candidate, use it.
-  if (Number.isFinite(cand) && cand > 0) {
-    const src = (integ?.source_sales || "Silverware DailyTotals").replace("(Total)", "(Food)");
-    return { value: cand, label: `Auto: ${src}` };
-  }
-
-  // Fallback
-  return { value: daySum, label: "Days" };
+  // 4) Fallback = sum of daily actual_sales (total) if nothing else available
+  return { value: daySum, label: "Days (fallback)" };
 }
 
 
