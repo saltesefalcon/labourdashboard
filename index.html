@@ -442,7 +442,6 @@ window._dbg = {
     const periodList = document.getElementById("periodList");
 const addPeriodBtn = document.getElementById("addPeriodBtn");
 const salTotalPill = document.getElementById("salTotalPill");
-const showInactivePeriods = document.getElementById("showInactivePeriods");
 const showInactiveChk = document.getElementById("showInactiveChk");
 
     // Weekly overrides (editable here)
@@ -932,86 +931,41 @@ load();
 
     });
 
-    // ----- Settings modal: managers list -----
-    function mgrRowTemplate(name="", weekly=""){
-      const row = document.createElement("div");
-      row.className = "mgr-row";
-      row.innerHTML = `
-        <input type="text" placeholder="Manager name" value="${name||""}">
-        <input type="number" step="0.01" placeholder="0.00" value="${weekly!==""?weekly:""}">
-        <button title="Remove">🗑</button>
-      `;
-      const [nameEl, amtEl, delBtn] = row.children;
-      delBtn.onclick = () => row.remove();
-      return row;
-    }
-    function ensureMgrTotalsEl(){
-  let el = document.getElementById("mgrTotalsLine");
-  if (!el) {
-    el = document.createElement("div");
-    el.id = "mgrTotalsLine";
-    el.className = "small";
-    // place it just under the "+ Add Manager" row
-    addMgrBtn?.parentElement?.appendChild(el);
-  }
-  return el;
-}
-
+// ----- Settings modal: Salaried Management (dated periods) -----
 function applyPeriodVisibility(){
   const week = weekInput.value; // selected week start (Monday)
-  const showInactive = !!showInactivePeriods?.checked;
+  const showAll = !!showInactiveChk?.checked;
 
   Array.from(periodList.children).forEach(row => {
     const ins = row.querySelectorAll("input");
-    const end = (ins[3]?.value || "").trim(); // end date input
+    const end = (ins[3]?.value || "").trim(); // end date
     const inactive = end && end < week;       // ended before selected week
-
-    row.style.display = (!showInactive && inactive) ? "none" : "";
+    row.style.display = (!showAll && inactive) ? "none" : "";
   });
 }
 
-applyPeriodVisibility();
-function recalcMgrTotals(){
-  // plain managers list weekly sum
-  
-  const rows = Array.from(mgrList.querySelectorAll(".mgr-row"));
-  const weeklySum = rows.reduce((a,r)=>{
-    const amt = Number(r.querySelector('input[type="number"]')?.value) || 0;
-    return a + amt;
-  }, 0);
+function recalcSalaryTotal(){
+  applyPeriodVisibility();
 
-  // optional: period-aware total for THIS selected week
   const periods = Array.from(periodList.children).map(r=>{
     const ins = r.querySelectorAll("input");
     return {
       name:  (ins[0]?.value || "").trim(),
-      weekly:Number(ins[1]?.value) || 0,
+      weekly: Number(ins[1]?.value) || 0,
       start: (ins[2]?.value || "").trim(),
       end:   (ins[3]?.value || "").trim() || null
     };
   }).filter(p => p.name && p.weekly > 0 && p.start);
 
-  let periodTotal = 0;
   const sal = salaryFromPeriods(periods, weekInput.value, shiftDays(weekInput.value, 6));
-  if (sal) periodTotal = sal.fullWeek;
-  if (salTotalPill) salTotalPill.textContent = fmtMoney(periodTotal);
+  const total = sal ? sal.fullWeek : 0;
 
-  const el = ensureMgrTotalsEl();
-  el.textContent =
-    `Total weekly (Managers list): ${fmtMoney(weeklySum)}  •  Periods total (this week): ${fmtMoney(periodTotal)}`;
+  if (salTotalPill) salTotalPill.textContent = fmtMoney(total);
 }
 
     settingsClose.onclick = () => settingsModal.style.display = "none";
     settingsBtn.onclick = async () => {
       const s = await loadSettingsFor(locationSel.value);
-      // Render managers
-      mgrList.innerHTML = "";
-      const mgrs = Array.isArray(s.salaried_mgrs) ? s.salaried_mgrs.slice() : [];
-      if ((!mgrs || mgrs.length===0) && isNum(s.salaried_mgmt) && s.salaried_mgmt>0){
-        mgrs.push({ name: "Salaried Mgmt", weekly: Number(s.salaried_mgmt) });
-      }
-      if (!mgrs || mgrs.length===0) mgrs.push({name:"", weekly:""});
-      mgrs.forEach(m => mgrList.appendChild(mgrRowTemplate(m.name||"", m.weekly??"")));
 
       // Render salary periods (beta)
 periodList.innerHTML = "";
@@ -1024,15 +978,14 @@ if (ps.length === 0) {
   });
 }
 // hook changes so the total stays live
-recalcMgrTotals();
-periodList.oninput = recalcMgrTotals;
-showInactivePeriods?.addEventListener("change", recalcMgrTotals);
-
+recalcSalaryTotal();
+periodList.oninput = recalcSalaryTotal;
+showInactiveChk && (showInactiveChk.onchange = recalcSalaryTotal);
 
 // when adding new rows, also refresh totals
 addPeriodBtn.onclick = () => {
   periodList.appendChild(periodRowTemplate());
-  recalcMgrTotals();
+  recalcSalaryTotal();
 };
 
       setRemitPct.value = s.remit_pct ?? 0;
@@ -1049,12 +1002,6 @@ addPeriodBtn.onclick = () => {
     settingsSave.onclick = async () => {
       settingsMsg.textContent = "Saving…";
       try{
-        const rows = Array.from(mgrList.querySelectorAll(".mgr-row"));
-        const salaried_mgrs = rows.map(r => {
-          const [nameEl, amtEl] = r.children;
-          return { name: (nameEl.value||"").trim(), weekly: Number(amtEl.value)||0 };
-        }).filter(m => m.name && m.weekly >= 0);
-
         const loc = locationSel.value;
         const ref = doc(db, getSettingsPath(loc));
 
@@ -1071,7 +1018,6 @@ const periods = Array.from(periodList.children).map(r => {
 
         // Save new settings and zero out the legacy field
         await setDoc(ref, {
-          salaried_mgrs,
           mgr_salary_periods: periods,  
           remit_pct:        num(setRemitPct.value),
           budget_pct_food:  num(setPctFood.value),
@@ -1083,7 +1029,7 @@ const periods = Array.from(periodList.children).map(r => {
         }, { merge:true });
 
         // Then delete the legacy field so it can’t repopulate on load
-        try { await updateDoc(ref, { salaried_mgmt: deleteField() }); } catch {}
+        try { await updateDoc(ref, { salaried_mgmt: deleteField(), salaried_mgrs: deleteField() }); } catch {}
 
         settingsMsg.textContent = "Saved ✓";
         await load();
