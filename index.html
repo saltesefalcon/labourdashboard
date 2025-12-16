@@ -120,14 +120,28 @@
         </div>
 
         <!-- Salaried managers -->
-        <div style="margin:8px 0 6px;font-weight:600">Salaried Management</div>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin:8px 0 6px; font-weight:600">
+  <span>Salaried Management (calculated)</span>
+  <span id="salTotalPill" class="pill">—</span>
+</div>
+<div class="small" style="margin-bottom:10px">
+  Uses <b>Salary Periods</b> for the selected week. (Legacy “Managers list” below is optional.)
+</div>
+
         <div id="mgrList"></div>
         <div class="row" style="align-items:center;margin-bottom:12px">
           <button id="addMgrBtn">+ Add Manager</button>
           <span class="small">Weekly amounts; include only managers affecting this location’s weekly labour.</span>
         </div>
 <!-- Salary periods (beta) -->
-<div style="margin:14px 0 6px;font-weight:600">Salary Periods (beta)</div>
+<div style="display:flex; align-items:center; justify-content:space-between; margin:14px 0 6px; font-weight:600">
+  <span>Salary Periods (beta)</span>
+  <label class="small" style="display:flex; align-items:center; gap:6px; font-weight:400">
+    <input type="checkbox" id="showInactivePeriods">
+    Show inactive
+  </label>
+</div>
+
 <div id="periodList"></div>
 <div class="row" style="align-items:center;margin-bottom:12px">
   <button id="addPeriodBtn">+ Add Period</button>
@@ -431,6 +445,9 @@ window._dbg = {
     const addMgrBtn = document.getElementById("addMgrBtn");
     const periodList = document.getElementById("periodList");
 const addPeriodBtn = document.getElementById("addPeriodBtn");
+const salTotalPill = document.getElementById("salTotalPill");
+const showInactivePeriods = document.getElementById("showInactivePeriods");
+
 
 
     // Weekly overrides (editable here)
@@ -944,8 +961,24 @@ load();
   }
   return el;
 }
+
+function applyPeriodVisibility(){
+  const week = weekInput.value; // selected week start (Monday)
+  const showInactive = !!showInactivePeriods?.checked;
+
+  Array.from(periodList.children).forEach(row => {
+    const ins = row.querySelectorAll("input");
+    const end = (ins[3]?.value || "").trim(); // end date input
+    const inactive = end && end < week;       // ended before selected week
+
+    row.style.display = (!showInactive && inactive) ? "none" : "";
+  });
+}
+
+applyPeriodVisibility();
 function recalcMgrTotals(){
   // plain managers list weekly sum
+  
   const rows = Array.from(mgrList.querySelectorAll(".mgr-row"));
   const weeklySum = rows.reduce((a,r)=>{
     const amt = Number(r.querySelector('input[type="number"]')?.value) || 0;
@@ -966,6 +999,7 @@ function recalcMgrTotals(){
   let periodTotal = 0;
   const sal = salaryFromPeriods(periods, weekInput.value, shiftDays(weekInput.value, 6));
   if (sal) periodTotal = sal.fullWeek;
+  if (salTotalPill) salTotalPill.textContent = fmtMoney(periodTotal);
 
   const el = ensureMgrTotalsEl();
   el.textContent =
@@ -998,6 +1032,8 @@ if (ps.length === 0) {
 recalcMgrTotals();
 mgrList.addEventListener("input", recalcMgrTotals);
 periodList.addEventListener("input", recalcMgrTotals);
+showInactivePeriods?.addEventListener("change", recalcMgrTotals);
+
 
 // when adding new rows, also refresh totals
 addMgrBtn.onclick = () => {
