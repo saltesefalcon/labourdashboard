@@ -1137,12 +1137,16 @@ function deepSumFoodNet(root){
   }
   return normalizeCurrency(sum);
 }
+const asNum = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
 
 // Returns FOOD-only weekly sales if found; otherwise falls back to daySum
 function getAutoFoodSales(integ, daySum){
   // 1) explicit fields writers might set
   const direct =
-    toNum(integ?.food_sales_silverware) ??
+    toNum(integ?.food_sales_total) ?? 
     toNum(integ?.net_food_sales_silverware) ??
     toNum(integ?.food_net_sales) ??
     toNum(integ?.food_sales) ??
@@ -1278,9 +1282,19 @@ function effSalesFrom(base, ovr, integ){
   }
 
 // Food-only for the right panel — totals/KPIs still use TOTAL sales
-const autoFoodInfo = getAutoFoodSales(integ || {}, t.actSalesDays);
-const autoFood = autoFoodInfo.value;
 const totalActSales = t.actSalesDays; // keep TOTAL for KPIs/table
+
+// Prefer the explicit food-only values written by Silverware DailyTotals writers.
+// Fall back to deep scan, then finally to total days sum (so UI never blanks).
+const autoFoodDirect =
+  toNum(integ?.food_sales_total) ??
+  toNum(integ?.food_sales_silverware);
+
+const autoFood =
+  (autoFoodDirect != null && autoFoodDirect > 0)
+    ? normalizeCurrency(autoFoodDirect)
+    : (deepSumFoodNet(integ || {}) || totalActSales);
+
 
   // ----- Salaried + remit for “to-date”, then week % and delta -----
   const weekCutoffISO = cutoffForWeek(weekISO);
