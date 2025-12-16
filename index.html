@@ -1090,127 +1090,73 @@ function normalizeCurrency(n){
   const v = Number(n);
   if (!Number.isFinite(v)) return null;
   return v >= 100000 ? v * 0.01 : v; // treat very large values as cents
-}
-const asNum = (v) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
 };
-function pickCaseInsensitive(obj, ...keys){
-  if (!obj || typeof obj !== "object") return null;
-  const map = new Map(Object.keys(obj).map(k => [k.toLowerCase(), k]));
-  for (const k of keys){
-    const real = map.get(String(k).toLowerCase());
-    if (real != null) return obj[real];
+
+
+// Deeply scan ANY Silverware DailyTotals blob and SUM all FOOD NetAmount
+function deepSumFoodNet(root){
+  if (!root || typeof root !== "object") return 0;
+  const seen = new Set();
+  let sum = 0;
+
+  const push = (v) => { if (v && typeof v === "object") stack.push(v); };
+  const stack = [root];
+
+  while (stack.length){
+    const cur = stack.pop();
+    if (!cur || typeof cur !== "object") continue;
+    if (seen.has(cur)) continue;
+    seen.add(cur);
+
+    // Case A: explicit FOOD category objects (Name or InterfaceID)
+    const name = cur?.Name ?? cur?.name;
+    const id   = cur?.InterfaceID ?? cur?.interfaceID ?? cur?.interfaceId;
+    const isFoodRow = (typeof name === "string" && name.toUpperCase() === "FOOD") || String(id||"") === "5000";
+    if (isFoodRow){
+      const net = toNum(cur?.NetAmount ?? cur?.netAmount ?? cur?.net ?? cur?.Net);
+      if (net) sum += net;
+    }
+
+    // Case B: “categories” style objects: { food: { net: ... } } or { FOOD: number }
+    const cat = cur?.food ?? cur?.FOOD;
+    if (cat != null){
+      const net = toNum(
+        (typeof cat === "object")
+          ? (cat?.net ?? cat?.Net ?? cat?.netAmount ?? cat?.NetAmount)
+          : cat
+      );
+      if (net) sum += net;
+    }
+
+    // Recurse
+    if (Array.isArray(cur)){
+      for (const v of cur) push(v);
+    } else {
+      for (const v of Object.values(cur)) push(v);
+    }
   }
-  return null;
+  return normalizeCurrency(sum);
 }
 
-// --- MAIN: return { value:number, label:string } ---
-function getAutoFoodSales(integ, daySum) {
-  const autoLabel = (kind="Food") => {
-    const base = (integ?.source_sales || "Silverware DailyTotals");
-    return `Auto: ${String(base).replace("(Total)","").trim()} (${kind})`;
-  };
+// Returns FOOD-only weekly sales if found; otherwise falls back to daySum
+function getAutoFoodSales(integ, daySum){
+  // 1) explicit fields writers might set
+  const direct =
+    toNum(integ?.food_sales_silverware) ??
+    toNum(integ?.net_food_sales_silverware) ??
+    toNum(integ?.food_net_sales) ??
+    toNum(integ?.food_sales) ??
+    toNum(integ?.food);
+  if (direct && direct > 0) return { value: normalizeCurrency(direct), label: "Auto: Silverware DailyTotals (Food)" };
 
-  // 1) Direct fields some writers store
-  {
-    const direct = [
-      integ?.food_sales_silverware,
-      integ?.net_food_sales_silverware,
-      integ?.food_net_sales,
-      integ?.food_sales,
-      integ?.food,
-      integ?.auto_food_sales,
-      integ?.netFood, integ?.foodNet
-    ].map(asNum).find(v => v && v > 0);
-    if (direct) return { value: normalizeCurrency(direct), label: autoLabel("Food") };
-  }
+  // 2) deep scan of any Sales/Categories blobs for FOOD=5000
+  const deep = deepSumFoodNet(integ);
+  if (deep && deep > 0) return { value: deep, label: "Auto: Silverware DailyTotals (Food)" };
 
-  // 2) Structured breakdowns like { sales_breakdown: { food:{net}, wine:{net}, ... } }
-  {
-    const buckets = pickCaseInsensitive(integ, "sales_breakdown", "categories", "breakdown", "salesCategories");
-    if (buckets && typeof buckets === "object"){
-      const food = pickCaseInsensitive(buckets, "food");
-      const v =
-        asNum(pickCaseInsensitive(food||{}, "net","netamount","netsales","amountnet","nettotal")) ??
-        asNum(food);
-      if (v && v > 0) return { value: normalizeCurrency(v), label: autoLabel("Food") };
-    }
-  }
-
-  // 3) Silverware-style Sales.Items arrays
-  function readNet(it){
-    return (
-      asNum(pickCaseInsensitive(it, "NetAmount","netAmount","Net","net","NetSales","netSales","AmountNet","NetTotal")) ||
-      0
-    );
-  }
-  function readName(it){
-    return (
-      pickCaseInsensitive(it, "Name","name","Category","category","MenuGroup","menuGroup","RevenueClass","GroupName") || ""
-    ) + "";
-  }
-  function readId(it){
-    return (
-      pickCaseInsensitive(it, "InterfaceID","interfaceId","interfaceID","CategoryID","DepartmentID","MenuGroupID")
-    );
-  }
-  function looksFood(it){
-    const nm = (readName(it) || "").toUpperCase();
-    const id = readId(it);
-    if (nm.includes("FOOD")) return true;
-    // common Silverware mapping: 5000
-    if (id === 5000 || id === "5000") return true;
-    return false;
-  }
-  function looksBeverage(it){
-    const nm = (readName(it) || "").toUpperCase();
-    return nm.includes("WINE") || nm.includes("LIQUOR") || nm.includes("BEER") || nm.includes("ALCOHOL");
-  }
-
-  function collectItems(root){
-    const out = [];
-    const stack = [root];
-    const seen = new Set();
-    while (stack.length){
-      const cur = stack.pop();
-      if (!cur || typeof cur !== "object") continue;
-      if (seen.has(cur)) continue; seen.add(cur);
-
-      const candidates = [
-        pickCaseInsensitive(cur, "Sales"),
-        pickCaseInsensitive(cur, "silverware_daily_totals"),
-        pickCaseInsensitive(cur, "silverware"),
-        pickCaseInsensitive(cur, "RAW")
-      ];
-      for (const c of candidates){
-        const items = pickCaseInsensitive(c||{}, "Items");
-        if (Array.isArray(items)) out.push(items);
-      }
-
-      for (const v of Object.values(cur)){
-        if (v && typeof v === "object") stack.push(v);
-      }
-    }
-    return out.flat();
-  }
-
-  const items = collectItems(integ);
-  if (items.length){
-    const foodNet = items.reduce((a,it)=> a + (looksFood(it) ? readNet(it) : 0), 0);
-    const bevNet  = items.reduce((a,it)=> a + (looksBeverage(it) ? readNet(it) : 0), 0);
-    const totalNet= items.reduce((a,it)=> a + readNet(it), 0);
-
-    if (foodNet > 0) return { value: normalizeCurrency(foodNet), label: autoLabel("Food") };
-    if (totalNet > 0 && bevNet > 0) {
-      const v = totalNet - bevNet;
-      if (v > 0) return { value: normalizeCurrency(v), label: autoLabel("Food=Total−Beverage") };
-    }
-  }
-
-  // 4) Absolute fallback so UI never blanks: day sum (total)
+  // 3) fallback so the UI never blanks
   return { value: daySum, label: "Days (fallback)" };
 }
+
 
 
 function effSalesFrom(base, ovr, integ){
@@ -1331,13 +1277,10 @@ function effSalesFrom(base, ovr, integ){
     tbody.appendChild(tr);
   }
 
-// ----- Effective ACTUAL SALES (auto vs manual override) -----
+// Food-only for the right panel — totals/KPIs still use TOTAL sales
 const autoFoodInfo = getAutoFoodSales(integ || {}, t.actSalesDays);
 const autoFood = autoFoodInfo.value;
-const effActSales = (typeof ovr?.food_sales === "number" && ovr.food_sales > 0)
-  ? Number(ovr.food_sales)
-  : autoFood;
-
+const totalActSales = t.actSalesDays; // keep TOTAL for KPIs/table
 
   // ----- Salaried + remit for “to-date”, then week % and delta -----
   const weekCutoffISO = cutoffForWeek(weekISO);
@@ -1361,12 +1304,12 @@ const effActSales = (typeof ovr?.food_sales === "number" && ovr.food_sales > 0)
   const remit             = (Number(settings.remit_pct) || 0) * grossLabourToDate;
   const adjustedActLab    = grossLabourToDate + remit;
 
-  const weekPct   = effActSales > 0 ? (adjustedActLab / effActSales) : null;
+  const weekPct   = totalActSales > 0 ? (adjustedActLab / totalActSales) : null;
   const weekDelta = (weekPct!=null && effTarget!=null) ? (weekPct - effTarget) : null;
 
   // ----- Totals & KPIs -----
   document.getElementById("tProjSales").textContent  = fmtMoney(t.projSales);
-  document.getElementById("tActSales").textContent   = fmtMoney(effActSales);
+  document.getElementById("tActSales").textContent   = fmtMoney(totalActSales);
   document.getElementById("tProjLabour").textContent = fmtMoney(t.projLab);
   document.getElementById("tActLabour").textContent  = fmtMoney(adjustedActLab);
 
@@ -1380,7 +1323,7 @@ const effActSales = (typeof ovr?.food_sales === "number" && ovr.food_sales > 0)
     `<span class="pill ${weekDelta!=null?(weekDelta<=0?"good":"bad"):""}">${weekDelta!=null? (weekDelta*100).toFixed(1)+" pp":"—"}</span>`;
 
   if (kpiProjSales) kpiProjSales.textContent = fmtMoney(t.projSales);
-  if (kpiActSales)  kpiActSales.textContent  = fmtMoney(effActSales);
+  if (kpiActSales)  kpiActSales.textContent  = fmtMoney(totalActSales);
   const projPct = (t.projLab && t.projSales) ? (t.projLab / t.projSales) : null;
   if (kpiProjPct)  kpiProjPct.textContent = fmtPct(projPct);
   if (kpiActPct)   { kpiActPct.textContent = fmtPct(weekPct); applyPctClass(kpiActPct, weekPct); }
@@ -1392,13 +1335,9 @@ const effActSales = (typeof ovr?.food_sales === "number" && ovr.food_sales > 0)
   else if (typeof syncAt==="string"){ const dt=new Date(syncAt); syncTxt = isNaN(dt)? syncAt : dt.toLocaleString(); }
   syncLine.textContent = "Last sync: " + (syncTxt || "—");
 
-let salesSrc = "Days";
-if (typeof ovr.food_sales === "number" && ovr.food_sales > 0) {
-  salesSrc = "Manual override";
-} else {
-  salesSrc = autoFoodInfo.label; // e.g., "Auto: Silverware DailyTotals (Food)"
-}
-salesSource.textContent = salesSrc;
+// Totals are from day documents; food-only is shown separately below
+salesSource.textContent = "Days (totals) • Food via Silverware";
+
 
   // Extras (manual > integration)
   const autoVoids  = isNum(integ?.voids_silverware)  ? integ.voids_silverware  : (isNum(integ?.voids)  ? integ.voids  : null);
@@ -1475,13 +1414,10 @@ const integ= integSnap.exists()? integSnap.data(): null;
         actMin    += d.actual_labor_minutes ?? 0;
       }
 
-const foodInfo = getAutoFoodSales(integ || {}, actSalesDays);
-const effActSales = (isNum(ovr.food_sales) && ovr.food_sales > 0)
-  ? Number(ovr.food_sales)
-  : foodInfo.value;
+// PDF stays on TOTAL sales (not food-only)
+const totalActSales = actSalesDays;
 
-
-      
+    
 let salaried = 0;
 const salPdf = salaryFromPeriods(settings?.mgr_salary_periods, weekISO, shiftDays(weekISO, 6));
 if (salPdf) salaried = salPdf.fullWeek;
@@ -1498,7 +1434,7 @@ const grossLabour  = (actLab || 0) + salaried;
   : (isNum(settings?.target_labour_pct) ? Number(settings.target_labour_pct) : null);
 
       const projPct = (projLab && projSales) ? projLab/projSales : null;
-      const actPct  = (adjActLab && effActSales) ? adjActLab/effActSales : null;
+      const actPct  = (adjActLab && totalActSales) ? adjActLab/totalActSales : null;
       const delta   = (actPct!=null && target!=null) ? (actPct-target) : null;
 
       const budgets = {
@@ -1516,16 +1452,17 @@ const grossLabour  = (actLab || 0) + salaried;
       ]);
 let lastWeek = null;
 if (pBaseSnap.exists()){
-  const pIntegSnap = await getDoc(doc(db, `companies/aidan/locations/${locKey}/integrations/${prevISO}`));
-  const prevInteg  = pIntegSnap.exists()? pIntegSnap.data() : null;
-  lastWeek = effSalesFrom(pBaseSnap.data(), pOvrSnap.exists()?pOvrSnap.data():null, prevInteg);
+  const prevBase = pBaseSnap.data();
+  const pDays  = prevBase?.days || [];
+  const pScale = detectCurrencyScale(pDays);
+  lastWeek = pDays.reduce((a,d)=> a + ((d.actual_sales ?? 0) * pScale), 0); // TOTAL
 }
 
 
       return {
         locKey,
         target,
-        projSales, actSales: effActSales,
+        projSales, actSales: totalActSales,
         projLab,   actLab: adjActLab,
         projMin,   actMin,
         projPct,   actPct, delta,
