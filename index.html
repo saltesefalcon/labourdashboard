@@ -180,6 +180,24 @@
       </div>
     </div>
 
+<!-- COMING SOON MODAL (FOH/BOH Optimizer) -->
+<div id="soonModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9998; align-items:center; justify-content:center;">
+  <div class="card" style="width:520px; max-width:94%; background:var(--panel); border:1px solid var(--line)">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+      <div style="font-weight:600">FOH / BOH Optimizer</div>
+      <button id="soonClose">✕</button>
+    </div>
+
+    <div class="small" style="line-height:1.35">
+      <strong>Coming soon.</strong> This feature isn’t enabled yet while we finish building the optimizer page.
+    </div>
+
+    <div class="row" style="margin-top:12px">
+      <button id="soonOk" class="primary">OK</button>
+    </div>
+  </div>
+</div>
+
     <!-- AUTH GATE -->
     <div id="authGate" class="card" style="max-width:520px;margin:48px auto 0;">
       <h2>Sign in to view data</h2>
@@ -470,12 +488,26 @@ const showInactiveChk = document.getElementById("showInactiveChk");
     const kpiProjPct   = document.getElementById("kpiProjPct");
     const kpiActPct    = document.getElementById("kpiActPct");
 
-    // FOH/BOH nav button: just go to foh-boh.html
-    if (optimizerBtn) {
-      on(optimizerBtn, "click", () => {
-        window.location.href = "foh-boh.html";
-      });
-    }
+// FOH/BOH Optimizer: Coming soon (disabled navigation for now)
+const soonModal = document.getElementById("soonModal");
+const soonClose = document.getElementById("soonClose");
+const soonOk    = document.getElementById("soonOk");
+
+function openSoonModal(){
+  if (soonModal) soonModal.style.display = "flex";
+}
+function closeSoonModal(){
+  if (soonModal) soonModal.style.display = "none";
+}
+
+on(soonClose, "click", closeSoonModal);
+on(soonOk,    "click", closeSoonModal);
+on(soonModal, "click", (e) => { if (e.target === soonModal) closeSoonModal(); });
+
+if (optimizerBtn) {
+  on(optimizerBtn, "click", openSoonModal);
+}
+
 
     // Helpers
     const fmtMoney = n => (n==null? "—" : n.toLocaleString(undefined,{style:"currency",currency:"CAD",maximumFractionDigits:0}));
