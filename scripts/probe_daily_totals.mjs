@@ -4,8 +4,9 @@
 //   node scripts/probe_daily_totals.mjs cesoir       --week=2025-10-27 --debug
 
 const loc = (process.argv[2] || "").toLowerCase();
-if (!["prohibition","cesoir"].includes(loc)) {
-  console.error("First arg must be prohibition|cesoir"); process.exit(1);
+if (!["beacon","tulia","prohibition","cesoir"].includes(loc)) {
+  console.error("First arg must be beacon|tulia|prohibition|cesoir");
+  process.exit(1);
 }
 
 const BASE = process.env[`SILVERWARE_BASE_${loc.toUpperCase()}`];
@@ -64,38 +65,53 @@ const flat = (obj, pref="", out={}) => {
   return out;
 };
 
+function normalizeCurrency(n){
+  const v = Number(n);
+  if (!Number.isFinite(v)) return 0;
+  // if Silverware ever returns cents as big integers, convert to dollars
+  return v >= 100000 ? (v * 0.01) : v;
+}
+
 function pickFood(obj) {
-  // Try common places: Department/Category/Revenue center buckets containing "Food" or "Kitchen"
+  // Keep keys list for debug visibility
   const f = flat(obj);
-  const hints = (process.env.FOOD_CATEGORY_HINTS || "Food,Kitchen")
-    .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
 
-  // best single numeric for total sales
-  let total = 0;
-  for (const [k,v] of Object.entries(f)) {
-    const lk = k.toLowerCase();
-    if (isNum(v) && /\bsales\b|\bamount\b|\brevenue\b/.test(lk) && !/tax|gratuity|tip|deposit/.test(lk))
-      total += v;
-  }
+  // TOTAL SALES: use Sales.TotalNetAmount (this matches what you see in the payload)
+  const total = normalizeCurrency(
+    obj?.Sales?.TotalNetAmount ??
+    obj?.Sales?.TotalGrossAmount ??
+    0
+  );
 
-  // sum any “foodish” buckets
+  // FOOD SALES: explicitly pull FOOD row from Sales.Items (InterfaceID 5000)
   let food = 0;
-  for (const [k,v] of Object.entries(f)) {
-    const lk = k.toLowerCase();
-    if (isNum(v) && hints.some(h => lk.includes(h)) && /sales|amount|revenue/.test(lk))
-      food += v;
-  }
+  const items = Array.isArray(obj?.Sales?.Items) ? obj.Sales.Items : [];
+  for (const it of items){
+    const name = String(it?.Name ?? it?.name ?? "").toUpperCase();
+    const id   = String(it?.InterfaceID ?? it?.interfaceID ?? it?.interfaceId ?? "");
+    const isFood = (name === "FOOD") || (id === "5000");
+    if (!isFood) continue;
 
-  // promos/discounts & voids by keyword sweep
-  let promos = 0, voids = 0;
-  for (const [k,v] of Object.entries(f)) {
-    const lk = k.toLowerCase();
-    if (isNum(v) && /(discount|promo|promotion|comp|coupon)s?(\.|$)/.test(lk)) promos += v;
-    if (isNum(v) && /(void|cancel|cancell?ed)s?(\.|$)/.test(lk))           voids  += v;
+    const net = Number(it?.NetAmount ?? it?.netAmount ?? it?.Net ?? it?.net ?? 0) || 0;
+    food += net;
   }
+  food = normalizeCurrency(food);
+
+  // PROMOS/DISCOUNTS: use Discounts.TotalAmount (matches payload Discounts section)
+  const promos = normalizeCurrency(
+    obj?.Discounts?.TotalAmount ??
+    obj?.Sales?.TotalDiscountAmount ??
+    0
+  );
+
+  // VOIDS: ONLY use Voids.TotalAmount (DO NOT include cancellations)
+  const voids = normalizeCurrency(
+    obj?.Voids?.TotalAmount ?? 0
+  );
 
   return { total, food, promos, voids, keys: Object.keys(f).slice(0,60) };
 }
+
 
 (async () => {
   console.log(`[${loc}] probe ${from}..${to}`);
@@ -116,13 +132,17 @@ function pickFood(obj) {
     roll.voids  += m.voids;
   }
 
-  console.log(`[${loc}] Totals for ${from}..${to}`);
-  console.table({
-    total_sales:   Math.round(roll.total),
-    food_sales:    Math.round(roll.food),
-    promos:        Math.round(roll.promos),
-    voids:         Math.round(roll.voids),
-  });
+console.log(`[${loc}] Totals for ${from}..${to}`);
+
+const r2 = n => Math.round(n * 100) / 100;
+
+console.table({
+  total_sales: r2(roll.total),
+  food_sales:  r2(roll.food),
+  promos:      r2(roll.promos),
+  voids:       r2(roll.voids),
+});
+
 
   // Show key names we saw to fine-tune mapping
   if (dbg) console.log("Sample keys seen:", pickFood(days[0]||{}).keys);

@@ -170,6 +170,7 @@ function integDocPath(locKey, weekISO) {
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 const payload = {
+  writer_version: "voids-only-test-1",
   total_sales_silverware: round2(sums.totalNet),
   food_sales_total:       round2(sums.food),
   promos_silverware:      round2(sums.promos),
