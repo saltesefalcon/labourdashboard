@@ -134,13 +134,14 @@ function deriveFromOne(day) {
   const promos = isNum(day?.Discounts?.TotalAmount) ? day.Discounts.TotalAmount : 0;
 
   // ✅ VOIDS ONLY (no cancellations)
-  const voidsOnly = isNum(day?.Voids?.TotalAmount) ? day.Voids.TotalAmount : 0;
+const voids = isNum(day?.Voids?.TotalAmount) ? day.Voids.TotalAmount : 0;
+const cancellations = isNum(day?.Cancellations?.TotalAmount) ? day.Cancellations.TotalAmount : 0;
 
-   const cancellations = isNum(day?.Cancellations?.TotalAmount) ? day.Cancellations.TotalAmount : 0;
 
   const totalNet = isNum(day?.Sales?.TotalNetAmount) ? day.Sales.TotalNetAmount : 0;
 
-  return { food, promos, voids: voidsOnly, totalNet };
+  return { food, promos, voids, cancellations, totalNet };
+
 }
 
 function rollup(days) {
@@ -183,6 +184,7 @@ function integDocPath(locKey, weekISO) {
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 const payload = {
+  writer_tag: "daily_totals",
   total_sales_silverware: round2(sums.totalNet),
   food_sales_total:       round2(sums.food),
   promos_silverware:      round2(sums.promos),

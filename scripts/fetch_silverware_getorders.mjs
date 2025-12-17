@@ -115,14 +115,30 @@ async function run(){
   console.log(`[beacon] food_net=${roll.food_sales_total} promos=${roll.promos_silverware} voids=${roll.voids_silverware}`);
 
   const ref = db.doc(`companies/aidan/locations/beacon/integrations/${WEEK_OF}`);
-  await ref.set({
-    ...roll,
-    source_sales: "Silverware (Orders)",
-    source_extras: "Silverware (Orders)",
-    tz_offset_min: TZ_OFFSET_MIN,
-    synced_at: admin.firestore.FieldValue.serverTimestamp(),
-    orders_sample: Array.isArray(orders) ? (orders[0] ?? null) : null
-  }, { merge:true });
+// IMPORTANT: Do NOT overwrite DailyTotals integration fields.
+// Store Orders-derived values under non-colliding keys.
+const {
+  food_sales_total,
+  promos_silverware,
+  voids_silverware,
+  ...rest
+} = roll;
+
+await ref.set({
+  ...rest,
+
+  // renamed to avoid collisions with DailyTotals
+  orders_food_sales_total: food_sales_total,
+  orders_promos: promos_silverware,
+  orders_voids: voids_silverware,
+
+  tz_offset_min: TZ_OFFSET_MIN,
+  synced_at_orders: admin.firestore.FieldValue.serverTimestamp(),
+  source_orders: "Silverware (Orders)",
+
+  orders_sample: Array.isArray(orders) ? (orders[0] ?? null) : null
+}, { merge:true });
+
 
   console.log("Done.");
 }
@@ -134,11 +150,11 @@ run().catch(async (e) => {
     console.error("Token likely lacks permission for ThirdParty/GetOrders. Ask Silverware to enable ThirdParty Orders API for this app/token.");
   }
   const ref = db.doc(`companies/aidan/locations/beacon/integrations/${WEEK_OF}`);
-  await ref.set({
-    source_sales: "Silverware (Orders)",
-    source_extras: "Silverware (Orders)",
-    last_error: (e?.message || String(e)).slice(0, 500),
-    synced_at: admin.firestore.FieldValue.serverTimestamp(),
-  }, { merge:true });
+await ref.set({
+  source_orders: "Silverware (Orders)",
+  last_error_orders: (e?.message || String(e)).slice(0, 500),
+  synced_at_orders: admin.firestore.FieldValue.serverTimestamp(),
+}, { merge:true });
+
   process.exit(1);
 });
