@@ -131,8 +131,7 @@ function deriveFromOne(day) {
     }
   }
   const promos = isNum(day?.Discounts?.TotalAmount) ? day.Discounts.TotalAmount : 0;
-  const voids  = (isNum(day?.Voids?.TotalAmount) ? day.Voids.TotalAmount : 0)
-               + (isNum(day?.Cancellations?.TotalAmount) ? day.Cancellations.TotalAmount : 0);
+const voids  = isNum(day?.Voids?.TotalAmount) ? day.Voids.TotalAmount : 0; // ✅ Voids only (no cancellations)
   const totalNet = isNum(day?.Sales?.TotalNetAmount) ? day.Sales.TotalNetAmount : 0;
   return { food, promos, voids, totalNet };
 }
