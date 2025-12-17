@@ -136,6 +136,8 @@ function deriveFromOne(day) {
   // ✅ VOIDS ONLY (no cancellations)
   const voidsOnly = isNum(day?.Voids?.TotalAmount) ? day.Voids.TotalAmount : 0;
 
+   const cancellations = isNum(day?.Cancellations?.TotalAmount) ? day.Cancellations.TotalAmount : 0;
+
   const totalNet = isNum(day?.Sales?.TotalNetAmount) ? day.Sales.TotalNetAmount : 0;
 
   return { food, promos, voids: voidsOnly, totalNet };
@@ -147,10 +149,12 @@ function rollup(days) {
     a.food += x.food;
     a.promos += x.promos;
     a.voids += x.voids;
+    a.cancellations += (x.cancellations || 0);
     a.totalNet += x.totalNet;
     return a;
-  }, { food:0, promos:0, voids:0, totalNet:0 });
+  }, { food:0, promos:0, voids:0, cancellations:0, totalNet:0 });
 }
+
 
 
 function integDocPath(locKey, weekISO) {
@@ -179,16 +183,15 @@ function integDocPath(locKey, weekISO) {
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 const payload = {
-  writer_version: "voids-only-test-1",
   total_sales_silverware: round2(sums.totalNet),
   food_sales_total:       round2(sums.food),
   promos_silverware:      round2(sums.promos),
-  voids_silverware:       round2(sums.voids),
+  voids_silverware:       round2(sums.voids),                 // ✅ voids only now
+  cancellations_silverware: round2(sums.cancellations),       // ✅ verification field
   source_sales:  "Silverware DailyTotals (Total)",
   source_extras: "Silverware DailyTotals",
   synced_at: admin.firestore.FieldValue.serverTimestamp(),
 };
-
 
       await db.doc(integDocPath(loc, weekISO)).set(payload, { merge: true });
       console.log(`[${loc}] wrote → ${integDocPath(loc, weekISO)}`);
