@@ -302,24 +302,30 @@
 
       <!-- MANUAL INPUTS + LAST WEEK / BUDGETS -->
       <div class="two" style="margin-top:12px">
-        <div class="card">
-          <div class="section-title">Manual inputs (saved per week)</div>
+<div class="card">
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+    <div class="section-title" style="margin:0">Manual inputs (saved per week)</div>
+    <button id="manualToggleBtn">Show</button>
+  </div>
 
-          <div class="row">
-            <label>Food Sales $<br><input id="inFoodSales" type="number" step="0.01" placeholder="0"></label>
-            <label>Promos/Discounts $<br><input id="inPromos" type="number" step="0.01" placeholder="0"></label>
-          </div>
+  <div id="manualInputsWrap" style="display:none; margin-top:10px;">
+    <div class="row">
+      <label>Food Sales $<br><input id="inFoodSales" type="number" step="0.01" placeholder="0"></label>
+      <label>Promos/Discounts $<br><input id="inPromos" type="number" step="0.01" placeholder="0"></label>
+    </div>
 
-          <div class="row">
-            <label>Voids $<br><input id="inVoids" type="number" step="0.01" placeholder="0"></label>
-          </div>
+    <div class="row">
+      <label>Voids $<br><input id="inVoids" type="number" step="0.01" placeholder="0"></label>
+    </div>
 
-          <div class="row">
-            <button id="saveOverrides" class="primary">Save</button>
-            <span id="saveMsg" class="small"></span>
-          </div>
-          <div class="small" style="margin-top:4px">Manual values override auto values if entered (&gt; 0).</div>
-        </div>
+    <div class="row">
+      <button id="saveOverrides" class="primary">Save</button>
+      <span id="saveMsg" class="small"></span>
+    </div>
+    <div class="small" style="margin-top:4px">Manual values override auto values if entered (&gt; 0).</div>
+  </div>
+</div>
+
 
         <div class="card">
           <div class="section-title">Last Week, Auto Feeds & Purchasing Budgets</div>
@@ -468,6 +474,28 @@ const showInactiveChk = document.getElementById("showInactiveChk");
     const inPromos = document.getElementById("inPromos");
     const saveBtn = document.getElementById("saveOverrides");
     const saveMsg = document.getElementById("saveMsg");
+
+    // Manual Inputs collapse/expand
+const manualToggleBtn  = document.getElementById("manualToggleBtn");
+const manualInputsWrap = document.getElementById("manualInputsWrap");
+
+function setManualOpen(open){
+  if (!manualInputsWrap || !manualToggleBtn) return;
+  manualInputsWrap.style.display = open ? "" : "none";
+  manualToggleBtn.textContent = open ? "Hide" : "Show";
+  localStorage.setItem("showManualInputs", open ? "1" : "0");
+}
+
+// default closed (remember last choice)
+setManualOpen(localStorage.getItem("showManualInputs") === "1");
+
+if (manualToggleBtn){
+  manualToggleBtn.addEventListener("click", () => {
+    const isOpen = manualInputsWrap && manualInputsWrap.style.display !== "none";
+    setManualOpen(!isOpen);
+  });
+}
+
 
     // Budgets & extras view
     const vwProjSales = document.getElementById("vwProjSales");
@@ -759,23 +787,28 @@ function updateFrozenUI(frozen){
 async function toggleLock(){
   const loc   = locationSel.value;
   const week  = weekInput.value;
+
   try{
+    const nextFrozen = !FROZEN;
+
     await setDoc(
       doc(db, `companies/aidan/locations/${loc}/labour/${week}`),
       {
-        frozen: !FROZEN,
+        frozen: nextFrozen,
         frozen_by_uid:   CUR_USER?.uid   || null,
         frozen_by_email: CUR_USER?.email || null,
         frozen_at: serverTimestamp()
       },
       { merge:true }
     );
-    updateFrozenUI(!FROZEN);
-    refreshMsg.textContent = FROZEN ? "Week unlocked." : "Week locked.";
+
+    updateFrozenUI(nextFrozen);
+    refreshMsg.textContent = nextFrozen ? "Week locked." : "Week unlocked.";
   }catch(e){
     refreshMsg.textContent = "Lock toggle failed: " + (e.message || e);
   }
 }
+
 
 async function maybeAutoLock(base, weekISO){
   // Auto-lock any week that’s in a past month and is complete, if not already frozen
@@ -812,6 +845,10 @@ function daysElapsedInWeek(weekISO, cutoffISO){
     weekInput.onchange = load;
 
    async function refreshWeek(){
+   if (FROZEN) {
+  refreshMsg.textContent = "Week is locked (frozen). Unlock it to refresh.";
+  return;
+}
   const week_of = weekInput.value;
   const locKey  = locationSel.value; // beacon | tulia | prohibition | cesoir
   refreshMsg.textContent = "Dispatching update…";
@@ -837,6 +874,7 @@ function daysElapsedInWeek(weekISO, cutoffISO){
     refreshBtn.onclick = refreshWeek;
 
 async function ensureFreshness(base, integ, weekISO, locKey){
+  if (base?.frozen) return; // don't auto-refresh frozen weeks
   const guardKey = `autoRefresh:${locKey}:${weekISO}`;
   const lastGuard = Number(localStorage.getItem(guardKey) || 0);
   const now = Date.now();
@@ -1217,6 +1255,9 @@ function effSalesFrom(base, ovr, integ){
 
       const base = baseSnap.exists()? baseSnap.data(): null;
       const ovr  = ovrSnap.exists()? ovrSnap.data(): {};
+
+      // IMPORTANT: lock is per-week — reset UI based on THIS week doc
+updateFrozenUI(!!base?.frozen);
 
       // also fetch PREVIOUS week for "Last Week Sales"
       const prevISO = shiftDays(weekISO, -7);
