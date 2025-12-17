@@ -1150,6 +1150,44 @@ function normalizeCurrency(n){
   return v >= 100000 ? v * 0.01 : v; // treat very large values as cents
 };
 
+function moneyMaybe(v){
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  return (n >= 100000) ? n * 0.01 : n; // cents→dollars safety
+}
+
+function getAutoVoidsOnly(integ){
+  // 1) Prefer explicit “voids only” fields if you ever add them in the writer
+  const explicit =
+    moneyMaybe(integ?.voids_only) ??
+    moneyMaybe(integ?.voidsOnly) ??
+    moneyMaybe(integ?.voids_total) ??
+    moneyMaybe(integ?.voidsTotal);
+
+  if (explicit != null) {
+    return { value: explicit, label: "Auto: Silverware (Voids)" };
+  }
+
+  // 2) Otherwise: read voids + cancellations and subtract cancellations if both exist
+  const rawVoids =
+    moneyMaybe(integ?.voids_silverware) ??
+    moneyMaybe(integ?.voids);
+
+  const canc =
+    moneyMaybe(integ?.cancellations_silverware) ??
+    moneyMaybe(integ?.cancellations) ??
+    moneyMaybe(integ?.cancellations_total) ??
+    moneyMaybe(integ?.cancellationsTotal);
+
+  if (rawVoids != null && canc != null) {
+    return { value: Math.max(0, rawVoids - canc), label: "Auto: Silverware (Voids only)" };
+  }
+
+  // 3) fallback
+  if (rawVoids != null) return { value: rawVoids, label: "Auto: Silverware (Voids)" };
+  return { value: null, label: "—" };
+}
+
 
 // Deeply scan ANY Silverware DailyTotals blob and SUM all FOOD NetAmount
 function deepSumFoodNet(root){
@@ -1431,8 +1469,9 @@ const autoFood =
 salesSource.textContent = "Days (totals) • Food via Silverware";
 
 
-  // Extras (manual > integration)
-  const autoVoids  = isNum(integ?.voids_silverware)  ? integ.voids_silverware  : (isNum(integ?.voids)  ? integ.voids  : null);
+// Extras (manual > integration) — Voids ONLY (exclude cancellations)
+const voidsAuto = getAutoVoidsOnly(integ || {});
+const autoVoids = voidsAuto.value;
   const autoPromos = isNum(integ?.promos_silverware) ? integ.promos_silverware : (isNum(integ?.promos) ? integ.promos : null);
   const effVoids   = pickVal(Number(ovr.voids),  autoVoids);
   const effPromos  = pickVal(Number(ovr.promos), autoPromos);
@@ -1441,10 +1480,11 @@ salesSource.textContent = "Days (totals) • Food via Silverware";
   if (vwVoids)     vwVoids.textContent     = fmtMoney(effVoids);
   if (vwPromos)    vwPromos.textContent    = fmtMoney(effPromos);
 
-  pill(srcVoids,
-       (isNum(ovr.voids)  && ovr.voids  > 0) ? "Manual"
-         : (integ?.source_extras ? `Auto: ${integ.source_extras}` : "—"),
-       (isNum(ovr.voids) && ovr.voids>0) ? "bad" : null);
+pill(srcVoids,
+  (isNum(ovr.voids) && ovr.voids > 0) ? "Manual"
+    : voidsAuto.label,
+  (isNum(ovr.voids) && ovr.voids > 0) ? "bad" : null
+);
   pill(srcPromos,
        (isNum(ovr.promos) && ovr.promos > 0) ? "Manual"
          : (integ?.source_extras ? `Auto: ${integ.source_extras}` : "—"));
