@@ -130,19 +130,28 @@ function deriveFromOne(day) {
       if (isNum(it?.NetAmount)) food += it.NetAmount;
     }
   }
+
   const promos = isNum(day?.Discounts?.TotalAmount) ? day.Discounts.TotalAmount : 0;
-const voids  = isNum(day?.Voids?.TotalAmount) ? day.Voids.TotalAmount : 0; // ✅ Voids only (no cancellations)
+
+  // ✅ VOIDS ONLY (no cancellations)
+  const voidsOnly = isNum(day?.Voids?.TotalAmount) ? day.Voids.TotalAmount : 0;
+
   const totalNet = isNum(day?.Sales?.TotalNetAmount) ? day.Sales.TotalNetAmount : 0;
-  return { food, promos, voids, totalNet };
+
+  return { food, promos, voids: voidsOnly, totalNet };
 }
 
 function rollup(days) {
   return days.reduce((a,d)=> {
     const x = deriveFromOne(d);
-    a.food += x.food; a.promos += x.promos; a.voids += x.voids; a.totalNet += x.totalNet;
+    a.food += x.food;
+    a.promos += x.promos;
+    a.voids += x.voids;
+    a.totalNet += x.totalNet;
     return a;
   }, { food:0, promos:0, voids:0, totalNet:0 });
 }
+
 
 function integDocPath(locKey, weekISO) {
   return `companies/aidan/locations/${locKey}/integrations/${weekISO}`;
