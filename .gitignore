@@ -14,4 +14,5 @@ Thumbs.db
 
 # local secrets
 secrets/
+functions/secrets/
 
