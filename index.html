@@ -1603,6 +1603,21 @@ if (pBaseSnap.exists()){
   lastWeek = pDays.reduce((a,d)=> a + ((d.actual_sales ?? 0) * pScale), 0); // TOTAL
 }
 
+// --- PDF extras: use the same logic as the dashboard (manual > auto) ---
+const foodSales = effSalesFrom(base || {}, ovr || {}, integ || {});
+
+// Voids ONLY (exclude cancellations)
+const voidsAuto = getAutoVoidsOnly(integ || {});
+const effVoids  = pickVal(Number(ovr.voids), voidsAuto.value);
+
+// Promos (manual > auto)
+const autoPromos =
+  moneyMaybe(integ?.promos_silverware) ??
+  moneyMaybe(integ?.promos) ??
+  null;
+
+const effPromos = pickVal(Number(ovr.promos), autoPromos);
+
 
       return {
         locKey,
@@ -1612,8 +1627,9 @@ if (pBaseSnap.exists()){
         projMin,   actMin,
         projPct,   actPct, delta,
         lastWeek,
-        promos: Number(ovr.promos)||0,
-        voids: Number(ovr.voids)||0,
+        foodSales,          // NEW
+        promos: effPromos,  // FIXED
+        voids:  effVoids,   // FIXED
         budgets
       };
     }
@@ -1649,6 +1665,7 @@ if (pBaseSnap.exists()){
               <thead><tr><th colspan="2">Last Week & Extras</th></tr></thead>
               <tbody>
                 <tr><th>Last Week Sales</th><td>${fmtMoneyLocal(s.lastWeek)}</td></tr>
+                <tr><th>Food Sales (Silverware)</th><td>${fmtMoneyLocal(s.foodSales)}</td></tr> 
                 <tr><th>Promos/Discounts</th><td>${fmtMoneyLocal(s.promos)}</td></tr>
                 <tr><th>Voids</th><td>${fmtMoneyLocal(s.voids)}</td></tr>
               </tbody>
