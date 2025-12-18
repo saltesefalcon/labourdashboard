@@ -11,3 +11,7 @@ service-account.labour-dashboard.json
 # OS cruft
 .DS_Store
 Thumbs.db
+
+# local secrets
+secrets/
+

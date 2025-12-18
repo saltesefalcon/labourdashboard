@@ -1157,16 +1157,20 @@ function moneyMaybe(v){
 }
 
 function getAutoVoidsOnly(integ){
-  // 1) Prefer explicit “voids only” fields if you ever add them in the writer
-  const explicit =
+  // After the writer fix, voids_silverware is already "voids only".
+  // Do NOT subtract cancellations here (that would double-fix and undercount).
+  const v =
+    moneyMaybe(integ?.voids_silverware) ??
+    moneyMaybe(integ?.voids) ??
     moneyMaybe(integ?.voids_only) ??
     moneyMaybe(integ?.voidsOnly) ??
     moneyMaybe(integ?.voids_total) ??
     moneyMaybe(integ?.voidsTotal);
 
-  if (explicit != null) {
-    return { value: explicit, label: "Auto: Silverware (Voids)" };
-  }
+  if (v != null) return { value: v, label: "Auto: Silverware (Voids only)" };
+  return { value: null, label: "—" };
+}
+
 
   // 2) Otherwise: read voids + cancellations and subtract cancellations if both exist
   const rawVoids =
