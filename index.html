@@ -1157,38 +1157,39 @@ function moneyMaybe(v){
 }
 
 function getAutoVoidsOnly(integ){
-  // After the writer fix, voids_silverware is already "voids only".
-  // Do NOT subtract cancellations here (that would double-fix and undercount).
-  const v =
-    moneyMaybe(integ?.voids_silverware) ??
-    moneyMaybe(integ?.voids) ??
-    moneyMaybe(integ?.voids_only) ??
-    moneyMaybe(integ?.voidsOnly) ??
-    moneyMaybe(integ?.voids_total) ??
-    moneyMaybe(integ?.voidsTotal);
+  integ = integ || {};
 
-  if (v != null) return { value: v, label: "Auto: Silverware (Voids only)" };
-  return { value: null, label: "—" };
-}
+  // 1) Prefer explicit “voids only” fields if we add them in the writer later
+  const explicit =
+    moneyMaybe(integ.voids_only) ??
+    moneyMaybe(integ.voidsOnly) ??
+    moneyMaybe(integ.voids_total) ??
+    moneyMaybe(integ.voidsTotal);
 
+  if (explicit != null) {
+    return { value: explicit, label: "Auto: Silverware (Voids)" };
+  }
 
-  // 2) Otherwise: read voids + cancellations and subtract cancellations if both exist
+  // 2) Otherwise: subtract cancellations if both exist
   const rawVoids =
-    moneyMaybe(integ?.voids_silverware) ??
-    moneyMaybe(integ?.voids);
+    moneyMaybe(integ.voids_silverware) ??
+    moneyMaybe(integ.voids);
 
   const canc =
-    moneyMaybe(integ?.cancellations_silverware) ??
-    moneyMaybe(integ?.cancellations) ??
-    moneyMaybe(integ?.cancellations_total) ??
-    moneyMaybe(integ?.cancellationsTotal);
+    moneyMaybe(integ.cancellations_silverware) ??
+    moneyMaybe(integ.cancellations) ??
+    moneyMaybe(integ.cancellations_total) ??
+    moneyMaybe(integ.cancellationsTotal);
 
   if (rawVoids != null && canc != null) {
     return { value: Math.max(0, rawVoids - canc), label: "Auto: Silverware (Voids only)" };
   }
 
   // 3) fallback
-  if (rawVoids != null) return { value: rawVoids, label: "Auto: Silverware (Voids)" };
+  if (rawVoids != null) {
+    return { value: rawVoids, label: "Auto: Silverware (Voids)" };
+  }
+
   return { value: null, label: "—" };
 }
 
