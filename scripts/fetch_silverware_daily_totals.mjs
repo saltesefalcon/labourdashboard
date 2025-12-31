@@ -92,6 +92,30 @@ function envFor(loc) {
   return { base, token };
 }
 
+function* eachDayISO(fromISO, toISO){
+  const d = new Date(fromISO + "T00:00:00Z");
+  const end = new Date(toISO + "T00:00:00Z");
+  while (d <= end){
+    yield d.toISOString().slice(0,10);
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+}
+
+function firstDayPayload(data){
+  // Your API might return {Days:[...]} or [...] or a single object.
+  const arr = toArrayDays(data);
+  return arr && arr.length ? arr[0] : null;
+}
+
+function getTotalSalesAmount(day){
+  // Prefer the same “Amount” total you see on the Silverware report.
+  // Many payloads have Sales.TotalAmount; some have Sales.TotalNetAmount.
+  if (isNum(day?.Sales?.TotalAmount)) return day.Sales.TotalAmount;
+  if (isNum(day?.Sales?.TotalNetAmount)) return day.Sales.TotalNetAmount;
+  return 0;
+}
+
+
 // ---------- Silverware fetch ----------
 async function postDailyTotals(base, token, bizFrom, bizTo) {
   const endpoint = `${base}/api/ThirdParty/DailyTotals`;
@@ -174,26 +198,76 @@ function integDocPath(locKey, weekISO) {
 
     console.log(`[${loc}] DailyTotals ${from}..${to}`);
     try {
-      const data = await postDailyTotals(base, token, from, to);
-      if (DEBUG) console.dir(data, { depth: 6 });
+const totalsByDate = {};
 
-      const days = toArrayDays(data);
-      const sums = rollup(days);
+for (const dayISO of eachDayISO(from, to)){
+  const data = await postDailyTotals(base, token, dayISO, dayISO);
+  if (DEBUG) {
+    console.log(`[${loc}] debug day=${dayISO}`);
+    console.dir(data, { depth: 6 });
+  }
+
+  const day = firstDayPayload(data);
+  if (!day){
+    totalsByDate[dayISO] = { total_sales: 0, food: 0, promos: 0, voids: 0, cancellations: 0 };
+    continue;
+  }
+
+  const x = deriveFromOne(day);
+
+  totalsByDate[dayISO] = {
+    total_sales: getTotalSalesAmount(day),
+    food: x.food,
+    promos: x.promos,
+    voids: x.voids,
+    cancellations: x.cancellations,
+  };
+}
+
+// weekly rollup from per-day totals
+const sums = Object.values(totalsByDate).reduce((a,d)=> {
+  a.totalSales += (Number(d.total_sales) || 0);
+  a.food += (Number(d.food) || 0);
+  a.promos += (Number(d.promos) || 0);
+  a.voids += (Number(d.voids) || 0);
+  a.cancellations += (Number(d.cancellations) || 0);
+  return a;
+}, { totalSales:0, food:0, promos:0, voids:0, cancellations:0 });
+
 
 // round helper
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
+// round the per-day map too
+const totals_by_date = {};
+for (const [dayISO, v] of Object.entries(totalsByDate)){
+  totals_by_date[dayISO] = {
+    total_sales: round2(v.total_sales),
+    food: round2(v.food),
+    promos: round2(v.promos),
+    voids: round2(v.voids),
+    cancellations: round2(v.cancellations),
+  };
+}
+
 const payload = {
   writer_tag: "daily_totals",
-  total_sales_silverware: round2(sums.totalNet),
+
+  // Weekly totals (authoritative)
+  total_sales_silverware: round2(sums.totalSales),
   food_sales_total:       round2(sums.food),
   promos_silverware:      round2(sums.promos),
-  voids_silverware:       round2(sums.voids),                 // ✅ voids only now
-  cancellations_silverware: round2(sums.cancellations),       // ✅ verification field
+  voids_silverware:       round2(sums.voids),
+  cancellations_silverware: round2(sums.cancellations),
+
+  // ✅ NEW: per-day totals
+  totals_by_date,
+
   source_sales:  "Silverware DailyTotals (Total)",
   source_extras: "Silverware DailyTotals",
   synced_at: admin.firestore.FieldValue.serverTimestamp(),
 };
+
 
       await db.doc(integDocPath(loc, weekISO)).set(payload, { merge: true });
       console.log(`[${loc}] wrote → ${integDocPath(loc, weekISO)}`);

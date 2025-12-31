@@ -1,0 +1,321 @@
+﻿{
+    "Sales":  {
+                  "Items":  [
+                                {
+                                    "Name":  "BEER",
+                                    "InterfaceID":  "8000",
+                                    "Quantity":  22.0,
+                                    "GrossAmount":  221.0000,
+                                    "RefundAmount":  0.0000,
+                                    "DiscountAmount":  90.0000,
+                                    "NetAmount":  131.0000
+                                },
+                                {
+                                    "Name":  "BEVERAGE",
+                                    "InterfaceID":  "6000",
+                                    "Quantity":  122.0,
+                                    "GrossAmount":  729.6600,
+                                    "RefundAmount":  0.0000,
+                                    "DiscountAmount":  0.0000,
+                                    "NetAmount":  729.6600
+                                },
+                                {
+                                    "Name":  "FOOD",
+                                    "InterfaceID":  "5000",
+                                    "Quantity":  377.0,
+                                    "GrossAmount":  9812.0200,
+                                    "RefundAmount":  0.0000,
+                                    "DiscountAmount":  200.0000,
+                                    "NetAmount":  9612.0200
+                                },
+                                {
+                                    "Name":  "LIQUOR",
+                                    "InterfaceID":  "9000",
+                                    "Quantity":  111.0,
+                                    "GrossAmount":  1458.0000,
+                                    "RefundAmount":  0.0000,
+                                    "DiscountAmount":  9.0000,
+                                    "NetAmount":  1449.0000
+                                },
+                                {
+                                    "Name":  "MODIFIERS",
+                                    "InterfaceID":  "10000",
+                                    "Quantity":  238.0,
+                                    "GrossAmount":  31.0000,
+                                    "RefundAmount":  0.0000,
+                                    "DiscountAmount":  0.0000,
+                                    "NetAmount":  31.0000
+                                },
+                                {
+                                    "Name":  "WINE",
+                                    "InterfaceID":  "7000",
+                                    "Quantity":  57.0,
+                                    "GrossAmount":  1578.0000,
+                                    "RefundAmount":  0.0000,
+                                    "DiscountAmount":  0.0000,
+                                    "NetAmount":  1578.0000
+                                }
+                            ],
+                  "TotalQuantity":  927.0,
+                  "TotalGrossAmount":  13829.6800,
+                  "TotalRefundAmount":  0.0000,
+                  "TotalDiscountAmount":  299.0000,
+                  "TotalNetAmount":  13530.6800
+              },
+    "NonSales":  {
+                     "Items":  [
+                                   {
+                                       "Name":  "GIFT CARD",
+                                       "InterfaceID":  "3000",
+                                       "Quantity":  9.0,
+                                       "GrossAmount":  1700.0000,
+                                       "RefundAmount":  0.0000,
+                                       "DiscountAmount":  0.0000,
+                                       "NetAmount":  1700.0000
+                                   }
+                               ],
+                     "TotalQuantity":  9.0,
+                     "TotalGrossAmount":  1700.0000,
+                     "TotalRefundAmount":  0.0000,
+                     "TotalDiscountAmount":  0.0000,
+                     "TotalNetAmount":  1700.0000
+                 },
+    "Gratuities":  {
+                       "Items":  [
+                                     {
+                                         "Name":  "Open $ Grat",
+                                         "Quantity":  1.0,
+                                         "Amount":  13.2400
+                                     },
+                                     {
+                                         "Name":  "20%",
+                                         "Quantity":  6.0,
+                                         "Amount":  369.5900
+                                     }
+                                 ],
+                       "TotalQuantity":  7.0,
+                       "TotalAmount":  382.8300
+                   },
+    "Taxes":  {
+                  "Items":  [
+                                {
+                                    "Name":  "HST 13%",
+                                    "InterfaceID":  "",
+                                    "Quantity":  7.0,
+                                    "Amount":  49.7700
+                                },
+                                {
+                                    "Name":  "HST 13% NQ",
+                                    "InterfaceID":  "",
+                                    "Quantity":  81.0,
+                                    "Amount":  1759.0400
+                                }
+                            ],
+                  "TotalQuantity":  88.0,
+                  "TotalAmount":  1808.8100
+              },
+    "Payments":  {
+                     "Items":  [
+                                   {
+                                       "TipAmount":  474.4900,
+                                       "Name":  "AMEX",
+                                       "InterfaceID":  "",
+                                       "Quantity":  12.0,
+                                       "Amount":  3265.5100
+                                   },
+                                   {
+                                       "TipAmount":  0.0000,
+                                       "Name":  "GIFTCARD",
+                                       "InterfaceID":  "",
+                                       "Quantity":  1.0,
+                                       "Amount":  199.7200
+                                   },
+                                   {
+                                       "TipAmount":  0.0000,
+                                       "Name":  "CASH",
+                                       "InterfaceID":  "",
+                                       "Quantity":  13.0,
+                                       "Amount":  553.7900
+                                   },
+                                   {
+                                       "TipAmount":  278.6600,
+                                       "Name":  "MC",
+                                       "InterfaceID":  "",
+                                       "Quantity":  15.0,
+                                       "Amount":  2436.8300
+                                   },
+                                   {
+                                       "TipAmount":  1144.6200,
+                                       "Name":  "VISA",
+                                       "InterfaceID":  "",
+                                       "Quantity":  44.0,
+                                       "Amount":  10511.4000
+                                   },
+                                   {
+                                       "TipAmount":  373.5500,
+                                       "Name":  "DEBIT",
+                                       "InterfaceID":  "",
+                                       "Quantity":  20.0,
+                                       "Amount":  2726.4100
+                                   },
+                                   {
+                                       "TipAmount":  0.0000,
+                                       "Name":  "RNDADJST",
+                                       "InterfaceID":  "",
+                                       "Quantity":  4.0,
+                                       "Amount":  -0.0200
+                                   }
+                               ],
+                     "TotalQuantity":  109.0,
+                     "TotalAmount":  19693.6400
+                 },
+    "NetCashOwing":  {
+                         "CashPaymentsAmount":  553.7900,
+                         "CashDepositsAmount":  0.0000,
+                         "DeclaredCashTips":  0.0000,
+                         "NonCashTips":  -2271.3200,
+                         "TipCharges":  0.0000,
+                         "Gratuity":  -382.8300,
+                         "ServiceCharge":  0.0000,
+                         "SalesCharge":  0.0000,
+                         "SalesChargeCount":  0,
+                         "PayInOutAmount":  0.0000,
+                         "TotalNetCashOwing":  -2100.3600,
+                         "AdjustmentAmount":  0.0
+                     },
+    "Discounts":  {
+                      "Items":  [
+                                    {
+                                        "Name":  "Birthday!",
+                                        "InterfaceID":  "",
+                                        "Quantity":  5.0,
+                                        "Amount":  53.0000
+                                    },
+                                    {
+                                        "Name":  "BOH After Shift Beer",
+                                        "InterfaceID":  "",
+                                        "Quantity":  9.0,
+                                        "Amount":  90.0000
+                                    },
+                                    {
+                                        "Name":  "Manager Meal",
+                                        "InterfaceID":  "",
+                                        "Quantity":  8.0,
+                                        "Amount":  96.0000
+                                    },
+                                    {
+                                        "Name":  "Menu Tasting",
+                                        "InterfaceID":  "",
+                                        "Quantity":  1.0,
+                                        "Amount":  29.0000
+                                    },
+                                    {
+                                        "Name":  "Server Error",
+                                        "InterfaceID":  "",
+                                        "Quantity":  1.0,
+                                        "Amount":  9.0000
+                                    },
+                                    {
+                                        "Name":  "Staff Meal",
+                                        "InterfaceID":  "",
+                                        "Quantity":  2.0,
+                                        "Amount":  22.0000
+                                    }
+                                ],
+                      "TotalQuantity":  26.0,
+                      "TotalAmount":  299.0000
+                  },
+    "Voids":  {
+                  "Items":  [
+                                {
+                                    "Name":  "Not Made",
+                                    "Quantity":  5.0,
+                                    "Amount":  387.0000
+                                }
+                            ],
+                  "TotalQuantity":  5.0,
+                  "TotalAmount":  387.0000
+              },
+    "Cancellations":  {
+                          "Items":  [
+                                        {
+                                            "Type":  "Due To Void",
+                                            "Quantity":  3.0,
+                                            "Amount":  137.0000
+                                        },
+                                        {
+                                            "Type":  "Due To Unsplit",
+                                            "Quantity":  9.0,
+                                            "Amount":  0.0000
+                                        }
+                                    ],
+                          "TotalQuantity":  12,
+                          "TotalAmount":  137.0000
+                      },
+    "Users":  {
+                  "Items":  [
+                                {
+                                    "ID":  "da234f74-9224-4c1a-ab42-5a320f893fe9",
+                                    "Name":  "Events AM",
+                                    "InterfaceID":  "68",
+                                    "Quantity":  61.0,
+                                    "GrossAmount":  1144.9700,
+                                    "RefundAmount":  0.0000,
+                                    "DiscountAmount":  0.0000,
+                                    "NetAmount":  1144.9700
+                                },
+                                {
+                                    "ID":  "2f8414de-1462-433e-8fba-65070b91a9af",
+                                    "Name":  "Take Out PM",
+                                    "InterfaceID":  "61",
+                                    "Quantity":  16.0,
+                                    "GrossAmount":  515.5000,
+                                    "RefundAmount":  0.0000,
+                                    "DiscountAmount":  43.5000,
+                                    "NetAmount":  472.0000
+                                },
+                                {
+                                    "ID":  "1180b502-2dc4-49b1-83ae-b82ba48549ea",
+                                    "Name":  "Bar PM",
+                                    "InterfaceID":  "18",
+                                    "Quantity":  685.0,
+                                    "GrossAmount":  10821.3500,
+                                    "RefundAmount":  0.0000,
+                                    "DiscountAmount":  130.5000,
+                                    "NetAmount":  10690.8500
+                                },
+                                {
+                                    "ID":  "e6d19f5b-acca-40ba-a07e-cad4337204f9",
+                                    "Name":  "Bar AM",
+                                    "InterfaceID":  "19",
+                                    "Quantity":  174.0,
+                                    "GrossAmount":  3047.8600,
+                                    "RefundAmount":  0.0000,
+                                    "DiscountAmount":  125.0000,
+                                    "NetAmount":  2922.8600
+                                }
+                            ],
+                  "TotalQuantity":  936.0,
+                  "TotalGrossAmount":  15529.6800,
+                  "TotalRefundAmount":  0.0000,
+                  "TotalDiscountAmount":  299.0000,
+                  "TotalNetAmount":  15230.6800
+              },
+    "Statistics":  {
+                       "PeriodStart":  "2025-12-21T11:04:16",
+                       "PeriodEnd":  "2025-12-21T23:34:49",
+                       "TotalHours":  12.51,
+                       "AvgHourGross":  1105.56,
+                       "AvgHourNet":  1081.66,
+                       "AvgGuestHour":  17.35,
+                       "CheckCount":  98,
+                       "AvgCheckGross":  141.12,
+                       "AvgCheckNet":  138.07,
+                       "EntreeCount":  0,
+                       "GuestCount":  217,
+                       "AvgGuestGross":  63.73,
+                       "AvgGuestNet":  62.35,
+                       "AverageStay":  1.35
+                   },
+    "Success":  true
+}

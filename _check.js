@@ -1,361 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Labour Dashboard V2 (Secure)</title>
 
-<style>
-  :root{--bg:#0f172a;--panel:#111827;--ink:#e5e7eb;--muted:#9ca3af;--accent:#22c55e;--warn:#ef4444;--brand:#0ea5e9;--line:#1f2937;}
-  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
-  .wrap{max-width:1100px;margin:24px auto;padding:16px}
-  h1{font-size:1.6rem;margin:0 0 2px}
-  .sub{color:var(--muted);font-size:.95rem;margin:0 0 18px}
-  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:16px;flex-wrap:wrap}
-  .authbox{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .avatar{width:28px;height:28px;border-radius:50%;background:#0b1220;border:1px solid var(--line)}
-  .bar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:12px 0 16px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
-  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-  .kpi h3{font-size:.85rem;color:var(--muted);margin:0 0 6px}
-  .kpi .v{font-size:1.4rem;font-weight:600}
-  .controls{display:flex;gap:8px;flex-wrap:wrap}
-  select,input,button{background:#0b1220;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:.95rem}
-  input[type="number"]{width:130px}
-  button.primary{background:var(--brand);border-color:transparent;color:#001827;font-weight:600}
-  .grid{display:grid;gap:12px}
-  .section-title{margin:6px 0 6px;font-size:1.05rem;color:var(--muted)}
-  table{width:100%;border-collapse:collapse}
-  th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:right}
-  th:first-child,td:first-child{text-align:left}
-  .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#0b1220;border:1px solid var(--line);font-size:.8rem;white-space:nowrap}
-  .pill.good{border-color:#1d3f2a;color:#8fe2a8}
-  .pill.bad{border-color:#4c1f1f;color:#f39a9a}
-  .pill.warn{border-color:#423312;color:#fbbf24}
-  .footer{margin-top:24px;color:var(--muted);font-size:.85rem}
-  @media (max-width:900px){ .kpis{grid-template-columns:repeat(2,1fr)} }
-  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-  .row > *{flex:1}
-  .small{font-size:.85rem;color:var(--muted)}
-  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  @media (max-width:900px){ .two{grid-template-columns:1fr} }
-  .denied{border:1px solid #4c1f1f;background:#1b1515}
-
-  /* colours for % text (app) */
-  .pct-good{color:#22c55e}
-  .pct-warn{color:#f59e0b}
-  .pct-bad{color:#ef4444}
-
-  /* Settings: managers list */
-  .mgr-row{display:grid;grid-template-columns:1fr 140px 36px;gap:8px;align-items:center;margin-bottom:8px}
-  .mgr-row input[type="text"]{width:100%}
-  .mgr-row input[type="number"]{width:100%}
-
-  /* --- helpers for Target Labour pill placement --- */
-#targetCtrl{ align-self:flex-end; }
-@media (max-width:900px){
-  #targetCtrl{ margin-left:0; }
-}
-
-.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-@media (max-width:700px){.settings-grid{grid-template-columns:1fr}}
-
-/* --- Layout widen + align with Data bar ---------------------------------- */
-
-/* Give the whole page a wider working area */
-.wrap{
-  /* use a responsive clamp so big screens get more room but it still looks tight on smaller ones */
-  max-width: clamp(1100px, 92vw, 1320px);
-}
-
-/* Make KPI row stretch fully across with no intrinsic min-width shrink */
-.kpis{
-  width: 100%;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-/* Ensure the Daily breakdown card spans full width of the wrap */
-.grid{ width: 100%; }
-.grid > .card{ width: 100%; }
-
-/* Keep the Data bar growing nicely while the other controls stay compact */
-#refreshWrap{
-  flex: 1 1 900px;   /* grow to fill the row */
-}
-
-/* Tiny cosmetic spacing so rows visually align left/right */
-.bar{ gap: 12px; }
-
-</style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="topbar">
-      <div>
-        <h1>Labour Dashboard V2</h1>
-        <p class="sub">Secure • Sign-in required</p>
-      </div>
-      <div class="authbox">
-        <div id="authStatus" class="muted">Not signed in</div>
-        <img class="avatar" id="userAvatar" alt="" hidden />
-        <button id="signinBtn" class="primary">Sign in</button>
-        <button id="signoutBtn" style="display:none">Sign out</button>
-        <button id="settingsBtn" style="display:none">Settings</button>
-        <!-- This button JUST navigates to foh-boh.html -->
-        <button id="optimizerToggleBtn" style="display:none">FOH / BOH Optimizer</button>
-      </div>
-    </div>
-
-    <!-- SETTINGS MODAL (admin only) -->
-    <div id="settingsModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9999; align-items:center; justify-content:center;">
-      <div class="card" style="width:620px; max-width:94%; background:var(--panel); border:1px solid var(--line)">
-        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
-          <div style="font-weight:600">Location Settings</div>
-          <button id="settingsClose">✕</button>
-        </div>
-
-        <div class="small" style="margin-bottom:10px">
-          These values persist for the selected location until changed by an admin.
-          Percentages are decimals (e.g. <code>0.35</code> for 35%).
-        </div>
-
-   <!-- Salaried Management (dated; replaces legacy managers list) -->
-<div style="margin:8px 0 6px;font-weight:600">Salaried Management</div>
-
-<div class="small" style="margin-bottom:10px">
-  Weekly salaries with effective dates. This is what the dashboard uses for labour (keeps history correct).
-</div>
-
-<div class="row" style="align-items:center; justify-content:space-between; margin-bottom:10px">
-  <div class="small">Calculated for selected week</div>
-  <span id="salTotalPill" class="pill">—</span>
-</div>
-
-<div class="row" style="justify-content:flex-end; margin-bottom:8px">
-  <label class="small" style="display:flex; gap:8px; align-items:center; justify-content:flex-end">
-    <input type="checkbox" id="showInactiveChk">
-    Show inactive & future
-  </label>
-</div>
-
-<div id="periodList"></div>
-
-<div class="row" style="align-items:center;margin-bottom:12px">
-  <button id="addPeriodBtn">+ Add Manager</button>
-  <span class="small">Use “Increase pay” or “End salary” so past weeks don’t change.</span>
-</div>
-
-
-<div class="settings-grid" style="margin-top:6px">
-  <label>Remittance % of Gross Labour<br>
-    <input id="setRemitPct" type="number" step="0.0001" placeholder="0.0000">
-  </label>
-
-  <label>Target Labour % (fallback)<br>
-    <input id="setTargetPct" type="number" step="0.0001" placeholder="0.0000">
-  </label>
-
-  <label>Budget % Food<br>
-    <input id="setPctFood" type="number" step="0.01" placeholder="0.00">
-  </label>
-
-  <label>Budget % Wine<br>
-    <input id="setPctWine" type="number" step="0.01" placeholder="0.00">
-  </label>
-
-  <label>Budget % Liquor<br>
-    <input id="setPctLiquor" type="number" step="0.01" placeholder="0.00">
-  </label>
-
-  <label>Budget % Beer<br>
-    <input id="setPctBeer" type="number" step="0.01" placeholder="0.00">
-  </label>
-</div>
-
-
-        <div class="row" style="margin-top:10px">
-          <button id="settingsSave" class="primary">Save Settings</button>
-          <span id="settingsMsg" class="small"></span>
-        </div>
-      </div>
-    </div>
-
-<!-- COMING SOON MODAL (FOH/BOH Optimizer) -->
-<div id="soonModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9998; align-items:center; justify-content:center;">
-  <div class="card" style="width:520px; max-width:94%; background:var(--panel); border:1px solid var(--line)">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
-      <div style="font-weight:600">FOH / BOH Optimizer</div>
-      <button id="soonClose">✕</button>
-    </div>
-
-    <div class="small" style="line-height:1.35">
-      <strong>Coming soon.</strong> This feature isn’t enabled yet while we finish building the optimizer page.
-    </div>
-
-    <div class="row" style="margin-top:12px">
-      <button id="soonOk" class="primary">OK</button>
-    </div>
-  </div>
-</div>
-
-    <!-- AUTH GATE -->
-    <div id="authGate" class="card" style="max-width:520px;margin:48px auto 0;">
-      <h2>Sign in to view data</h2>
-      <div class="small" style="margin-bottom:10px">Use your email and password.</div>
-      <div class="row" style="margin-bottom:10px">
-        <input id="email" type="email" placeholder="Email" autocomplete="username" />
-        <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
-      </div>
-      <div class="row" style="margin-bottom:10px;align-items:center">
-        <button id="doSignin" class="primary">Sign in</button>
-        <span id="authMsg" style="color:#fca5a5;display:none"></span>
-      </div>
-      <div class="small">If you need access, ask an admin to add your account.</div>
-    </div>
-
-    <!-- ACCESS DENIED -->
-    <div id="denied" class="card denied" style="display:none;max-width:520px;margin:48px auto 0;">
-      <h2>Access denied</h2>
-      <div class="small">Your account is signed in, but not authorized for this dashboard.</div>
-    </div>
-
-    <!-- MAIN APP (Dashboard view only) -->
-    <div id="app" hidden>
-      <div class="bar">
-        <div class="controls card">
-          <label class="small">Location</label>
-          <select id="locationSel">
-            <option value="beacon">Beacon</option>
-            <option value="tulia">Tulia</option>
-            <option value="cesoir">Ce Soir</option>
-            <option value="prohibition">Prohibition</option>
-          </select>
-        </div>
-
-        <div class="controls card">
-          <label class="small">Week of (Monday)</label>
-          <input id="weekInput" type="date" />
-          <button id="prevBtn">◀</button><button id="nextBtn">▶</button>
-        </div>
-
-        <div class="controls card" id="refreshWrap" style="min-width:320px; flex:1 1 680px">
-          <label style="display:block;font-size:.8rem;color:var(--muted);margin-bottom:6px">Data</label>
-<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px">
-<!-- left group: actions -->
-<div style="display:flex; gap:6px; flex-wrap:wrap">
-  <button id="refreshBtn" class="primary">Refresh week</button>
-  <button id="pdfBtn">Download PDF (all locations)</button>
-
-  <!-- lock controls (admin button + status pill) -->
-  <div id="lockWrap" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center">
-    <button id="lockBtn" title="Freeze this week so totals don’t change">Lock week</button>
-    <span id="lockPill" class="pill">Unfrozen</span>
-  </div>
-</div>
-
-  <!-- right group: target labour -->
-  <div style="margin-left:auto; display:flex; align-items:center; gap:8px">
-    <label class="small">Target Labour %</label>
-    <span id="targetPill" class="pill">—</span>
-  </div>
-</div>
-
-          <div class="small" id="refreshMsg"></div>
-          <div class="small" id="syncLine" style="margin-top:4px">Last sync: —</div>
-          <div class="small" id="sourceLine">Sales: <span id="salesSource">—</span> • Extras: <span id="extrasSource">—</span></div>
-        </div>
-
-      <!-- KPIs -->
-      <div class="kpis">
-        <div class="card kpi"><h3>Projected Sales</h3><div class="v" id="kpiProjSales">—</div></div>
-        <div class="card kpi"><h3>Actual Sales</h3><div class="v" id="kpiActSales">—</div></div>
-        <div class="card kpi"><h3>Projected Labour %</h3><div class="v" id="kpiProjPct">—</div></div>
-        <div class="card kpi"><h3>Actual Labour %</h3><div class="v" id="kpiActPct">—</div></div>
-      </div>
-
-      <!-- DAILY TABLE -->
-      <div class="grid" style="margin-top:14px">
-        <div class="card">
-          <div class="section-title">Daily breakdown (Mon–Sun)</div>
-          <table id="dailyTable">
-            <thead>
-              <tr>
-                <th>Date</th><th title="Projected sales">Proj $</th><th title="Actual sales">Act $</th>
-                <th title="Projected labour cost">Proj Labour $</th><th title="Actual labour cost">Act Labour $</th>
-                <th title="Projected labour minutes">Proj Min</th><th title="Actual labour minutes">Act Min</th>
-                <th>Labour %</th><th>Δ vs Target</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-            <tfoot>
-              <tr>
-                <th>Total</th>
-                <th id="tProjSales">—</th><th id="tActSales">—</th>
-                <th id="tProjLabour">—</th><th id="tActLabour">—</th>
-                <th id="tProjMin">—</th><th id="tActMin">—</th>
-                <th id="tLabourPct">—</th><th id="tDelta">—</th>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </div>
-
-      <!-- MANUAL INPUTS + LAST WEEK / BUDGETS -->
-      <div class="two" style="margin-top:12px">
-<div class="card">
-  <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-    <div class="section-title" style="margin:0">Manual inputs (saved per week)</div>
-    <button id="manualToggleBtn">Show</button>
-  </div>
-
-  <div id="manualInputsWrap" style="display:none; margin-top:10px;">
-    <div class="row">
-      <label>Food Sales $<br><input id="inFoodSales" type="number" step="0.01" placeholder="0"></label>
-      <label>Promos/Discounts $<br><input id="inPromos" type="number" step="0.01" placeholder="0"></label>
-    </div>
-
-    <div class="row">
-      <label>Voids $<br><input id="inVoids" type="number" step="0.01" placeholder="0"></label>
-    </div>
-
-    <div class="row">
-      <button id="saveOverrides" class="primary">Save</button>
-      <span id="saveMsg" class="small"></span>
-    </div>
-    <div class="small" style="margin-top:4px">Manual values override auto values if entered (&gt; 0).</div>
-  </div>
-</div>
-
-
-        <div class="card">
-          <div class="section-title">Last Week, Auto Feeds & Purchasing Budgets</div>
-          <table>
-            <tbody>
-              <tr><td style="text-align:left">Auto Food Sales (Silverware)</td><td id="vwAutoSales" style="text-align:right">—</td></tr>
-              <tr><td style="text-align:left">Promos/Discounts <span id="srcPromos" class="pill" style="margin-left:6px">—</span></td><td id="vwPromos" style="text-align:right">—</td></tr>
-              <tr><td style="text-align:left">Voids <span id="srcVoids" class="pill" style="margin-left:6px">—</span></td><td id="vwVoids" style="text-align:right">—</td></tr>
-
-              <tr><td colspan="2"><hr style="border:0;border-top:1px solid var(--line)"></td></tr>
-              <tr><td style="text-align:left">Last Week Sales (auto)</td><td id="vwLastWeek" style="text-align:right">—</td></tr>
-              <tr><td style="text-align:left">Projected Sales (this week)</td><td id="vwProjSales" style="text-align:right">—</td></tr>
-
-              <tr><td colspan="2"><hr style="border:0;border-top:1px solid var(--line)"></td></tr>
-              <tr><th style="text-align:left">Category</th><th style="text-align:right">Budget $</th></tr>
-              <tr><td style="text-align:left">Food</td><td id="bdgFood" style="text-align:right">—</td></tr>
-              <tr><td style="text-align:left">Wine</td><td id="bdgWine" style="text-align:right">—</td></tr>
-              <tr><td style="text-align:left">Liquor</td><td id="bdgLiquor" style="text-align:right">—</td></tr>
-              <tr><td style="text-align:left">Beer</td><td id="bdgBeer" style="text-align:right">—</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <p class="footer">Data source: 7shifts Daily Sales & Labor API and Silverware Avrio (via secure Firestore). Overrides are per week; Settings are sticky per location.</p>
-    </div>
-  </div>
-
-  <!-- Firebase (modular SDK) -->
-  <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
     import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteField, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
     import {
@@ -384,10 +27,6 @@
           "BslFJsAMikSucxwbL8S7qPXcC6r2",
           "nW1IbxeaZJT0hAoORZhDtgOlAdd2",
           "zbpmXxrpweXQzf7Z7JMx8kUblQi1",
-          "n1xq8sI8QWSfmQni7G5Qw5jS74b2",
-          "CfNm6og5ydXhOAcKlSvJEABWsT23",
-          "Yf1EPiMfQVNvgKVVMZD4h6zjpRX2",
-          "4Paoa0SWHybPzwP7uNjOx2VgbiJ2",
           "9aQ5evQ3nbYt0kjw91ruil5Igq52"
     ]);
     const ADMIN_UIDS = new Set([
@@ -395,10 +34,6 @@
           "BslFJsAMikSucxwbL8S7qPXcC6r2",
           "nW1IbxeaZJT0hAoORZhDtgOlAdd2",
           "zbpmXxrpweXQzf7Z7JMx8kUblQi1",
-          "n1xq8sI8QWSfmQni7G5Qw5jS74b2",
-          "CfNm6og5ydXhOAcKlSvJEABWsT23",
-          "Yf1EPiMfQVNvgKVVMZD4h6zjpRX2",
-          "4Paoa0SWHybPzwP7uNjOx2VgbiJ2",
           "9aQ5evQ3nbYt0kjw91ruil5Igq52"
     ]);
 
@@ -1151,111 +786,52 @@ function periodRowTemplate(name="", weekly="", start="", end=""){
   row.querySelector("button").onclick = () => row.remove();
   return row;
 }
-
-// --- Silverware TOTAL sales helpers (weekly + per-day if available) ---
-function swMoney(v){
-  const n = Number(v);
-  if (!Number.isFinite(n)) return null;
-  return (Number.isInteger(n) && n >= 100000) ? n * 0.01 : n;
-}
-
-
-function getSwWeekTotal(integ){
-  return (
-    swMoney(integ?.total_sales_silverware) ??
-    swMoney(integ?.totalSalesSilverware) ??
-    swMoney(integ?.total_sales) ??
-    swMoney(integ?.totalSales) ??
-    null
-  );
-}
-
-function getSwDayTotal(integ, dateISO){
-  if (!integ || !dateISO) return null;
-
-  // common array shapes
-  const arr =
-    integ?.sales_by_day ??
-    integ?.sw_sales_by_day ??
-    integ?.daily_sales ??
-    integ?.days ??
-    integ?.dailyTotals ??
-    null;
-
-  if (Array.isArray(arr)){
-    const row = arr.find(r => (r?.date || r?.day || r?.iso || "").slice(0,10) === dateISO);
-    if (row){
-      const v = swMoney(row?.total_sales ?? row?.totalSales ?? row?.total ?? row?.sales ?? row?.amount ?? row?.TotalAmount);
-      if (v != null) return v;
-    }
-  }
-
-  // common map shapes
-  const map =
-    integ?.salesByDay ??
-    integ?.swByDay ??
-    integ?.by_day ??
-    integ?.daily ??
-    integ?.totals_by_date ??
-    integ?.totalsByDate ??
-    null;
-
-  if (map && typeof map === "object" && !Array.isArray(map)){
-    const node = map[dateISO];
-    const v = swMoney((node && typeof node === "object") ? (node.total ?? node.sales ?? node.amount ?? node.total_sales) : node);
-    if (v != null) return v;
-  }
-
-  return null;
-}
-
 // --- Helpers for robust food-only extraction ---
 function normalizeCurrency(n){
   const v = Number(n);
   if (!Number.isFinite(v)) return null;
-  return (Number.isInteger(v) && v >= 100000) ? v * 0.01 : v;
+  return v >= 100000 ? v * 0.01 : v; // treat very large values as cents
 };
 
 function moneyMaybe(v){
   const n = Number(v);
   if (!Number.isFinite(n)) return null;
-  return (Number.isInteger(n) && n >= 100000) ? n * 0.01 : n;
+  return (n >= 100000) ? n * 0.01 : n; // cents→dollars safety
 }
 
 function getAutoVoidsOnly(integ){
-  integ = integ || {};
+  // After the writer fix, voids_silverware is already "voids only".
+  // Do NOT subtract cancellations here (that would double-fix and undercount).
+  const v =
+    moneyMaybe(integ?.voids_silverware) ??
+    moneyMaybe(integ?.voids) ??
+    moneyMaybe(integ?.voids_only) ??
+    moneyMaybe(integ?.voidsOnly) ??
+    moneyMaybe(integ?.voids_total) ??
+    moneyMaybe(integ?.voidsTotal);
 
-  // 1) Prefer explicit “voids only” fields if we add them in the writer later
-  const explicit =
-    moneyMaybe(integ.voids_only) ??
-    moneyMaybe(integ.voidsOnly) ??
-    moneyMaybe(integ.voids_total) ??
-    moneyMaybe(integ.voidsTotal);
+  if (v != null) return { value: v, label: "Auto: Silverware (Voids only)" };
+  return { value: null, label: "—" };
+}
 
-  if (explicit != null) {
-    return { value: explicit, label: "Auto: Silverware (Voids)" };
-  }
 
-  // 2) Otherwise: subtract cancellations if both exist
+  // 2) Otherwise: read voids + cancellations and subtract cancellations if both exist
   const rawVoids =
-    moneyMaybe(integ.voids_silverware) ??
-    moneyMaybe(integ.voids);
+    moneyMaybe(integ?.voids_silverware) ??
+    moneyMaybe(integ?.voids);
 
   const canc =
-    moneyMaybe(integ.cancellations_silverware) ??
-    moneyMaybe(integ.cancellations) ??
-    moneyMaybe(integ.cancellations_total) ??
-    moneyMaybe(integ.cancellationsTotal);
+    moneyMaybe(integ?.cancellations_silverware) ??
+    moneyMaybe(integ?.cancellations) ??
+    moneyMaybe(integ?.cancellations_total) ??
+    moneyMaybe(integ?.cancellationsTotal);
 
   if (rawVoids != null && canc != null) {
     return { value: Math.max(0, rawVoids - canc), label: "Auto: Silverware (Voids only)" };
   }
 
   // 3) fallback
-  if (rawVoids != null) {
-    return { value: rawVoids, label: "Auto: Silverware (Voids)" };
-  }
-
+  if (rawVoids != null) return { value: rawVoids, label: "Auto: Silverware (Voids)" };
   return { value: null, label: "—" };
 }
 
@@ -1342,107 +918,6 @@ function effSalesFrom(base, ovr, integ){
   return getAutoFoodSales(integ || {}, daySum).value;
 }
 
-// ---------------- Silverware: ACTUAL SALES (Total) helpers ----------------
-
-// Try to find a "DailyTotals report object" for a given date inside integ,
-// regardless of whether it's stored as a map, array, or nested blob.
-function findSilverwareReportForDate(integ, dayISO){
-  if (!integ || !dayISO) return null;
-
-  // Common “by date” containers writers often use
-  const candidates = [
-    integ.daily_totals_by_date,
-    integ.dailyTotalsByDate,
-    integ.daily_totals,
-    integ.dailyTotals,
-    integ.reports,
-    integ.byDate,
-    integ.by_date,
-    integ.days
-  ].filter(Boolean);
-
-  // 1) Direct map by date
-  for (const c of candidates){
-    if (c && typeof c === "object" && !Array.isArray(c)) {
-      if (c[dayISO]) return c[dayISO];
-    }
-  }
-
-  // 2) Array of daily rows
-  for (const c of candidates){
-    if (Array.isArray(c)) {
-      for (const row of c){
-        const d =
-          (row?.date || row?.day || row?.FromDate || row?.fromDate || row?.toDate || row?.ToDate || "")
-            .toString()
-            .slice(0,10);
-        if (d === dayISO) {
-          // sometimes row IS the report; sometimes row.report/data/payload holds it
-          return row?.report || row?.data || row?.payload || row;
-        }
-      }
-    }
-  }
-
-  // 3) Deep search fallback (walk the entire integ blob)
-  const seen = new Set();
-  const stack = [integ];
-  while (stack.length){
-    const cur = stack.pop();
-    if (!cur || typeof cur !== "object") continue;
-    if (seen.has(cur)) continue;
-    seen.add(cur);
-
-    const fd = (cur?.FromDate || cur?.fromDate || cur?.date || cur?.day || "").toString().slice(0,10);
-    if (fd === dayISO && (cur?.Sales || cur?.sales)) return cur;
-
-    if (Array.isArray(cur)) {
-      for (const v of cur) stack.push(v);
-    } else {
-      for (const v of Object.values(cur)) stack.push(v);
-    }
-  }
-
-  return null;
-}
-
-function extractSilverwareSalesTotal(report){
-  if (!report || typeof report !== "object") return null;
-
-  // Most common shape (matches what you saw in PowerShell):
-  // Sales: { Items:[...], TotalAmount: 145835.74 }
-  const total =
-    moneyMaybe(report?.Sales?.TotalAmount) ??
-    moneyMaybe(report?.sales?.TotalAmount) ??
-    moneyMaybe(report?.Sales?.Total?.Amount) ??
-    moneyMaybe(report?.sales?.total?.amount) ??
-    null;
-
-  if (total != null) return total;
-
-  // Fallback: sum Sales.Items[].Amount if present
-  const items = report?.Sales?.Items || report?.sales?.items;
-  if (Array.isArray(items) && items.length){
-    const s = items.reduce((a,it)=> a + (moneyMaybe(it?.Amount) ?? moneyMaybe(it?.amount) ?? 0), 0);
-    return (s > 0) ? s : null;
-  }
-
-  return null;
-}
-
-// Returns Silverware total sales for that day (or null if not found)
-function silverwareActualSalesForDay(integ, dayISO){
-  // Prefer the per-day map written by fetch_silverware_daily_totals.mjs
-  const viaMap = getSwDayTotal(integ, dayISO);
-  if (viaMap != null && viaMap > 0) return viaMap;
-
-  // Fallback: try to find an embedded report object if it exists
-  const rep = findSilverwareReportForDate(integ, dayISO);
-  const amt = extractSilverwareSalesTotal(rep);
-  return (amt != null && amt > 0) ? amt : null;
-}
-
-
 
     // -------------- LOAD + RENDER (safe integrations read + prev week) --------------
     async function load(){
@@ -1478,21 +953,7 @@ updateFrozenUI(!!base?.frozen);
       let pInteg = null;
       try { const s = await getDoc(doc(db, `companies/aidan/locations/${locKey}/integrations/${prevISO}`)); pInteg = s.exists() ? s.data() : null; } catch(_) {}
 
-      let lastWeekSales = null;
-if (pBaseSnap.exists()){
-  const prevBase = pBaseSnap.data();
-  const pDays  = prevBase?.days || [];
-  const pScale = detectCurrencyScale(pDays);
-
-  // fallback: 7shifts sum
-  const fallback7 = pDays.reduce((a,d)=> a + ((d.actual_sales ?? 0) * pScale), 0);
-
-  // Silverware sum (preferred): sum day-by-day from Silverware reports
-  const swSum = pDays.reduce((a,d)=> a + (silverwareActualSalesForDay(pInteg || {}, d.date || "") || 0), 0);
-
-  lastWeekSales = (swSum > 0) ? swSum : fallback7;
-}
-
+      const lastWeekSales = (pBaseSnap.exists() ? effSalesFrom(pBaseSnap.data(), pOvrSnap.exists()?pOvrSnap.data():null, pInteg) : null);
 
       // fill inputs
       inFoodSales.value = ovr.food_sales ?? "";
@@ -1544,13 +1005,7 @@ tbody.innerHTML = "";
 
 for (const d of days){
   const ps = (d.projected_sales ?? 0)      * SCALE;
-  const as7 = (d.actual_sales ?? 0) * SCALE;  // fallback (7shifts)
-const asSW =
-  getSwDayTotal(integ || {}, d.date || "") ??
-  silverwareActualSalesForDay(integ || {}, d.date || "");
-
-const as = (asSW != null) ? asSW : as7;
-
+  const as = (d.actual_sales ?? 0)         * SCALE;
   const pl = (d.projected_labor_cost ?? 0) * SCALE;
 
   // Hourly labour from 7shifts
@@ -1593,11 +1048,8 @@ const as = (asSW != null) ? asSW : as7;
 }
 
 
-// Food-only for the right panel — totals/KPIs should use TOTAL sales.
-// Prefer Silverware WEEK total if present (because 7shifts day totals may not update after the fact).
-const swWeekTotal = getSwWeekTotal(integ || {});
-const totalActSales = (swWeekTotal != null && swWeekTotal > 0) ? swWeekTotal : t.actSalesDays;
-
+// Food-only for the right panel — totals/KPIs still use TOTAL sales
+const totalActSales = t.actSalesDays; // keep TOTAL for KPIs/table
 
 // Prefer the explicit food-only values written by Silverware DailyTotals writers.
 // Fall back to deep scan, then finally to total days sum (so UI never blanks).
@@ -1661,12 +1113,7 @@ const autoFood =
   syncLine.textContent = "Last sync: " + (syncTxt || "—");
 
 // Totals are from day documents; food-only is shown separately below
-const usingSwPerDay = (days || []).some(d => silverwareActualSalesForDay(integ || {}, d.date || "") != null);
-
-salesSource.textContent =
-  usingSwPerDay ? "Silverware DailyTotals (per-day)" :
-  (swWeekTotal != null && swWeekTotal > 0 ? "Silverware DailyTotals (week total)" : "7shifts (day docs)");
-
+salesSource.textContent = "Days (totals) • Food via Silverware";
 
 
 // Extras (manual > integration) — Voids ONLY (exclude cancellations)
@@ -1790,21 +1237,6 @@ if (pBaseSnap.exists()){
   lastWeek = pDays.reduce((a,d)=> a + ((d.actual_sales ?? 0) * pScale), 0); // TOTAL
 }
 
-// --- PDF extras: use the same logic as the dashboard (manual > auto) ---
-const foodSales = effSalesFrom(base || {}, ovr || {}, integ || {});
-
-// Voids ONLY (exclude cancellations)
-const voidsAuto = getAutoVoidsOnly(integ || {});
-const effVoids  = pickVal(Number(ovr.voids), voidsAuto.value);
-
-// Promos (manual > auto)
-const autoPromos =
-  moneyMaybe(integ?.promos_silverware) ??
-  moneyMaybe(integ?.promos) ??
-  null;
-
-const effPromos = pickVal(Number(ovr.promos), autoPromos);
-
 
       return {
         locKey,
@@ -1814,9 +1246,8 @@ const effPromos = pickVal(Number(ovr.promos), autoPromos);
         projMin,   actMin,
         projPct,   actPct, delta,
         lastWeek,
-        foodSales,          // NEW
-        promos: effPromos,  // FIXED
-        voids:  effVoids,   // FIXED
+        promos: Number(ovr.promos)||0,
+        voids: Number(ovr.voids)||0,
         budgets
       };
     }
@@ -1852,7 +1283,6 @@ const effPromos = pickVal(Number(ovr.promos), autoPromos);
               <thead><tr><th colspan="2">Last Week & Extras</th></tr></thead>
               <tbody>
                 <tr><th>Last Week Sales</th><td>${fmtMoneyLocal(s.lastWeek)}</td></tr>
-                <tr><th>Food Sales (Silverware)</th><td>${fmtMoneyLocal(s.foodSales)}</td></tr> 
                 <tr><th>Promos/Discounts</th><td>${fmtMoneyLocal(s.promos)}</td></tr>
                 <tr><th>Voids</th><td>${fmtMoneyLocal(s.voids)}</td></tr>
               </tbody>
@@ -1911,6 +1341,4 @@ const effPromos = pickVal(Number(ovr.promos), autoPromos);
       w.print();
     } // end downloadPdfAll
     // -------------------- end PDF GENERATOR --------------------
-  </script>
-</body>
-</html>
+  
