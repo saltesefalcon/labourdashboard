@@ -1,34 +1,6 @@
 // scripts/fetch_7shifts_fohboh_week.mjs
 // Pull weekly FOH/BOH wages + total sales from 7shifts and
 // write companies/aidan/locations/{APP_KEY}/fohBoh/{WEEK_OF} in Firestore.
-//
-// ENV REQUIRED (for this run):
-//   FIREBASE_PROJECT_ID     = "labour-dashboard"
-//   FIREBASE_SA_JSON        = (stringified service account JSON)  OR
-//   FIREBASE_SA_FILE        = path to JSON file on disk
-//
-//   SEVENSHIFTS_TOKEN       = Bearer token for this 7shifts company
-//   COMPANY_ID              = 7shifts company id (integer)
-//   LOCATION_ID             = 7shifts location id (integer for this store)
-//   APP_KEY                 = beacon | tulia | prohibition | cesoir
-//
-//   WEEK_OF                 = Monday YYYY-MM-DD (optional; defaults to current week)
-//
-//   FOH_ROLE_LABELS         = comma-separated role names treated as FOH (e.g. "Server,Bartender,Host")
-//   BOH_ROLE_LABELS         = comma-separated role names treated as BOH (e.g. "Cook,Dish,Prep")
-//
-// WRITES:
-//   companies/aidan/locations/{APP_KEY}/fohBoh/{WEEK_OF}
-//     {
-//       week_of,
-//       total_sales,     // number, dollars
-//       foh_wages,       // number, dollars
-//       boh_wages,       // number, dollars
-//       foh_hours,       // number, hours
-//       boh_hours,       // number, hours
-//       updated_at: serverTimestamp(),
-//       // (we DO NOT touch foh_target_pct / boh_target_pct)
-//     }
 
 import fs from "fs";
 import axios from "axios";
@@ -98,21 +70,20 @@ async function fetchWeeklySales({ token, companyId, locationId, weekOf }) {
 
   const url = "https://api.7shifts.com/v2/reports/daily_sales_and_labor";
   const headers = { Authorization: `Bearer ${token}` };
+
+  // Daily Sales & Labor uses start_date + to_date. 
   const params = {
     company_id: companyId,
     location_id: locationId,
     start_date: start,
-    end_date: end,
+    to_date: end,
   };
 
   const { data } = await axios.get(url, { headers, params });
   const rows = data?.data || [];
 
   // 7shifts returns cents in this report. Convert to dollars.
-  const totalCents = rows.reduce(
-    (sum, r) => sum + (r.actual_sales ?? 0),
-    0
-  );
+  const totalCents = rows.reduce((sum, r) => sum + (r.actual_sales ?? 0), 0);
   return round2(totalCents / 100);
 }
 
@@ -122,17 +93,19 @@ async function fetchWeeklyFohBoh({ token, companyId, locationId, weekOf }) {
 
   const url = "https://api.7shifts.com/v2/reports/hours_and_wages";
   const headers = { Authorization: `Bearer ${token}` };
-  // Hours & Wages uses start/end (not start_date/end_date).
+
+  // Hours & Wages uses from/to (NOT start/end). 
   const params = {
     company_id: companyId,
     location_id: locationId,
-    start,
-    end,
+    from: start,
+    to: end,
     punches: true,
   };
 
   const { data } = await axios.get(url, { headers, params });
-  const users = data?.users || [];
+  const payload = data?.data ?? data ?? {};
+  const users = payload.users || [];
 
   const fohRoles = parseRoleSet("FOH_ROLE_LABELS");
   const bohRoles = parseRoleSet("BOH_ROLE_LABELS");
@@ -156,7 +129,7 @@ async function fetchWeeklyFohBoh({ token, companyId, locationId, weekOf }) {
       if (!kind) continue;
       const t = role.total || {};
       const hours = Number(t.total_hours || 0);
-      const pay = Number(t.total_pay || 0); // already in dollars
+      const pay = Number(t.total_pay || 0); // dollars
 
       if (kind === "foh") {
         fohHours += hours;
@@ -208,9 +181,7 @@ async function main() {
     fetchWeeklyFohBoh({ token, companyId, locationId, weekOf }),
   ]);
 
-  const ref = db.doc(
-    `companies/aidan/locations/${appKey}/fohBoh/${weekOf}`
-  );
+  const ref = db.doc(`companies/aidan/locations/${appKey}/fohBoh/${weekOf}`);
 
   await ref.set(
     {
@@ -221,8 +192,6 @@ async function main() {
       foh_hours: fohBoh.fohHours,
       boh_hours: fohBoh.bohHours,
       updated_at: admin.firestore.FieldValue.serverTimestamp(),
-      // We purposely do NOT touch foh_target_pct / boh_target_pct so your
-      // adjustments from the UI stay in place.
     },
     { merge: true }
   );
@@ -243,4 +212,3 @@ main().catch((err) => {
   console.error("ERROR:", err.message || err);
   process.exit(1);
 });
-

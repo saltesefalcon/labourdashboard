@@ -718,6 +718,18 @@ const preferNonZero = (primary, fallback) => {
   if (f != null) return f;
   return p ?? f ?? null;
 };
+
+function formatCallableError(e){
+  try{
+    const code = e?.code || e?.name || "error";
+    const msg  = e?.message || String(e);
+    const details =
+      (e?.details != null) ? (" | details: " + JSON.stringify(e.details)) : "";
+    return `${code}: ${msg}${details}`;
+  }catch(_){
+    return String(e);
+  }
+}
     
     // % colour grading
     function gradePct(p){ if(p==null) return null; const x=p*100; if (x<=30.7) return "good"; if (x<=31.9) return "warn"; return "bad"; }
@@ -852,30 +864,66 @@ function daysElapsedInWeek(weekISO, cutoffISO){
     locationSel.onchange = load;
     weekInput.onchange = load;
 
-   async function refreshWeek(){
-   if (FROZEN) {
-  refreshMsg.textContent = "Week is locked (frozen). Unlock it to refresh.";
-  return;
-}
+ async function refreshWeek(){
+  if (FROZEN) {
+    refreshMsg.textContent = "Week is locked (frozen). Unlock it to refresh.";
+    return;
+  }
+
   const week_of = weekInput.value;
-  const locKey  = locationSel.value; // beacon | tulia | prohibition | cesoir
+  const locKey  = locationSel.value;
   refreshMsg.textContent = "Dispatching update…";
 
   try {
-    // 7shifts/weekly pulls
     const call7  = httpsCallable(functions, "dispatchFetchWeek");
-    // Silverware DailyTotals pulls (use the name you deployed)
     const callSW = httpsCallable(functions, "dispatchSilverwareDailyTotals");
 
-    await Promise.allSettled([
-      call7({ week_of, include_sales:true, include_extras:true }),
-      callSW({ week_of, locations:[locKey] })
+    // Send both snake_case + camelCase + both “location” and “locations”
+    // so we don’t crash the function if it expects different keys.
+    const payload7 = {
+      week_of,
+      weekOf: week_of,
+      weekISO: week_of,
+      location: locKey,
+      locKey,
+      locations: [locKey],
+      include_sales: true,
+      includeSales: true,
+      include_extras: true,
+      includeExtras: true,
+    };
+
+    const payloadSW = {
+      week_of,
+      weekOf: week_of,
+      weekISO: week_of,
+      location: locKey,
+      locKey,
+      locations: [locKey],
+    };
+
+    const [r7, rSW] = await Promise.allSettled([
+      call7(payload7),
+      callSW(payloadSW),
     ]);
 
+    const errs = [];
+    if (r7.status === "rejected") errs.push("7shifts: " + formatCallableError(r7.reason));
+    if (rSW.status === "rejected") errs.push("Silverware: " + formatCallableError(rSW.reason));
+
+    if (errs.length){
+      console.error("Dispatch results:", { r7, rSW });
+      refreshMsg.textContent = errs.join(" • ");
+      // still try reloading later in case one side succeeded
+      setTimeout(load, 4000);
+      return;
+    }
+
     refreshMsg.textContent = "Update started. Check again shortly.";
-    setTimeout(load, 4000); // re-read once the writers finish
+    setTimeout(load, 4000);
   } catch (e) {
-    refreshMsg.textContent = "Refresh failed: " + (e.message || e);
+    console.error("Refresh week error:", e);
+    refreshMsg.textContent = "Refresh failed: " + formatCallableError(e);
   }
 }
 
@@ -883,6 +931,11 @@ function daysElapsedInWeek(weekISO, cutoffISO){
 
 async function ensureFreshness(base, integ, weekISO, locKey){
   if (base?.frozen) return; // don't auto-refresh frozen weeks
+
+  // Optional: only auto-refresh for admins (prevents spamming errors for normal users)
+  // If you want auto-refresh for everyone, delete the next line.
+  if (!IS_ADMIN) return;
+
   const guardKey = `autoRefresh:${locKey}:${weekISO}`;
   const lastGuard = Number(localStorage.getItem(guardKey) || 0);
   const now = Date.now();
@@ -899,27 +952,66 @@ async function ensureFreshness(base, integ, weekISO, locKey){
   const STALE_MS = 3 * 60 * 60 * 1000; // 3 hours
   const stale = !lastSync || (now - lastSync) > STALE_MS;
 
-  // const weekEndISO = shiftDays(weekISO, 6);
   const endISO = shiftDays(weekISO, 6);
   const afterSunday = todayISO() > endISO;
   const missingSun = !hasSunday(base?.days || [], weekISO);
 
   // don’t spam – at most once per 30 min per loc/week
-  if (((missingSun && afterSunday) || stale) && (now - lastGuard > 30 * 60 * 1000)) {
-    try{
-      refreshMsg.textContent = "Auto-updating…";
-      const call7  = httpsCallable(functions, "dispatchFetchWeek");
-      const callSW = httpsCallable(functions, "dispatchSilverwareDailyTotals");
-      await Promise.allSettled([
-        call7({ week_of: weekISO, include_sales:true, include_extras:true }),
-        callSW({ week_of: weekISO, locations:[locKey] })
-      ]);
-      localStorage.setItem(guardKey, String(now));
-      setTimeout(load, 4000);
-    }catch(_){ /* silent */ }
+  if (!((missingSun && afterSunday) || stale)) return;
+  if (now - lastGuard <= 30 * 60 * 1000) return;
+
+  // IMPORTANT: define week_of explicitly
+  const week_of = weekISO;
+
+  try{
+    refreshMsg.textContent = "Auto-updating…";
+    localStorage.setItem(guardKey, String(now));
+
+    const call7  = httpsCallable(functions, "dispatchFetchWeek");
+    const callSW = httpsCallable(functions, "dispatchSilverwareDailyTotals");
+
+    const payload7 = {
+      week_of,
+      weekOf: week_of,
+      weekISO: week_of,
+      location: locKey,
+      locKey,
+      locations: [locKey],
+      include_sales: true,
+      includeSales: true,
+      include_extras: true,
+      includeExtras: true,
+    };
+
+    const payloadSW = {
+      week_of,
+      weekOf: week_of,
+      weekISO: week_of,
+      location: locKey,
+      locKey,
+      locations: [locKey],
+    };
+
+    const [r7, rSW] = await Promise.allSettled([
+      call7(payload7),
+      callSW(payloadSW),
+    ]);
+
+    if (r7.status === "rejected") console.error("7shifts dispatch failed:", r7.reason);
+    if (rSW.status === "rejected") console.error("Silverware dispatch failed:", rSW.reason);
+
+    // Don’t hard-fail the UI — reload anyway; one side may have succeeded
+    refreshMsg.textContent =
+      (r7.status === "rejected" || rSW.status === "rejected")
+        ? "Auto-update ran (with errors). See console."
+        : "Auto-update started. Check again shortly.";
+
+    setTimeout(load, 4000);
+  }catch(e){
+    console.error("ensureFreshness error:", e);
+    refreshMsg.textContent = "Auto-update failed: " + formatCallableError(e);
   }
 }
-
 
     // --- Idle sign-out (7 minutes) ---
     const IDLE_MS = 7 * 60 * 1000;
@@ -1192,6 +1284,7 @@ function getSwDayTotal(integ, dateISO){
 
   // common map shapes
   const map =
+    integ?.sw_sales_by_date ?? 
     integ?.salesByDay ??
     integ?.swByDay ??
     integ?.by_day ??
@@ -1500,7 +1593,9 @@ if (pBaseSnap.exists()){
       inPromos.value    = ovr.promos ?? "";
 
       render(base, ovr, settings, integ, weekISO, lastWeekSales);
-      ensureFreshness(base, integ, weekISO, locKey);
+      // TEMP: disable auto-dispatch while we fix the GitHub token in dispatchFetchWeek
+// ensureFreshness(base, integ, weekISO, locKey);
+
 
       saveBtn.onclick = async () => {
         const newOvr = {
