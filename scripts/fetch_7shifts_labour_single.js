@@ -91,8 +91,12 @@ async function main() {
   }
 
   const weekISO = process.env.WEEK_OF || mondayISO(new Date());
-  const start = weekISO;
-  const end = isoAddDays(weekISO, 6);
+const start = weekISO;
+
+// OPTIONAL: For scheduled runs, we can cap the report at END_DATE (YYYY-MM-DD)
+// Example: END_DATE=yesterday so we don’t try to pull “today” before it’s complete.
+const endOverride = process.env.END_DATE ? String(process.env.END_DATE).trim() : "";
+const end = endOverride ? endOverride : isoAddDays(weekISO, 6);
 
   const url = "https://api.7shifts.com/v2/reports/daily_sales_and_labor";
   const headers = { Authorization: `Bearer ${token}` };

@@ -17,11 +17,9 @@ jobs:
       matrix:
         include:
           - app_key: beacon
-            # 7shifts (existing secrets)
             token_secret: BEACON_TOKEN
             company_id_secret: BEACON_COMPANY_ID
             location_id_secret: BEACON_LOCATION_ID
-            # Silverware (new secrets)
             sw_base_secret: SILVERWARE_BASE_BEACON
             sw_token_secret: SILVERWARE_TOKEN_BEACON
 
@@ -58,10 +56,28 @@ jobs:
       - name: Install deps
         run: |
           npm init -y >/dev/null 2>&1 || true
-          # Keep axios for your existing labour script, firebase-admin for Firestore
           npm i axios firebase-admin
 
-      # -------------------- 7shifts LABOUR (existing) --------------------
+      - name: Resolve WEEK_OF (input or default)
+        shell: bash
+        run: |
+          # If manually provided, use it
+          if [ -n "${{ github.event.inputs.week_of }}" ]; then
+            echo "WEEK_OF=${{ github.event.inputs.week_of }}" >> $GITHUB_ENV
+            echo "Resolved WEEK_OF from input: ${{ github.event.inputs.week_of }}"
+            exit 0
+          fi
+
+          # Otherwise choose a default based on Toronto date:
+          # Use "yesterday" so Monday's run still targets the week that contains Sunday.
+          Y=$(TZ=America/Toronto date -d "yesterday" +%F)
+          DOW=$(TZ=America/Toronto date -d "$Y" +%u)         # 1=Mon..7=Sun
+          OFFSET=$((DOW-1))
+          WEEK_OF=$(TZ=America/Toronto date -d "$Y - $OFFSET days" +%F)
+
+          echo "WEEK_OF=$WEEK_OF" >> $GITHUB_ENV
+          echo "Resolved WEEK_OF default (Toronto yesterday-based): $WEEK_OF"
+
       - name: Run 7shifts labour for ${{ matrix.app_key }}
         env:
           FIREBASE_SA_JSON:       ${{ secrets.FIREBASE_SA_JSON }}
@@ -70,11 +86,9 @@ jobs:
           COMPANY_ID:             ${{ secrets[matrix.company_id_secret] }}
           LOCATION_ID:            ${{ secrets[matrix.location_id_secret] }}
           APP_KEY:                ${{ matrix.app_key }}
-          WEEK_OF:                ${{ github.event.inputs.week_of }}
+          WEEK_OF:                ${{ env.WEEK_OF }}
         run: node scripts/fetch_7shifts_labour_single.js
 
-      # -------------------- SILVERWARE SALES (new) -----------------------
-      # This step primes env vars so the Silverware script only runs for the current matrix location.
       - name: Select Silverware env for ${{ matrix.app_key }}
         env:
           SELECTED_SW_BASE:  ${{ secrets[matrix.sw_base_secret] }}
@@ -100,12 +114,7 @@ jobs:
           esac
 
       - name: Run Silverware sales (Food/Voids/Promos) for ${{ matrix.app_key }}
-        # Uses the multi-location script you saved earlier; we only set vars for this location
         env:
-          # The Silverware script expects FIREBASE_SERVICE_ACCOUNT_JSON
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SA_JSON }}
-          WEEK_OF: ${{ github.event.inputs.week_of }}
-          # Optional tuning (uncomment and adjust as needed)
-          # FOOD_CATEGORY_HINTS: "Food,Kitchen"
-          # SILVERWARE_TZ_OFFSET_MINUTES: "-240"
+          WEEK_OF: ${{ env.WEEK_OF }}
         run: node scripts/fetch_silverware_week.mjs

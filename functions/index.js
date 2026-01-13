@@ -220,12 +220,8 @@ exports.dispatchFetchWeek = onCall(
     if (!token) throw new HttpsError("failed-precondition", "Missing GITHUB_TOKEN secret");
 
     // Try with inputs first
-    const inputs = {
-      week_of: weekOf,
-      locations: locations.join(","),
-      include_sales: String(includeSales),
-      include_extras: String(includeExtras),
-    };
+    const inputs = { week_of: weekOf };
+
 
     logger.info("dispatchFetchWeek -> GitHub workflow dispatch", {
       workflow: GH_WORKFLOW_FILE,
