@@ -52,42 +52,22 @@
   .mgr-row input[type="number"]{width:100%}
 
   /* --- helpers for Target Labour pill placement --- */
-#targetCtrl{ align-self:flex-end; }
-@media (max-width:900px){
-  #targetCtrl{ margin-left:0; }
-}
+  #targetCtrl{ align-self:flex-end; }
+  @media (max-width:900px){ #targetCtrl{ margin-left:0; } }
 
-.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-@media (max-width:700px){.settings-grid{grid-template-columns:1fr}}
+  .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:700px){.settings-grid{grid-template-columns:1fr}}
 
-/* --- Layout widen + align with Data bar ---------------------------------- */
-
-/* Give the whole page a wider working area */
-.wrap{
-  /* use a responsive clamp so big screens get more room but it still looks tight on smaller ones */
-  max-width: clamp(1100px, 92vw, 1320px);
-}
-
-/* Make KPI row stretch fully across with no intrinsic min-width shrink */
-.kpis{
-  width: 100%;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-/* Ensure the Daily breakdown card spans full width of the wrap */
-.grid{ width: 100%; }
-.grid > .card{ width: 100%; }
-
-/* Keep the Data bar growing nicely while the other controls stay compact */
-#refreshWrap{
-  flex: 1 1 900px;   /* grow to fill the row */
-}
-
-/* Tiny cosmetic spacing so rows visually align left/right */
-.bar{ gap: 12px; }
-
+  /* --- Layout widen + align with Data bar ---------------------------------- */
+  .wrap{ max-width: clamp(1100px, 92vw, 1320px); }
+  .kpis{ width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .grid{ width: 100%; }
+  .grid > .card{ width: 100%; }
+  #refreshWrap{ flex: 1 1 900px; }
+  .bar{ gap: 12px; }
 </style>
 </head>
+
 <body>
   <div class="wrap">
     <div class="topbar">
@@ -101,7 +81,6 @@
         <button id="signinBtn" class="primary">Sign in</button>
         <button id="signoutBtn" style="display:none">Sign out</button>
         <button id="settingsBtn" style="display:none">Settings</button>
-        <!-- This button JUST navigates to foh-boh.html -->
         <button id="optimizerToggleBtn" style="display:none">FOH / BOH Optimizer</button>
       </div>
     </div>
@@ -119,59 +98,55 @@
           Percentages are decimals (e.g. <code>0.35</code> for 35%).
         </div>
 
-   <!-- Salaried Management (dated; replaces legacy managers list) -->
-<div style="margin:8px 0 6px;font-weight:600">Salaried Management</div>
+        <div style="margin:8px 0 6px;font-weight:600">Salaried Management</div>
+        <div class="small" style="margin-bottom:10px">
+          Weekly salaries with effective dates. This is what the dashboard uses for labour (keeps history correct).
+        </div>
 
-<div class="small" style="margin-bottom:10px">
-  Weekly salaries with effective dates. This is what the dashboard uses for labour (keeps history correct).
-</div>
+        <div class="row" style="align-items:center; justify-content:space-between; margin-bottom:10px">
+          <div class="small">Calculated for selected week</div>
+          <span id="salTotalPill" class="pill">—</span>
+        </div>
 
-<div class="row" style="align-items:center; justify-content:space-between; margin-bottom:10px">
-  <div class="small">Calculated for selected week</div>
-  <span id="salTotalPill" class="pill">—</span>
-</div>
+        <div class="row" style="justify-content:flex-end; margin-bottom:8px">
+          <label class="small" style="display:flex; gap:8px; align-items:center; justify-content:flex-end">
+            <input type="checkbox" id="showInactiveChk">
+            Show inactive &amp; future
+          </label>
+        </div>
 
-<div class="row" style="justify-content:flex-end; margin-bottom:8px">
-  <label class="small" style="display:flex; gap:8px; align-items:center; justify-content:flex-end">
-    <input type="checkbox" id="showInactiveChk">
-    Show inactive & future
-  </label>
-</div>
+        <div id="periodList"></div>
 
-<div id="periodList"></div>
+        <div class="row" style="align-items:center;margin-bottom:12px">
+          <button id="addPeriodBtn">+ Add Manager</button>
+          <span class="small">Use “Increase pay” or “End salary” so past weeks don’t change.</span>
+        </div>
 
-<div class="row" style="align-items:center;margin-bottom:12px">
-  <button id="addPeriodBtn">+ Add Manager</button>
-  <span class="small">Use “Increase pay” or “End salary” so past weeks don’t change.</span>
-</div>
+        <div class="settings-grid" style="margin-top:6px">
+          <label>Remittance % of Gross Labour<br>
+            <input id="setRemitPct" type="number" step="0.0001" placeholder="0.0000">
+          </label>
 
+          <label>Target Labour % (fallback)<br>
+            <input id="setTargetPct" type="number" step="0.0001" placeholder="0.0000">
+          </label>
 
-<div class="settings-grid" style="margin-top:6px">
-  <label>Remittance % of Gross Labour<br>
-    <input id="setRemitPct" type="number" step="0.0001" placeholder="0.0000">
-  </label>
+          <label>Budget % Food<br>
+            <input id="setPctFood" type="number" step="0.01" placeholder="0.00">
+          </label>
 
-  <label>Target Labour % (fallback)<br>
-    <input id="setTargetPct" type="number" step="0.0001" placeholder="0.0000">
-  </label>
+          <label>Budget % Wine<br>
+            <input id="setPctWine" type="number" step="0.01" placeholder="0.00">
+          </label>
 
-  <label>Budget % Food<br>
-    <input id="setPctFood" type="number" step="0.01" placeholder="0.00">
-  </label>
+          <label>Budget % Liquor<br>
+            <input id="setPctLiquor" type="number" step="0.01" placeholder="0.00">
+          </label>
 
-  <label>Budget % Wine<br>
-    <input id="setPctWine" type="number" step="0.01" placeholder="0.00">
-  </label>
-
-  <label>Budget % Liquor<br>
-    <input id="setPctLiquor" type="number" step="0.01" placeholder="0.00">
-  </label>
-
-  <label>Budget % Beer<br>
-    <input id="setPctBeer" type="number" step="0.01" placeholder="0.00">
-  </label>
-</div>
-
+          <label>Budget % Beer<br>
+            <input id="setPctBeer" type="number" step="0.01" placeholder="0.00">
+          </label>
+        </div>
 
         <div class="row" style="margin-top:10px">
           <button id="settingsSave" class="primary">Save Settings</button>
@@ -180,23 +155,23 @@
       </div>
     </div>
 
-<!-- COMING SOON MODAL (FOH/BOH Optimizer) -->
-<div id="soonModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9998; align-items:center; justify-content:center;">
-  <div class="card" style="width:520px; max-width:94%; background:var(--panel); border:1px solid var(--line)">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
-      <div style="font-weight:600">FOH / BOH Optimizer</div>
-      <button id="soonClose">✕</button>
-    </div>
+    <!-- COMING SOON MODAL (FOH/BOH Optimizer) -->
+    <div id="soonModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9998; align-items:center; justify-content:center;">
+      <div class="card" style="width:520px; max-width:94%; background:var(--panel); border:1px solid var(--line)">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+          <div style="font-weight:600">FOH / BOH Optimizer</div>
+          <button id="soonClose">✕</button>
+        </div>
 
-    <div class="small" style="line-height:1.35">
-      <strong>Coming soon.</strong> This feature isn’t enabled yet while we finish building the optimizer page.
-    </div>
+        <div class="small" style="line-height:1.35">
+          <strong>Coming soon.</strong> This feature isn’t enabled yet while we finish building the optimizer page.
+        </div>
 
-    <div class="row" style="margin-top:12px">
-      <button id="soonOk" class="primary">OK</button>
+        <div class="row" style="margin-top:12px">
+          <button id="soonOk" class="primary">OK</button>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
 
     <!-- AUTH GATE -->
     <div id="authGate" class="card" style="max-width:520px;margin:48px auto 0;">
@@ -219,7 +194,7 @@
       <div class="small">Your account is signed in, but not authorized for this dashboard.</div>
     </div>
 
-    <!-- MAIN APP (Dashboard view only) -->
+    <!-- MAIN APP -->
     <div id="app" hidden>
       <div class="bar">
         <div class="controls card">
@@ -240,30 +215,29 @@
 
         <div class="controls card" id="refreshWrap" style="min-width:320px; flex:1 1 680px">
           <label style="display:block;font-size:.8rem;color:var(--muted);margin-bottom:6px">Data</label>
-<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px">
-<!-- left group: actions -->
-<div style="display:flex; gap:6px; flex-wrap:wrap">
-  <button id="refreshBtn" class="primary">Refresh week</button>
-  <button id="pdfBtn">Download PDF (all locations)</button>
 
-  <!-- lock controls (admin button + status pill) -->
-  <div id="lockWrap" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center">
-    <button id="lockBtn" title="Freeze this week so totals don’t change">Lock week</button>
-    <span id="lockPill" class="pill">Unfrozen</span>
-  </div>
-</div>
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px">
+            <div style="display:flex; gap:6px; flex-wrap:wrap">
+              <button id="refreshBtn" class="primary">Refresh week</button>
+              <button id="pdfBtn">Download PDF (all locations)</button>
 
-  <!-- right group: target labour -->
-  <div style="margin-left:auto; display:flex; align-items:center; gap:8px">
-    <label class="small">Target Labour %</label>
-    <span id="targetPill" class="pill">—</span>
-  </div>
-</div>
+              <div id="lockWrap" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center">
+                <button id="lockBtn" title="Freeze this week so totals don’t change">Lock week</button>
+                <span id="lockPill" class="pill">Unfrozen</span>
+              </div>
+            </div>
+
+            <div style="margin-left:auto; display:flex; align-items:center; gap:8px">
+              <label class="small">Target Labour %</label>
+              <span id="targetPill" class="pill">—</span>
+            </div>
+          </div>
 
           <div class="small" id="refreshMsg"></div>
           <div class="small" id="syncLine" style="margin-top:4px">Last sync: —</div>
           <div class="small" id="sourceLine">Sales: <span id="salesSource">—</span> • Extras: <span id="extrasSource">—</span></div>
         </div>
+      </div>
 
       <!-- KPIs -->
       <div class="kpis">
@@ -302,30 +276,29 @@
 
       <!-- MANUAL INPUTS + LAST WEEK / BUDGETS -->
       <div class="two" style="margin-top:12px">
-<div class="card">
-  <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-    <div class="section-title" style="margin:0">Manual inputs (saved per week)</div>
-    <button id="manualToggleBtn">Show</button>
-  </div>
+        <div class="card">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+            <div class="section-title" style="margin:0">Manual inputs (saved per week)</div>
+            <button id="manualToggleBtn">Show</button>
+          </div>
 
-  <div id="manualInputsWrap" style="display:none; margin-top:10px;">
-    <div class="row">
-      <label>Food Sales $<br><input id="inFoodSales" type="number" step="0.01" placeholder="0"></label>
-      <label>Promos/Discounts $<br><input id="inPromos" type="number" step="0.01" placeholder="0"></label>
-    </div>
+          <div id="manualInputsWrap" style="display:none; margin-top:10px;">
+            <div class="row">
+              <label>Food Sales $<br><input id="inFoodSales" type="number" step="0.01" placeholder="0"></label>
+              <label>Promos/Discounts $<br><input id="inPromos" type="number" step="0.01" placeholder="0"></label>
+            </div>
 
-    <div class="row">
-      <label>Voids $<br><input id="inVoids" type="number" step="0.01" placeholder="0"></label>
-    </div>
+            <div class="row">
+              <label>Voids $<br><input id="inVoids" type="number" step="0.01" placeholder="0"></label>
+            </div>
 
-    <div class="row">
-      <button id="saveOverrides" class="primary">Save</button>
-      <span id="saveMsg" class="small"></span>
-    </div>
-    <div class="small" style="margin-top:4px">Manual values override auto values if entered (&gt; 0).</div>
-  </div>
-</div>
-
+            <div class="row">
+              <button id="saveOverrides" class="primary">Save</button>
+              <span id="saveMsg" class="small"></span>
+            </div>
+            <div class="small" style="margin-top:4px">Manual values override auto values if entered (&gt; 0).</div>
+          </div>
+        </div>
 
         <div class="card">
           <div class="section-title">Last Week, Auto Feeds & Purchasing Budgets</div>
@@ -381,52 +354,28 @@
 
     const ALLOWED_UIDS = new Set([
       "e0G8FBe3xlYExc3HvSGtIk5Osgw1",
-          "BslFJsAMikSucxwbL8S7qPXcC6r2",
-          "nW1IbxeaZJT0hAoORZhDtgOlAdd2",
-          "zbpmXxrpweXQzf7Z7JMx8kUblQi1",
-          "n1xq8sI8QWSfmQni7G5Qw5jS74b2",
-          "CfNm6og5ydXhOAcKlSvJEABWsT23",
-          "Yf1EPiMfQVNvgKVVMZD4h6zjpRX2",
-          "4Paoa0SWHybPzwP7uNjOx2VgbiJ2",
-          "9aQ5evQ3nbYt0kjw91ruil5Igq52"
+      "BslFJsAMikSucxwbL8S7qPXcC6r2",
+      "nW1IbxeaZJT0hAoORZhDtgOlAdd2",
+      "zbpmXxrpweXQzf7Z7JMx8kUblQi1",
+      "n1xq8sI8QWSfmQni7G5Qw5jS74b2",
+      "CfNm6og5ydXhOAcKlSvJEABWsT23",
+      "Yf1EPiMfQVNvgKVVMZD4h6zjpRX2",
+      "4Paoa0SWHybPzwP7uNjOx2VgbiJ2",
+      "9aQ5evQ3nbYt0kjw91ruil5Igq52"
     ]);
     const ADMIN_UIDS = new Set([
       "e0G8FBe3xlYExc3HvSGtIk5Osgw1",
-          "BslFJsAMikSucxwbL8S7qPXcC6r2",
-          "nW1IbxeaZJT0hAoORZhDtgOlAdd2",
-          "zbpmXxrpweXQzf7Z7JMx8kUblQi1",
-          "n1xq8sI8QWSfmQni7G5Qw5jS74b2",
-          "CfNm6og5ydXhOAcKlSvJEABWsT23",
-          "Yf1EPiMfQVNvgKVVMZD4h6zjpRX2",
-          "4Paoa0SWHybPzwP7uNjOx2VgbiJ2",
-          "9aQ5evQ3nbYt0kjw91ruil5Igq52"
+      "BslFJsAMikSucxwbL8S7qPXcC6r2",
+      "nW1IbxeaZJT0hAoORZhDtgOlAdd2",
+      "zbpmXxrpweXQzf7Z7JMx8kUblQi1",
+      "n1xq8sI8QWSfmQni7G5Qw5jS74b2",
+      "CfNm6og5ydXhOAcKlSvJEABWsT23",
+      "Yf1EPiMfQVNvgKVVMZD4h6zjpRX2",
+      "4Paoa0SWHybPzwP7uNjOx2VgbiJ2",
+      "9aQ5evQ3nbYt0kjw91ruil5Igq52"
     ]);
 
     const on = (el, type, fn) => { if (el) el.addEventListener(type, fn); };
-    window.addEventListener("error", e => {
-      if (authMsg) { authMsg.textContent = e.message || String(e); authMsg.style.display = ""; }
-    });
-
-    // --- DEBUG HELPERS (safe to keep) -------------------------------------------
-window._dbg = {
-  async readInteg(locKey, weekISO) {
-    // companies/aidan/locations/{locKey}/integrations/{weekISO}
-    const ref = doc(db, `companies/aidan/locations/${locKey}/integrations/${weekISO}`);
-    const snap = await getDoc(ref);
-    const data = snap.exists() ? snap.data() : null;
-    console.log("[integ]", locKey, weekISO, data);
-    return data;
-  },
-  async readAll(locKey, weekISO) {
-    const base = (await getDoc(doc(db, `companies/aidan/locations/${locKey}/labour/${weekISO}`))).data() || null;
-    const ovr  = (await getDoc(doc(db, `companies/aidan/locations/${locKey}/overrides/${weekISO}`))).data() || null;
-    const integ= (await getDoc(doc(db, `companies/aidan/locations/${locKey}/integrations/${weekISO}`))).data() || null;
-    console.log({ base, ovr, integ });
-    return { base, ovr, integ };
-  }
-};
-// ---------------------------------------------------------------------------
-
 
     // Elements
     const appEl = document.getElementById("app");
@@ -445,11 +394,11 @@ window._dbg = {
     const refreshBtn = document.getElementById("refreshBtn");
     const refreshMsg = document.getElementById("refreshMsg");
     const pdfBtn  = document.getElementById("pdfBtn");
+
     const lockWrap = document.getElementById("lockWrap");
     const lockBtn  = document.getElementById("lockBtn");
     const lockPill = document.getElementById("lockPill");
-    let CUR_USER   = null;
-    let   FROZEN   = false;
+
     const locationSel = document.getElementById("locationSel");
     const weekInput = document.getElementById("weekInput");
     const prevBtn = document.getElementById("prevBtn");
@@ -472,9 +421,9 @@ window._dbg = {
     const setPctLiquor = document.getElementById("setPctLiquor");
     const setPctBeer = document.getElementById("setPctBeer");
     const periodList = document.getElementById("periodList");
-const addPeriodBtn = document.getElementById("addPeriodBtn");
-const salTotalPill = document.getElementById("salTotalPill");
-const showInactiveChk = document.getElementById("showInactiveChk");
+    const addPeriodBtn = document.getElementById("addPeriodBtn");
+    const salTotalPill = document.getElementById("salTotalPill");
+    const showInactiveChk = document.getElementById("showInactiveChk");
 
     // Weekly overrides (editable here)
     const inFoodSales = document.getElementById("inFoodSales");
@@ -484,26 +433,8 @@ const showInactiveChk = document.getElementById("showInactiveChk");
     const saveMsg = document.getElementById("saveMsg");
 
     // Manual Inputs collapse/expand
-const manualToggleBtn  = document.getElementById("manualToggleBtn");
-const manualInputsWrap = document.getElementById("manualInputsWrap");
-
-function setManualOpen(open){
-  if (!manualInputsWrap || !manualToggleBtn) return;
-  manualInputsWrap.style.display = open ? "" : "none";
-  manualToggleBtn.textContent = open ? "Hide" : "Show";
-  localStorage.setItem("showManualInputs", open ? "1" : "0");
-}
-
-// default closed (remember last choice)
-setManualOpen(localStorage.getItem("showManualInputs") === "1");
-
-if (manualToggleBtn){
-  manualToggleBtn.addEventListener("click", () => {
-    const isOpen = manualInputsWrap && manualInputsWrap.style.display !== "none";
-    setManualOpen(!isOpen);
-  });
-}
-
+    const manualToggleBtn  = document.getElementById("manualToggleBtn");
+    const manualInputsWrap = document.getElementById("manualInputsWrap");
 
     // Budgets & extras view
     const vwProjSales = document.getElementById("vwProjSales");
@@ -524,233 +455,90 @@ if (manualToggleBtn){
     const kpiProjPct   = document.getElementById("kpiProjPct");
     const kpiActPct    = document.getElementById("kpiActPct");
 
-// FOH/BOH Optimizer: Coming soon (disabled navigation for now)
-const soonModal = document.getElementById("soonModal");
-const soonClose = document.getElementById("soonClose");
-const soonOk    = document.getElementById("soonOk");
+    // Global error display (now safe: authMsg already exists)
+    window.addEventListener("error", e => {
+      try{
+        if (authMsg) {
+          authMsg.textContent = e?.message || String(e);
+          authMsg.style.display = "";
+        }
+      }catch(_){}
+    });
 
-function openSoonModal(){
-  if (soonModal) soonModal.style.display = "flex";
-}
-function closeSoonModal(){
-  if (soonModal) soonModal.style.display = "none";
-}
+    // --- DEBUG HELPERS (safe to keep) -------------------------------------------
+    window._dbg = {
+      async readInteg(locKey, weekISO) {
+        const ref = doc(db, `companies/aidan/locations/${locKey}/integrations/${weekISO}`);
+        const snap = await getDoc(ref);
+        const data = snap.exists() ? snap.data() : null;
+        console.log("[integ]", locKey, weekISO, data);
+        return data;
+      },
+      async readAll(locKey, weekISO) {
+        const base = (await getDoc(doc(db, `companies/aidan/locations/${locKey}/labour/${weekISO}`))).data() || null;
+        const ovr  = (await getDoc(doc(db, `companies/aidan/locations/${locKey}/overrides/${weekISO}`))).data() || null;
+        const integ= (await getDoc(doc(db, `companies/aidan/locations/${locKey}/integrations/${weekISO}`))).data() || null;
+        console.log({ base, ovr, integ });
+        return { base, ovr, integ };
+      }
+    };
+    // ---------------------------------------------------------------------------
 
-on(soonClose, "click", closeSoonModal);
-on(soonOk,    "click", closeSoonModal);
-on(soonModal, "click", (e) => { if (e.target === soonModal) closeSoonModal(); });
+    // FOH/BOH Optimizer: Coming soon (disabled navigation for now)
+    const soonModal = document.getElementById("soonModal");
+    const soonClose = document.getElementById("soonClose");
+    const soonOk    = document.getElementById("soonOk");
 
-if (optimizerBtn) {
-  on(optimizerBtn, "click", openSoonModal);
-}
+    function openSoonModal(){ if (soonModal) soonModal.style.display = "flex"; }
+    function closeSoonModal(){ if (soonModal) soonModal.style.display = "none"; }
 
+    on(soonClose, "click", closeSoonModal);
+    on(soonOk,    "click", closeSoonModal);
+    on(soonModal, "click", (e) => { if (e.target === soonModal) closeSoonModal(); });
+    if (optimizerBtn) on(optimizerBtn, "click", openSoonModal);
 
     // Helpers
     const fmtMoney = n => (n==null? "—" : n.toLocaleString(undefined,{style:"currency",currency:"CAD",maximumFractionDigits:0}));
     const fmtInt   = n => (n==null? "—" : Math.round(n).toLocaleString());
     const fmtPct   = n => (n==null? "—" : (n*100).toFixed(1) + "%");
-    function getMondayISO(d=new Date()){ const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())); const day=dt.getUTCDay()||7; if(day!==1) dt.setUTCDate(dt.getUTCDate()-(day-1)); return dt.toISOString().slice(0,10); }
-    function shiftDays(iso,delta){ const d=new Date(iso+"T00:00:00Z"); d.setUTCDate(d.getUTCDate()+delta); return d.toISOString().slice(0,10); }
+
+    function getMondayISO(d=new Date()){
+      const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+      const day=dt.getUTCDay()||7;
+      if(day!==1) dt.setUTCDate(dt.getUTCDate()-(day-1));
+      return dt.toISOString().slice(0,10);
+    }
+    function shiftDays(iso,delta){
+      const d=new Date(iso+"T00:00:00Z");
+      d.setUTCDate(d.getUTCDate()+delta);
+      return d.toISOString().slice(0,10);
+    }
     function todayISO(){
       const d = new Date();
       const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
       return dt.toISOString().slice(0,10);
     }
+    function parseISODate(iso){ return new Date(iso + "T00:00:00Z"); }
+    function dayDiff(aISO, bISO){ return Math.floor((parseISODate(bISO) - parseISODate(aISO))/86400000); }
+    function isoMin(aISO, bISO){ return (aISO <= bISO) ? aISO : bISO; }
+    function isoMax(aISO, bISO){ return (aISO >= bISO) ? aISO : bISO; }
+    function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+
     function hasSunday(days, weekISO){
-      const want = shiftDays(weekISO, 6);            // Sunday of that week
+      const want = shiftDays(weekISO, 6);
       return (days||[]).some(d =>
         d?.date === want && (
           (d.actual_sales ?? 0) !== 0 || (d.actual_labor_cost ?? 0) !== 0
         )
       );
     }
-    function parseISODate(iso){ return new Date(iso + "T00:00:00Z"); }
-function dayDiff(aISO, bISO){ return Math.floor((parseISODate(bISO) - parseISODate(aISO))/86400000); }
-function isoMin(aISO, bISO){ return (aISO <= bISO) ? aISO : bISO; }
-function isoMax(aISO, bISO){ return (aISO >= bISO) ? aISO : bISO; }
 
-// inclusive overlap (returns 0..7)
-function overlapDaysInWeek(aStartISO, aEndISO, weekStartISO, weekEndISO){
-  // treat null end as far future
-  const aEnd = aEndISO && aEndISO !== "" ? aEndISO : "9999-12-31";
-  const start = isoMax(aStartISO, weekStartISO);
-  const end   = isoMin(aEnd, weekEndISO);
-  const days  = dayDiff(start, end) + 1; // inclusive
-  return Math.max(0, Math.min(7, days));
-}
-
-// Compute salaried dollars for (a) full week and (b) to-date in the week (cutoff)
-function salaryFromPeriods(periods=[], weekISO, cutoffISO){
-  if (!Array.isArray(periods) || periods.length===0) return null;
-  const weekStart = weekISO;
-  const weekEnd   = shiftDays(weekISO, 6);
-  const cutoff    = isoMin(cutoffISO || weekEnd, weekEnd);
-
-  let fullWeek = 0;
-  let toDate   = 0;
-
-  for (const p of periods){
-    const w = Number(p?.weekly) || 0;
-    const s = (p?.start || "").trim();
-    if (!w || !s) continue;
-    const e = (p?.end || null);
-
-    // overlap for whole week
-    const dFull = overlapDaysInWeek(s, e, weekStart, weekEnd);
-    if (dFull > 0) fullWeek += w * (dFull / 7);
-
-    // overlap up to cutoff (today or Sunday, whichever is earlier)
-    const dTo   = overlapDaysInWeek(s, e, weekStart, cutoff);
-    if (dTo > 0) toDate += w * (dTo / 7);
-  }
-  // round to cents
-  const r2 = n => Math.round(n * 100) / 100;
-  return { fullWeek: r2(fullWeek), toDate: r2(toDate) };
-}
-
-function salaryForDay(periods=[], dayISO){
-  if (!Array.isArray(periods) || !dayISO) return 0;
-  let total = 0;
-
-  for (const p of periods){
-    const w = Number(p?.weekly) || 0;
-    const s = (p?.start || "").trim();
-    if (!w || !s) continue;
-
-    const e = (p?.end || "").trim();
-    const endISO = e ? e : "9999-12-31";
-
-    if (dayISO >= s && dayISO <= endISO) total += (w / 7);
-  }
-  return Math.round(total * 100) / 100;
-}
-
-
-// ----- Salaried management: period-aware helpers -----
-// Data model (preferred):
-// settings.mgr_salary_periods = [
-//   { name: "Alice", periods: [
-//       { start:"2025-01-01", weekly:1200 },                  // open-ended
-//       { start:"2025-05-15", weekly:1400 },                  // raise (from this date)
-//       { start:"2025-10-01", weekly:1400, end:"2025-12-31"}  // termination (closed period)
-//   ]}
-// ]
-//
-// Back-compat fallback (no periods configured):
-// settings.salaried_mgrs = [{ name:"Alice", weekly:1200 }, ...]
-//
-const FAR_FUTURE = "9999-12-31";
-
-function getMgrPeriods(settings){
-  const advanced = Array.isArray(settings?.mgr_salary_periods) ? settings.mgr_salary_periods : null;
-  if (advanced && advanced.length) return advanced;
-
-  // fallback: map existing weekly-only list to one open-ended period
-  const legacyList = Array.isArray(settings?.salaried_mgrs) ? settings.salaried_mgrs : [];
-  return legacyList.map(m => ({
-    name: m?.name || "",
-    periods: [{ start: "1970-01-01", weekly: Number(m?.weekly)||0 }]
-  }));
-}
-
-function overlapDaysInRange(startISO, endISO, rangeStartISO, rangeEndISO){
-  const s = (startISO && startISO > rangeStartISO) ? startISO : rangeStartISO;
-  const e = (endISO   && endISO   < rangeEndISO)   ? endISO   : rangeEndISO;
-  if (e < s) return 0;
-  const A = Date.parse(s+"T00:00:00Z");
-  const B = Date.parse(e+"T00:00:00Z");
-  return Math.floor((B - A) / 86400000) + 1; // inclusive days
-}
-
-function sumSalariedFullWeek(settings, weekISO){
-  const wkStart = weekISO;
-  const wkEnd   = shiftDays(weekISO, 6);
-  const list = getMgrPeriods(settings);
-  let total = 0;
-  for (const mgr of list){
-    const periods = Array.isArray(mgr?.periods) ? mgr.periods : [];
-    for (const p of periods){
-      const days = overlapDaysInRange(p.start, p.end || FAR_FUTURE, wkStart, wkEnd);
-      if (days>0) total += (Number(p.weekly)||0) * (days/7);
-    }
-  }
-  return total;
-}
-
-function sumSalariedToDate(settings, weekISO, cutoffISO){
-  const wkStart = weekISO;
-  const list = getMgrPeriods(settings);
-  let total = 0;
-  for (const mgr of list){
-    const periods = Array.isArray(mgr?.periods) ? mgr.periods : [];
-    for (const p of periods){
-      const days = overlapDaysInRange(p.start, p.end || FAR_FUTURE, wkStart, cutoffISO);
-      if (days>0) total += (Number(p.weekly)||0) * (days/7);
-    }
-  }
-  return total;
-}
-
-// Legacy weekly-sum fallback (when no period table is used)
-function sumLegacyWeekly(settings){
-  const list = Array.isArray(settings?.salaried_mgrs) ? settings.salaried_mgrs : [];
-  const sumList = list.reduce((a,m)=> a + (Number(m?.weekly)||0), 0);
-  const legacy  = Number(settings?.salaried_mgmt) || 0; // old single number
-  return sumList > 0 ? sumList : legacy;
-}
-
-    
-    function num(v){ const n=parseFloat(v); return isNaN(n)?0:n; }
-    const isNum = v => typeof v === "number" && isFinite(v);
-    const pickVal = (manual, auto) => (isNum(manual) && manual > 0 ? manual : (isNum(auto) ? auto : 0));
-    const pill = (el, txt, g) => { el.textContent = txt || "—"; el.classList.remove("good","bad","warn"); if (g) el.classList.add(g); };
-
-    // Coerce anything numeric-looking to a number; return null if not finite
-const toNum = (v) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-};
-// Prefer a non-zero primary; otherwise use fallback if it exists
-const preferNonZero = (primary, fallback) => {
-  const p = toNum(primary);
-  const f = toNum(fallback);
-  if (p != null && p > 0) return p;
-  if (f != null) return f;
-  return p ?? f ?? null;
-};
-
-function formatCallableError(e){
-  try{
-    const code = e?.code || e?.name || "error";
-    const msg  = e?.message || String(e);
-    const details =
-      (e?.details != null) ? (" | details: " + JSON.stringify(e.details)) : "";
-    return `${code}: ${msg}${details}`;
-  }catch(_){
-    return String(e);
-  }
-}
-    
-    // % colour grading
-    function gradePct(p){ if(p==null) return null; const x=p*100; if (x<=30.7) return "good"; if (x<=31.9) return "warn"; return "bad"; }
-    function applyPctClass(el, p){
-      el.classList.remove("pct-good","pct-warn","pct-bad");
-      const g = gradePct(p);
-      if (g==="good") el.classList.add("pct-good");
-      else if (g==="warn") el.classList.add("pct-warn");
-      else if (g==="bad") el.classList.add("pct-bad");
-    }
-
-    function getSettingsPath(locKey){ return `companies/aidan/locations/${locKey}/settings/app`; }
-    async function loadSettingsFor(locKey){
-      const snap = await getDoc(doc(db, getSettingsPath(locKey)));
-      return snap.exists() ? snap.data() : {
-        salaried_mgrs: [], salaried_mgmt: 0, remit_pct: 0,target_labour_pct: 0,
-        budget_pct_food: 0, budget_pct_wine: 0, budget_pct_liquor: 0, budget_pct_beer: 0
-      };
-    }
-    async function saveSettingsFor(locKey, data){
-      await setDoc(doc(db, getSettingsPath(locKey)), data, { merge:true });
+    function cutoffForWeek(weekISO){
+      const today = todayISO();
+      const end   = shiftDays(weekISO, 6);
+      if (today < weekISO) return weekISO;
+      if (today > end)     return end;
+      return today;
     }
 
     // --- currency scaling (detect cents vs dollars) ---
@@ -763,98 +551,472 @@ function formatCallableError(e){
       return 1;
     }
 
-    // ----- lock helpers -----
-function weekEndISO(weekISO){ return shiftDays(weekISO, 6); }
-function isWeekComplete(weekISO){ return todayISO() > weekEndISO(weekISO); }
+    function num(v){ const n=parseFloat(v); return isNaN(n)?0:n; }
+    const isNum = v => typeof v === "number" && isFinite(v);
+    const pickVal = (manual, auto) => (isNum(manual) && manual > 0 ? manual : (isNum(auto) ? auto : 0));
+    const pill = (el, txt, g) => {
+      if (!el) return;
+      el.textContent = txt || "—";
+      el.classList.remove("good","bad","warn");
+      if (g) el.classList.add(g);
+    };
 
+    const toNum = (v) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
 
-    function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+    function formatCallableError(e){
+      try{
+        const code = e?.code || e?.name || "error";
+        const msg  = e?.message || String(e);
+        const details = (e?.details != null) ? (" | details: " + JSON.stringify(e.details)) : "";
+        return `${code}: ${msg}${details}`;
+      }catch(_){
+        return String(e);
+      }
+    }
 
-function cutoffForWeek(weekISO){
-  const today = todayISO();
-  const end   = shiftDays(weekISO, 6);
-  if (today < weekISO) return weekISO;   // week not started
-  if (today > end)     return end;       // week finished
-  return today;                          // mid-week → today
-}
+    // % colour grading
+    function gradePct(p){
+      if(p==null) return null;
+      const x=p*100;
+      if (x<=30.7) return "good";
+      if (x<=31.9) return "warn";
+      return "bad";
+    }
+    function applyPctClass(el, p){
+      if (!el) return;
+      el.classList.remove("pct-good","pct-warn","pct-bad");
+      const g = gradePct(p);
+      if (g==="good") el.classList.add("pct-good");
+      else if (g==="warn") el.classList.add("pct-warn");
+      else if (g==="bad") el.classList.add("pct-bad");
+    }
 
-function isPastMonth(weekISO){
-  const w = new Date(weekISO + "T00:00:00Z");
-  const t = new Date();
-  const wy = w.getUTCFullYear(), wm = w.getUTCMonth();
-  const ty = t.getUTCFullYear(), tm = t.getUTCMonth();
-  return (wy < ty) || (wy === ty && wm < tm);
-}
+    function getSettingsPath(locKey){ return `companies/aidan/locations/${locKey}/settings/app`; }
+    async function loadSettingsFor(locKey){
+      const snap = await getDoc(doc(db, getSettingsPath(locKey)));
+      return snap.exists() ? snap.data() : {
+        mgr_salary_periods: [],
+        salaried_mgrs: [],
+        salaried_mgmt: 0,
+        remit_pct: 0,
+        target_labour_pct: 0,
+        budget_pct_food: 0,
+        budget_pct_wine: 0,
+        budget_pct_liquor: 0,
+        budget_pct_beer: 0
+      };
+    }
 
-function updateFrozenUI(frozen){
-  FROZEN = !!frozen;
-  if (lockPill){
-    lockPill.textContent = FROZEN ? "Frozen" : "Unfrozen";
-    lockPill.classList.remove("good","bad","warn");
-    lockPill.classList.add(FROZEN ? "bad" : "good");
-  }
-  if (lockBtn){
-    lockBtn.textContent = FROZEN ? "Unlock week" : "Lock week";
-  }
-  // when frozen, prevent mutating actions (refresh + manual overrides)
-  if (refreshBtn) refreshBtn.disabled = FROZEN;
-  if (saveBtn)    saveBtn.disabled    = FROZEN;
-  if (inFoodSales) inFoodSales.disabled = FROZEN;
-  if (inVoids)     inVoids.disabled    = FROZEN;
-  if (inPromos)    inPromos.disabled   = FROZEN;
-}
+    // ----- Salaried management helpers (flat list of periods) -----
+    function overlapDaysInWeek(aStartISO, aEndISO, weekStartISO, weekEndISO){
+      const aEnd = aEndISO && aEndISO !== "" ? aEndISO : "9999-12-31";
+      const start = isoMax(aStartISO, weekStartISO);
+      const end   = isoMin(aEnd, weekEndISO);
+      const days  = dayDiff(start, end) + 1; // inclusive
+      return Math.max(0, Math.min(7, days));
+    }
 
-async function toggleLock(){
-  const loc   = locationSel.value;
-  const week  = weekInput.value;
+    function salaryFromPeriods(periods=[], weekISO, cutoffISO){
+      if (!Array.isArray(periods) || periods.length===0) return null;
+      const weekStart = weekISO;
+      const weekEnd   = shiftDays(weekISO, 6);
+      const cutoff    = isoMin(cutoffISO || weekEnd, weekEnd);
 
-  try{
-    const nextFrozen = !FROZEN;
+      let fullWeek = 0;
+      let toDate   = 0;
 
-    await setDoc(
-      doc(db, `companies/aidan/locations/${loc}/labour/${week}`),
-      {
-        frozen: nextFrozen,
-        frozen_by_uid:   CUR_USER?.uid   || null,
-        frozen_by_email: CUR_USER?.email || null,
-        frozen_at: serverTimestamp()
-      },
-      { merge:true }
-    );
+      for (const p of periods){
+        const w = Number(p?.weekly) || 0;
+        const s = (p?.start || "").trim();
+        if (!w || !s) continue;
+        const e = (p?.end || null);
 
-    updateFrozenUI(nextFrozen);
-    refreshMsg.textContent = nextFrozen ? "Week locked." : "Week unlocked.";
-  }catch(e){
-    refreshMsg.textContent = "Lock toggle failed: " + (e.message || e);
-  }
-}
+        const dFull = overlapDaysInWeek(s, e, weekStart, weekEnd);
+        if (dFull > 0) fullWeek += w * (dFull / 7);
 
+        const dTo   = overlapDaysInWeek(s, e, weekStart, cutoff);
+        if (dTo > 0) toDate += w * (dTo / 7);
+      }
+      const r2 = n => Math.round(n * 100) / 100;
+      return { fullWeek: r2(fullWeek), toDate: r2(toDate) };
+    }
 
-async function maybeAutoLock(base, weekISO){
-  // Auto-lock any week that’s in a past month and is complete, if not already frozen
-  if (!base?.frozen && isPastMonth(weekISO) && isWeekComplete(weekISO) && IS_ADMIN){
-    const loc = locationSel.value;
-    try{
-      await setDoc(
-        doc(db, `companies/aidan/locations/${loc}/labour/${weekISO}`),
-        { frozen:true, frozen_by_uid: CUR_USER?.uid || null, frozen_at: serverTimestamp() },
-        { merge:true }
+    function salaryForDay(periods=[], dayISO){
+      if (!Array.isArray(periods) || !dayISO) return 0;
+      let total = 0;
+
+      for (const p of periods){
+        const w = Number(p?.weekly) || 0;
+        const s = (p?.start || "").trim();
+        if (!w || !s) continue;
+
+        const e = (p?.end || "").trim();
+        const endISO = e ? e : "9999-12-31";
+
+        if (dayISO >= s && dayISO <= endISO) total += (w / 7);
+      }
+      return Math.round(total * 100) / 100;
+    }
+
+    // Legacy weekly-sum fallback (when no period table is used)
+    function sumLegacyWeekly(settings){
+      const list = Array.isArray(settings?.salaried_mgrs) ? settings.salaried_mgrs : [];
+      const sumList = list.reduce((a,m)=> a + (Number(m?.weekly)||0), 0);
+      const legacy  = Number(settings?.salaried_mgmt) || 0;
+      return sumList > 0 ? sumList : legacy;
+    }
+
+    function daysElapsedInWeek(weekISO, cutoffISO){
+      const a = Date.parse(weekISO + "T00:00:00Z");
+      const b = Date.parse(cutoffISO + "T00:00:00Z");
+      return clamp(Math.floor((b - a) / 86400000) + 1, 1, 7);
+    }
+
+    // --- Manual Inputs collapse/expand ---
+    function setManualOpen(open){
+      if (!manualInputsWrap || !manualToggleBtn) return;
+      manualInputsWrap.style.display = open ? "" : "none";
+      manualToggleBtn.textContent = open ? "Hide" : "Show";
+      localStorage.setItem("showManualInputs", open ? "1" : "0");
+    }
+    setManualOpen(localStorage.getItem("showManualInputs") === "1");
+    if (manualToggleBtn){
+      manualToggleBtn.addEventListener("click", () => {
+        const isOpen = manualInputsWrap && manualInputsWrap.style.display !== "none";
+        setManualOpen(!isOpen);
+      });
+    }
+
+    // --- Silverware TOTAL sales helpers (weekly + per-day if available) ---
+    function moneyMaybe(v){
+      const n = Number(v);
+      if (!Number.isFinite(n)) return null;
+      return (Number.isInteger(n) && n >= 100000) ? n * 0.01 : n;
+    }
+
+    function getSwWeekTotal(integ){
+      return (
+        moneyMaybe(integ?.total_sales_silverware) ??
+        moneyMaybe(integ?.totalSalesSilverware) ??
+        moneyMaybe(integ?.total_sales) ??
+        moneyMaybe(integ?.totalSales) ??
+        null
       );
-      updateFrozenUI(true);
-    }catch(_){} // best-effort
-  }else{
-    updateFrozenUI(!!base?.frozen);
-  }
-}
+    }
 
+    function getSwDayTotal(integ, dateISO){
+      if (!integ || !dateISO) return null;
 
-function daysElapsedInWeek(weekISO, cutoffISO){
-  const a = Date.parse(weekISO + "T00:00:00Z");
-  const b = Date.parse(cutoffISO + "T00:00:00Z");
-  // inclusive count: Mon..Mon = 1, Mon..Tue = 2, … max 7
-  return clamp(Math.floor((b - a) / 86400000) + 1, 1, 7);
-}
+      const arr =
+        integ?.sales_by_day ??
+        integ?.sw_sales_by_day ??
+        integ?.daily_sales ??
+        integ?.days ??
+        integ?.dailyTotals ??
+        null;
 
+      if (Array.isArray(arr)){
+        const row = arr.find(r => (r?.date || r?.day || r?.iso || "").slice(0,10) === dateISO);
+        if (row){
+          const v = moneyMaybe(row?.total_sales ?? row?.totalSales ?? row?.total ?? row?.sales ?? row?.amount ?? row?.TotalAmount);
+          if (v != null) return v;
+        }
+      }
+
+      const map =
+        integ?.sw_sales_by_date ??
+        integ?.salesByDay ??
+        integ?.swByDay ??
+        integ?.by_day ??
+        integ?.daily ??
+        integ?.totals_by_date ??
+        integ?.totalsByDate ??
+        null;
+
+      if (map && typeof map === "object" && !Array.isArray(map)){
+        const node = map[dateISO];
+        const v = moneyMaybe((node && typeof node === "object") ? (node.total ?? node.sales ?? node.amount ?? node.total_sales) : node);
+        if (v != null) return v;
+      }
+
+      return null;
+    }
+
+    // Deep scan: sum all FOOD NetAmount (InterfaceID 5000 or Name FOOD)
+    function deepSumFoodNet(root){
+      if (!root || typeof root !== "object") return 0;
+      const seen = new Set();
+      let sum = 0;
+
+      const stack = [root];
+      while (stack.length){
+        const cur = stack.pop();
+        if (!cur || typeof cur !== "object") continue;
+        if (seen.has(cur)) continue;
+        seen.add(cur);
+
+        const name = cur?.Name ?? cur?.name;
+        const id   = cur?.InterfaceID ?? cur?.interfaceID ?? cur?.interfaceId;
+        const isFoodRow = (typeof name === "string" && name.toUpperCase() === "FOOD") || String(id||"") === "5000";
+        if (isFoodRow){
+          const net = toNum(cur?.NetAmount ?? cur?.netAmount ?? cur?.net ?? cur?.Net);
+          if (net) sum += net;
+        }
+
+        const cat = cur?.food ?? cur?.FOOD;
+        if (cat != null){
+          const net = toNum((typeof cat === "object") ? (cat?.net ?? cat?.Net ?? cat?.netAmount ?? cat?.NetAmount) : cat);
+          if (net) sum += net;
+        }
+
+        if (Array.isArray(cur)){
+          for (const v of cur) if (v && typeof v === "object") stack.push(v);
+        } else {
+          for (const v of Object.values(cur)) if (v && typeof v === "object") stack.push(v);
+        }
+      }
+
+      // if it looks like cents, normalize (same heuristic)
+      return (Number.isInteger(sum) && sum >= 100000) ? sum * 0.01 : sum;
+    }
+
+    function getAutoFoodSales(integ, fallback){
+      const direct =
+        toNum(integ?.food_sales_total) ??
+        toNum(integ?.food_sales_silverware) ??
+        toNum(integ?.net_food_sales_silverware) ??
+        toNum(integ?.food_net_sales) ??
+        toNum(integ?.food_sales) ??
+        toNum(integ?.food);
+      if (direct && direct > 0) return { value: moneyMaybe(direct) ?? direct, label: "Auto: Silverware (Food)" };
+
+      const deep = deepSumFoodNet(integ);
+      if (deep && deep > 0) return { value: deep, label: "Auto: Silverware DailyTotals (Food)" };
+
+      return { value: (fallback != null ? fallback : 0), label: "Fallback" };
+    }
+
+    function getAutoVoidsOnly(integ){
+      integ = integ || {};
+
+      const explicit =
+        moneyMaybe(integ.voids_only) ??
+        moneyMaybe(integ.voidsOnly) ??
+        moneyMaybe(integ.voids_total) ??
+        moneyMaybe(integ.voidsTotal);
+
+      if (explicit != null) return { value: explicit, label: "Auto: Silverware (Voids)" };
+
+      const rawVoids =
+        moneyMaybe(integ.voids_silverware) ??
+        moneyMaybe(integ.voids);
+
+      const canc =
+        moneyMaybe(integ.cancellations_silverware) ??
+        moneyMaybe(integ.cancellations) ??
+        moneyMaybe(integ.cancellations_total) ??
+        moneyMaybe(integ.cancellationsTotal);
+
+      if (rawVoids != null && canc != null) {
+        return { value: Math.max(0, rawVoids - canc), label: "Auto: Silverware (Voids only)" };
+      }
+
+      if (rawVoids != null) return { value: rawVoids, label: "Auto: Silverware (Voids)" };
+      return { value: null, label: "—" };
+    }
+
+    // ---------------- Silverware: ACTUAL SALES (Total) deep finder ----------------
+    function findSilverwareReportForDate(integ, dayISO){
+      if (!integ || !dayISO) return null;
+
+      const candidates = [
+        integ.daily_totals_by_date,
+        integ.dailyTotalsByDate,
+        integ.daily_totals,
+        integ.dailyTotals,
+        integ.reports,
+        integ.byDate,
+        integ.by_date,
+        integ.days
+      ].filter(Boolean);
+
+      for (const c of candidates){
+        if (c && typeof c === "object" && !Array.isArray(c)) {
+          if (c[dayISO]) return c[dayISO];
+        }
+      }
+
+      for (const c of candidates){
+        if (Array.isArray(c)) {
+          for (const row of c){
+            const d =
+              (row?.date || row?.day || row?.FromDate || row?.fromDate || row?.toDate || row?.ToDate || "")
+                .toString()
+                .slice(0,10);
+            if (d === dayISO) return row?.report || row?.data || row?.payload || row;
+          }
+        }
+      }
+
+      const seen = new Set();
+      const stack = [integ];
+      while (stack.length){
+        const cur = stack.pop();
+        if (!cur || typeof cur !== "object") continue;
+        if (seen.has(cur)) continue;
+        seen.add(cur);
+
+        const fd = (cur?.FromDate || cur?.fromDate || cur?.date || cur?.day || "").toString().slice(0,10);
+        if (fd === dayISO && (cur?.Sales || cur?.sales)) return cur;
+
+        if (Array.isArray(cur)) for (const v of cur) stack.push(v);
+        else for (const v of Object.values(cur)) stack.push(v);
+      }
+
+      return null;
+    }
+
+    function extractSilverwareSalesTotal(report){
+      if (!report || typeof report !== "object") return null;
+
+      const total =
+        moneyMaybe(report?.Sales?.TotalAmount) ??
+        moneyMaybe(report?.sales?.TotalAmount) ??
+        moneyMaybe(report?.Sales?.Total?.Amount) ??
+        moneyMaybe(report?.sales?.total?.amount) ??
+        null;
+
+      if (total != null) return total;
+
+      const items = report?.Sales?.Items || report?.sales?.items;
+      if (Array.isArray(items) && items.length){
+        const s = items.reduce((a,it)=> a + (moneyMaybe(it?.Amount) ?? moneyMaybe(it?.amount) ?? 0), 0);
+        return (s > 0) ? s : null;
+      }
+
+      return null;
+    }
+
+    function silverwareActualSalesForDay(integ, dayISO){
+      const viaMap = getSwDayTotal(integ, dayISO);
+      if (viaMap != null && viaMap > 0) return viaMap;
+
+      const rep = findSilverwareReportForDate(integ, dayISO);
+      const amt = extractSilverwareSalesTotal(rep);
+      return (amt != null && amt > 0) ? amt : null;
+    }
+
+    function effSalesFrom(base, ovr, integ){
+      const days = base?.days ?? [];
+      const SCALE = detectCurrencyScale(days);
+      const daySum = days.reduce((a,d)=> a + ((d.actual_sales ?? 0) * SCALE), 0);
+
+      if (isNum(ovr?.food_sales) && ovr.food_sales > 0) return Number(ovr.food_sales);
+
+      return getAutoFoodSales(integ || {}, daySum).value;
+    }
+
+    // ----- lock helpers -----
+    function weekEndISO(weekISO){ return shiftDays(weekISO, 6); }
+    function isWeekComplete(weekISO){ return todayISO() > weekEndISO(weekISO); }
+    function isPastMonth(weekISO){
+      // month compare using ISO strings to avoid timezone surprises
+      const wKey = (weekISO || "").slice(0,7);
+      const tKey = todayISO().slice(0,7);
+      return wKey && tKey && (wKey < tKey);
+    }
+
+    let CUR_USER   = null;
+    let IS_ADMIN   = false;
+    let FROZEN     = false;
+
+    function updateFrozenUI(frozen){
+      FROZEN = !!frozen;
+      if (lockPill){
+        lockPill.textContent = FROZEN ? "Frozen" : "Unfrozen";
+        lockPill.classList.remove("good","bad","warn");
+        lockPill.classList.add(FROZEN ? "bad" : "good");
+      }
+      if (lockBtn){
+        lockBtn.textContent = FROZEN ? "Unlock week" : "Lock week";
+      }
+
+      if (refreshBtn) refreshBtn.disabled = FROZEN;
+      if (saveBtn)    saveBtn.disabled    = FROZEN;
+      if (inFoodSales) inFoodSales.disabled = FROZEN;
+      if (inVoids)     inVoids.disabled    = FROZEN;
+      if (inPromos)    inPromos.disabled   = FROZEN;
+    }
+
+    async function toggleLock(){
+      const loc   = locationSel.value;
+      const week  = weekInput.value;
+
+      try{
+        const nextFrozen = !FROZEN;
+
+        await setDoc(
+          doc(db, `companies/aidan/locations/${loc}/labour/${week}`),
+          {
+            frozen: nextFrozen,
+            frozen_by_uid:   CUR_USER?.uid   || null,
+            frozen_by_email: CUR_USER?.email || null,
+            frozen_at: serverTimestamp()
+          },
+          { merge:true }
+        );
+
+        updateFrozenUI(nextFrozen);
+        if (refreshMsg) refreshMsg.textContent = nextFrozen ? "Week locked." : "Week unlocked.";
+      }catch(e){
+        if (refreshMsg) refreshMsg.textContent = "Lock toggle failed: " + (e.message || e);
+      }
+    }
+
+    async function maybeAutoLock(base, weekISO){
+      if (!IS_ADMIN) {
+        updateFrozenUI(!!base?.frozen);
+        return;
+      }
+
+      // Auto-lock any week that’s in a past month AND complete, if not already frozen
+      if (!base?.frozen && isPastMonth(weekISO) && isWeekComplete(weekISO)) {
+        const loc = locationSel.value;
+        try{
+          await setDoc(
+            doc(db, `companies/aidan/locations/${loc}/labour/${weekISO}`),
+            { frozen:true, frozen_by_uid: CUR_USER?.uid || null, frozen_at: serverTimestamp() },
+            { merge:true }
+          );
+          updateFrozenUI(true);
+          if (refreshMsg) refreshMsg.textContent = "Auto-locked (past month).";
+          return;
+        }catch(_){}
+      }
+      updateFrozenUI(!!base?.frozen);
+    }
+
+    // --- Idle sign-out (7 minutes) ---
+    const IDLE_MS = 7 * 60 * 1000;
+    let idleTimer = null;
+    const activityEvents = ["mousemove","keydown","click","touchstart"];
+    function resetIdleTimer(){
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => { signOut(auth).catch(()=>{}); }, IDLE_MS);
+    }
+    function attachIdle(){
+      activityEvents.forEach(ev => window.addEventListener(ev, resetIdleTimer, {passive:true}));
+      document.addEventListener("visibilitychange", () => { if (!document.hidden) resetIdleTimer(); });
+      resetIdleTimer();
+    }
+    function detachIdle(){
+      activityEvents.forEach(ev => window.removeEventListener(ev, resetIdleTimer));
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = null;
+    }
 
     // Defaults
     weekInput.value = getMondayISO(new Date());
@@ -864,165 +1026,7 @@ function daysElapsedInWeek(weekISO, cutoffISO){
     locationSel.onchange = load;
     weekInput.onchange = load;
 
- async function refreshWeek(){
-  if (FROZEN) {
-    refreshMsg.textContent = "Week is locked (frozen). Unlock it to refresh.";
-    return;
-  }
-
-  const week_of = weekInput.value;
-  const locKey  = locationSel.value;
-  refreshMsg.textContent = "Dispatching update…";
-
-  try {
-    const call7  = httpsCallable(functions, "dispatchFetchWeek");
-    const callSW = httpsCallable(functions, "dispatchSilverwareDailyTotals");
-
-    // Send both snake_case + camelCase + both “location” and “locations”
-    // so we don’t crash the function if it expects different keys.
-    const payload7 = {
-      week_of,
-      weekOf: week_of,
-      weekISO: week_of,
-      location: locKey,
-      locKey,
-      locations: [locKey],
-      include_sales: true,
-      includeSales: true,
-      include_extras: true,
-      includeExtras: true,
-    };
-
-    const payloadSW = {
-      week_of,
-      weekOf: week_of,
-      weekISO: week_of,
-      location: locKey,
-      locKey,
-      locations: [locKey],
-    };
-
-    const [r7, rSW] = await Promise.allSettled([
-      call7(payload7),
-      callSW(payloadSW),
-    ]);
-
-    const errs = [];
-    if (r7.status === "rejected") errs.push("7shifts: " + formatCallableError(r7.reason));
-    if (rSW.status === "rejected") errs.push("Silverware: " + formatCallableError(rSW.reason));
-
-    if (errs.length){
-      console.error("Dispatch results:", { r7, rSW });
-      refreshMsg.textContent = errs.join(" • ");
-      // still try reloading later in case one side succeeded
-      setTimeout(load, 4000);
-      return;
-    }
-
-    refreshMsg.textContent = "Update started. Check again shortly.";
-    setTimeout(load, 4000);
-  } catch (e) {
-    console.error("Refresh week error:", e);
-    refreshMsg.textContent = "Refresh failed: " + formatCallableError(e);
-  }
-}
-
-    refreshBtn.onclick = refreshWeek;
-
-async function ensureFreshness(base, integ, weekISO, locKey){
-  if (base?.frozen) return; // don't auto-refresh frozen weeks
-
-  // Optional: only auto-refresh for admins (prevents spamming errors for normal users)
-  // If you want auto-refresh for everyone, delete the next line.
-  if (!IS_ADMIN) return;
-
-  const guardKey = `autoRefresh:${locKey}:${weekISO}`;
-  const lastGuard = Number(localStorage.getItem(guardKey) || 0);
-  const now = Date.now();
-
-  // Try to read an integration timestamp if present
-  let lastSync = 0;
-  const s = integ?.synced_at;
-  if (s?.toMillis) lastSync = s.toMillis();
-  else if (typeof s === "string") {
-    const t = new Date(s).getTime();
-    if (!isNaN(t)) lastSync = t;
-  }
-
-  const STALE_MS = 3 * 60 * 60 * 1000; // 3 hours
-  const stale = !lastSync || (now - lastSync) > STALE_MS;
-
-  const endISO = shiftDays(weekISO, 6);
-  const afterSunday = todayISO() > endISO;
-  const missingSun = !hasSunday(base?.days || [], weekISO);
-
-  // don’t spam – at most once per 30 min per loc/week
-  if (!((missingSun && afterSunday) || stale)) return;
-  if (now - lastGuard <= 30 * 60 * 1000) return;
-
-  // IMPORTANT: define week_of explicitly
-  const week_of = weekISO;
-
-  try{
-    refreshMsg.textContent = "Auto-updating…";
-    localStorage.setItem(guardKey, String(now));
-
-    const call7  = httpsCallable(functions, "dispatchFetchWeek");
-    const callSW = httpsCallable(functions, "dispatchSilverwareDailyTotals");
-
-    const payload7 = {
-      week_of,
-      weekOf: week_of,
-      weekISO: week_of,
-      location: locKey,
-      locKey,
-      locations: [locKey],
-      include_sales: true,
-      includeSales: true,
-      include_extras: true,
-      includeExtras: true,
-    };
-
-    const payloadSW = {
-      week_of,
-      weekOf: week_of,
-      weekISO: week_of,
-      location: locKey,
-      locKey,
-      locations: [locKey],
-    };
-
-    const [r7, rSW] = await Promise.allSettled([
-      call7(payload7),
-      callSW(payloadSW),
-    ]);
-
-    if (r7.status === "rejected") console.error("7shifts dispatch failed:", r7.reason);
-    if (rSW.status === "rejected") console.error("Silverware dispatch failed:", rSW.reason);
-
-    // Don’t hard-fail the UI — reload anyway; one side may have succeeded
-    refreshMsg.textContent =
-      (r7.status === "rejected" || rSW.status === "rejected")
-        ? "Auto-update ran (with errors). See console."
-        : "Auto-update started. Check again shortly.";
-
-    setTimeout(load, 4000);
-  }catch(e){
-    console.error("ensureFreshness error:", e);
-    refreshMsg.textContent = "Auto-update failed: " + formatCallableError(e);
-  }
-}
-
-    // --- Idle sign-out (7 minutes) ---
-    const IDLE_MS = 7 * 60 * 1000;
-    let idleTimer = null;
-    const activityEvents = ["mousemove","keydown","click","touchstart"];
-    function resetIdleTimer(){ if (idleTimer) clearTimeout(idleTimer); idleTimer = setTimeout(() => { signOut(auth).catch(()=>{}); }, IDLE_MS); }
-    function attachIdle(){ activityEvents.forEach(ev => window.addEventListener(ev, resetIdleTimer, {passive:true})); document.addEventListener("visibilitychange", () => { if (!document.hidden) resetIdleTimer(); }); resetIdleTimer(); }
-    function detachIdle(){ activityEvents.forEach(ev => window.removeEventListener(ev, resetIdleTimer)); if (idleTimer) clearTimeout(idleTimer); idleTimer = null; }
-    // NOTE: removed beforeunload sign-out so we can navigate to foh-boh.html without killing the session
-
-    // Auth
+    // Auth UI
     on(signinBtn, "click", () => {
       gateEl.scrollIntoView({behavior:"smooth",block:"center"});
       emailEl && emailEl.focus();
@@ -1030,150 +1034,149 @@ async function ensureFreshness(base, integ, weekISO, locKey){
     on(signoutBtn, "click", async () => { await signOut(auth); });
     on(doSignin, "click", async () => {
       if (!emailEl || !passEl) return;
-      authMsg.style.display = "none";
+      if (authMsg){ authMsg.style.display = "none"; }
       try {
         await signInWithEmailAndPassword(auth, emailEl.value.trim(), passEl.value);
         emailEl.value = ""; passEl.value = "";
       } catch (e) {
-        authMsg.textContent = e.message || "Sign-in failed";
-        authMsg.style.display = "";
+        if (authMsg){
+          authMsg.textContent = e.message || "Sign-in failed";
+          authMsg.style.display = "";
+        }
       }
     });
 
-    let IS_ADMIN = false;
-
-    onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        CUR_USER = null;   
-        if (lockBtn) { lockBtn.style.display = "none";
-        lockBtn.disabled = true; }  
-        detachIdle();
-        gateEl.style.display = "";          // show login card again
-        authStatus.textContent = "Not signed in";
-        userAvatar.hidden = true;
-        signoutBtn.style.display = "none";
-        signinBtn.style.display = "";
-        settingsBtn.style.display = "none";
-        if (optimizerBtn) optimizerBtn.style.display = "none";
-        appEl.hidden = true;
-        deniedEl.style.display = "none";
-        if (refreshBtn) refreshBtn.disabled = true;
-        if (refreshMsg) refreshMsg.textContent = "";
-        if (pdfBtn) { pdfBtn.disabled = true; pdfBtn.onclick = null; }
-        syncLine.textContent = "Last sync: —";
-        salesSource.textContent = "—";
-        extrasSource.textContent = "—";
+    async function refreshWeek(){
+      if (FROZEN) {
+        if (refreshMsg) refreshMsg.textContent = "Week is locked (frozen). Unlock it to refresh.";
         return;
       }
 
-      attachIdle();
+      const week_of = weekInput.value;
+      const locKey  = locationSel.value;
+      if (refreshMsg) refreshMsg.textContent = "Dispatching update…";
 
-      authStatus.textContent = user.email || "Signed in";
-      signoutBtn.style.display = "";
-      signinBtn.style.display = "none";
-      gateEl.style.display = "none";
+      try {
+        const call7  = httpsCallable(functions, "dispatchFetchWeek");
+        const callSW = httpsCallable(functions, "dispatchSilverwareDailyTotals");
 
-      userAvatar.hidden = !user.photoURL;
-      if (user.photoURL) userAvatar.src = user.photoURL;
+        const payload7 = {
+          week_of,
+          weekOf: week_of,
+          weekISO: week_of,
+          location: locKey,
+          locKey,
+          locations: [locKey],
+          include_sales: true,
+          includeSales: true,
+          include_extras: true,
+          includeExtras: true,
+        };
 
-      if (!ALLOWED_UIDS.has(user.uid)) {
-        appEl.hidden = true;
-        deniedEl.style.display = "";
-        settingsBtn.style.display = "none";
-        if (optimizerBtn) optimizerBtn.style.display = "none";
-        if (refreshBtn) refreshBtn.disabled = true;
-        if (refreshMsg) refreshMsg.textContent = "Not authorized to refresh.";
-        if (pdfBtn) { pdfBtn.disabled = true; pdfBtn.onclick = null; }
-        return;
+        const payloadSW = {
+          week_of,
+          weekOf: week_of,
+          weekISO: week_of,
+          location: locKey,
+          locKey,
+          locations: [locKey],
+        };
+
+        const [r7, rSW] = await Promise.allSettled([ call7(payload7), callSW(payloadSW) ]);
+
+        const errs = [];
+        if (r7.status === "rejected") errs.push("7shifts: " + formatCallableError(r7.reason));
+        if (rSW.status === "rejected") errs.push("Silverware: " + formatCallableError(rSW.reason));
+
+        if (errs.length){
+          console.error("Dispatch results:", { r7, rSW });
+          if (refreshMsg) refreshMsg.textContent = errs.join(" • ");
+          setTimeout(load, 4000);
+          return;
+        }
+
+        if (refreshMsg) refreshMsg.textContent = "Update started. Check again shortly.";
+        setTimeout(load, 4000);
+      } catch (e) {
+        console.error("Refresh week error:", e);
+        if (refreshMsg) refreshMsg.textContent = "Refresh failed: " + formatCallableError(e);
       }
+    }
+    if (refreshBtn) refreshBtn.onclick = refreshWeek;
 
-// user is signed in AND authorized
-appEl.hidden = false;
-deniedEl.style.display = "none";
+    // ----- Settings modal: Salaried Management (dated periods) -----
+    function periodRowTemplate(name="", weekly="", start="", end=""){
+      const row = document.createElement("div");
+      row.style.display = "grid";
+      row.style.gridTemplateColumns = "1fr 120px 140px 140px 36px";
+      row.style.gap = "8px";
+      row.style.alignItems = "center";
+      row.style.marginBottom = "8px";
+      row.innerHTML = `
+        <input type="text" placeholder="Manager name" value="${(name||"").replaceAll('"','&quot;')}">
+        <input type="number" step="0.01" placeholder="0.00" value="${weekly!==""?weekly:""}">
+        <input type="date" value="${start||""}">
+        <input type="date" value="${end||""}">
+        <button title="Remove">🗑</button>
+      `;
+      const btn = row.querySelector("button");
+      if (btn) btn.onclick = () => { row.remove(); recalcSalaryTotal(); };
+      return row;
+    }
 
-// who/role
-IS_ADMIN = ADMIN_UIDS.has(user.uid);
-CUR_USER = { uid: user.uid, email: user.email || "", name: user.displayName || "" };
+    function applyPeriodVisibility(){
+      if (!periodList) return;
+      const week = weekInput.value;
+      const showAll = !!showInactiveChk?.checked;
 
-// Lock UI — everyone sees the pill; only admins see the button
-if (lockWrap) lockWrap.style.display = "";
-if (lockBtn) {
-  lockBtn.style.display = IS_ADMIN ? "" : "none";
-  lockBtn.disabled = !IS_ADMIN;
-  lockBtn.onclick  = IS_ADMIN ? toggleLock : null;  // requires toggleLock()
-}
+      Array.from(periodList.children).forEach(row => {
+        const ins = row.querySelectorAll("input");
+        const end = (ins[3]?.value || "").trim();
+        const inactive = end && end < week;
+        row.style.display = (!showAll && inactive) ? "none" : "";
+      });
+    }
 
-// Other admin UI
-settingsBtn.style.display = IS_ADMIN ? "" : "none";
-if (optimizerBtn) optimizerBtn.style.display = "";
+    function recalcSalaryTotal(){
+      if (!periodList) return;
+      applyPeriodVisibility();
 
-// Enable actions
-if (refreshBtn) { refreshBtn.disabled = false; refreshMsg.textContent = ""; }
-if (pdfBtn)      { pdfBtn.disabled = false; pdfBtn.onclick = downloadPdfAll; }
+      const periods = Array.from(periodList.children).map(r=>{
+        const ins = r.querySelectorAll("input");
+        return {
+          name:  (ins[0]?.value || "").trim(),
+          weekly: Number(ins[1]?.value) || 0,
+          start: (ins[2]?.value || "").trim(),
+          end:   (ins[3]?.value || "").trim() || null
+        };
+      }).filter(p => p.name && p.weekly > 0 && p.start);
 
-// finally render
-load();
+      const sal = salaryFromPeriods(periods, weekInput.value, shiftDays(weekInput.value, 6));
+      const total = sal ? sal.fullWeek : 0;
+      if (salTotalPill) salTotalPill.textContent = fmtMoney(total);
+    }
 
+    if (settingsClose) settingsClose.onclick = () => settingsModal.style.display = "none";
 
-
-    });
-
-// ----- Settings modal: Salaried Management (dated periods) -----
-function applyPeriodVisibility(){
-  const week = weekInput.value; // selected week start (Monday)
-  const showAll = !!showInactiveChk?.checked;
-
-  Array.from(periodList.children).forEach(row => {
-    const ins = row.querySelectorAll("input");
-    const end = (ins[3]?.value || "").trim(); // end date
-    const inactive = end && end < week;       // ended before selected week
-    row.style.display = (!showAll && inactive) ? "none" : "";
-  });
-}
-
-function recalcSalaryTotal(){
-  applyPeriodVisibility();
-
-  const periods = Array.from(periodList.children).map(r=>{
-    const ins = r.querySelectorAll("input");
-    return {
-      name:  (ins[0]?.value || "").trim(),
-      weekly: Number(ins[1]?.value) || 0,
-      start: (ins[2]?.value || "").trim(),
-      end:   (ins[3]?.value || "").trim() || null
-    };
-  }).filter(p => p.name && p.weekly > 0 && p.start);
-
-  const sal = salaryFromPeriods(periods, weekInput.value, shiftDays(weekInput.value, 6));
-  const total = sal ? sal.fullWeek : 0;
-
-  if (salTotalPill) salTotalPill.textContent = fmtMoney(total);
-}
-
-    settingsClose.onclick = () => settingsModal.style.display = "none";
-    settingsBtn.onclick = async () => {
+    if (settingsBtn) settingsBtn.onclick = async () => {
       const s = await loadSettingsFor(locationSel.value);
 
-      // Render salary periods (beta)
-periodList.innerHTML = "";
-const ps = Array.isArray(s.mgr_salary_periods) ? s.mgr_salary_periods : [];
-if (ps.length === 0) {
-  periodList.appendChild(periodRowTemplate("", "", "", ""));
-} else {
-  ps.forEach(p => {
-    periodList.appendChild(periodRowTemplate(p.name||"", p.weekly??"", p.start||"", p.end||""));
-  });
-}
-// hook changes so the total stays live
-recalcSalaryTotal();
-periodList.oninput = recalcSalaryTotal;
-showInactiveChk && (showInactiveChk.onchange = recalcSalaryTotal);
+      if (periodList){
+        periodList.innerHTML = "";
+        const ps = Array.isArray(s.mgr_salary_periods) ? s.mgr_salary_periods : [];
+        if (ps.length === 0) periodList.appendChild(periodRowTemplate("", "", "", ""));
+        else ps.forEach(p => periodList.appendChild(periodRowTemplate(p.name||"", p.weekly??"", p.start||"", p.end||"")));
+        periodList.oninput = recalcSalaryTotal;
+      }
 
-// when adding new rows, also refresh totals
-addPeriodBtn.onclick = () => {
-  periodList.appendChild(periodRowTemplate());
-  recalcSalaryTotal();
-};
+      if (showInactiveChk) showInactiveChk.onchange = recalcSalaryTotal;
+
+      if (addPeriodBtn) addPeriodBtn.onclick = () => {
+        periodList && periodList.appendChild(periodRowTemplate());
+        recalcSalaryTotal();
+      };
+
+      recalcSalaryTotal();
 
       setRemitPct.value = s.remit_pct ?? 0;
       setPctFood.value  = s.budget_pct_food ?? 0;
@@ -1181,31 +1184,30 @@ addPeriodBtn.onclick = () => {
       setPctLiquor.value= s.budget_pct_liquor ?? 0;
       setPctBeer.value  = s.budget_pct_beer ?? 0;
       setTargetPct.value = s.target_labour_pct ?? 0;
-      settingsMsg.textContent = "";
-      setTargetPct.value = s.target_labour_pct ?? 0;
-      settingsModal.style.display = "flex";
+
+      if (settingsMsg) settingsMsg.textContent = "";
+      if (settingsModal) settingsModal.style.display = "flex";
     };
-    
-    settingsSave.onclick = async () => {
-      settingsMsg.textContent = "Saving…";
+
+    if (settingsSave) settingsSave.onclick = async () => {
+      if (settingsMsg) settingsMsg.textContent = "Saving…";
       try{
         const loc = locationSel.value;
         const ref = doc(db, getSettingsPath(loc));
 
-// Build periods array from UI rows
-const periods = Array.from(periodList.children).map(r => {
-  const ins = r.querySelectorAll("input");
-  const name  = (ins[0].value || "").trim();
-  const weekly= Number(ins[1].value) || 0;
-  const start = (ins[2].value || "").trim();   // YYYY-MM-DD
-  const end   = (ins[3].value || "").trim();   // "" means ongoing
-  return { name, weekly, start, end: end || null };
-}).filter(p => p.name && p.weekly > 0 && p.start);
+        const periods = periodList
+          ? Array.from(periodList.children).map(r => {
+              const ins = r.querySelectorAll("input");
+              const name  = (ins[0]?.value || "").trim();
+              const weekly= Number(ins[1]?.value) || 0;
+              const start = (ins[2]?.value || "").trim();
+              const end   = (ins[3]?.value || "").trim();
+              return { name, weekly, start, end: end || null };
+            }).filter(p => p.name && p.weekly > 0 && p.start)
+          : [];
 
-
-        // Save new settings and zero out the legacy field
         await setDoc(ref, {
-          mgr_salary_periods: periods,  
+          mgr_salary_periods: periods,
           remit_pct:        num(setRemitPct.value),
           budget_pct_food:  num(setPctFood.value),
           budget_pct_wine:  num(setPctWine.value),
@@ -1215,331 +1217,97 @@ const periods = Array.from(periodList.children).map(r => {
           salaried_mgmt: 0
         }, { merge:true });
 
-        // Then delete the legacy field so it can’t repopulate on load
         try { await updateDoc(ref, { salaried_mgmt: deleteField(), salaried_mgrs: deleteField() }); } catch {}
 
-        settingsMsg.textContent = "Saved ✓";
+        if (settingsMsg) settingsMsg.textContent = "Saved ✓";
         await load();
       }catch(e){
-        settingsMsg.textContent = "Save failed: " + (e.message || e);
+        if (settingsMsg) settingsMsg.textContent = "Save failed: " + (e.message || e);
       }
     };
 
-    // Row for salary periods: name | weekly | start | end | 🗑
-function periodRowTemplate(name="", weekly="", start="", end=""){
-  const row = document.createElement("div");
-  row.style.display = "grid";
-  row.style.gridTemplateColumns = "1fr 120px 140px 140px 36px";
-  row.style.gap = "8px";
-  row.style.alignItems = "center";
-  row.style.marginBottom = "8px";
-  row.innerHTML = `
-    <input type="text" placeholder="Manager name" value="${name||""}">
-    <input type="number" step="0.01" placeholder="0.00" value="${weekly!==""?weekly:""}">
-    <input type="date" value="${start||""}">
-    <input type="date" value="${end||""}">
-    <button title="Remove">🗑</button>
-  `;
-  row.querySelector("button").onclick = () => row.remove();
-  return row;
-}
+    // ---------------- AUTH STATE ----------------
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        CUR_USER = null;
+        IS_ADMIN = false;
+        detachIdle();
 
-// --- Silverware TOTAL sales helpers (weekly + per-day if available) ---
-function swMoney(v){
-  const n = Number(v);
-  if (!Number.isFinite(n)) return null;
-  return (Number.isInteger(n) && n >= 100000) ? n * 0.01 : n;
-}
+        if (gateEl) gateEl.style.display = "";
+        if (authStatus) authStatus.textContent = "Not signed in";
+        if (userAvatar) userAvatar.hidden = true;
+        if (signoutBtn) signoutBtn.style.display = "none";
+        if (signinBtn) signinBtn.style.display = "";
+        if (settingsBtn) settingsBtn.style.display = "none";
+        if (optimizerBtn) optimizerBtn.style.display = "none";
+        if (deniedEl) deniedEl.style.display = "none";
+        if (appEl) appEl.hidden = true;
 
+        if (refreshBtn) refreshBtn.disabled = true;
+        if (refreshMsg) refreshMsg.textContent = "";
+        if (pdfBtn) { pdfBtn.disabled = true; pdfBtn.onclick = null; }
 
-function getSwWeekTotal(integ){
-  return (
-    swMoney(integ?.total_sales_silverware) ??
-    swMoney(integ?.totalSalesSilverware) ??
-    swMoney(integ?.total_sales) ??
-    swMoney(integ?.totalSales) ??
-    null
-  );
-}
+        if (syncLine) syncLine.textContent = "Last sync: —";
+        if (salesSource) salesSource.textContent = "—";
+        if (extrasSource) extrasSource.textContent = "—";
 
-function getSwDayTotal(integ, dateISO){
-  if (!integ || !dateISO) return null;
-
-  // common array shapes
-  const arr =
-    integ?.sales_by_day ??
-    integ?.sw_sales_by_day ??
-    integ?.daily_sales ??
-    integ?.days ??
-    integ?.dailyTotals ??
-    null;
-
-  if (Array.isArray(arr)){
-    const row = arr.find(r => (r?.date || r?.day || r?.iso || "").slice(0,10) === dateISO);
-    if (row){
-      const v = swMoney(row?.total_sales ?? row?.totalSales ?? row?.total ?? row?.sales ?? row?.amount ?? row?.TotalAmount);
-      if (v != null) return v;
-    }
-  }
-
-  // common map shapes
-  const map =
-    integ?.sw_sales_by_date ?? 
-    integ?.salesByDay ??
-    integ?.swByDay ??
-    integ?.by_day ??
-    integ?.daily ??
-    integ?.totals_by_date ??
-    integ?.totalsByDate ??
-    null;
-
-  if (map && typeof map === "object" && !Array.isArray(map)){
-    const node = map[dateISO];
-    const v = swMoney((node && typeof node === "object") ? (node.total ?? node.sales ?? node.amount ?? node.total_sales) : node);
-    if (v != null) return v;
-  }
-
-  return null;
-}
-
-// --- Helpers for robust food-only extraction ---
-function normalizeCurrency(n){
-  const v = Number(n);
-  if (!Number.isFinite(v)) return null;
-  return (Number.isInteger(v) && v >= 100000) ? v * 0.01 : v;
-};
-
-function moneyMaybe(v){
-  const n = Number(v);
-  if (!Number.isFinite(n)) return null;
-  return (Number.isInteger(n) && n >= 100000) ? n * 0.01 : n;
-}
-
-function getAutoVoidsOnly(integ){
-  integ = integ || {};
-
-  // 1) Prefer explicit “voids only” fields if we add them in the writer later
-  const explicit =
-    moneyMaybe(integ.voids_only) ??
-    moneyMaybe(integ.voidsOnly) ??
-    moneyMaybe(integ.voids_total) ??
-    moneyMaybe(integ.voidsTotal);
-
-  if (explicit != null) {
-    return { value: explicit, label: "Auto: Silverware (Voids)" };
-  }
-
-  // 2) Otherwise: subtract cancellations if both exist
-  const rawVoids =
-    moneyMaybe(integ.voids_silverware) ??
-    moneyMaybe(integ.voids);
-
-  const canc =
-    moneyMaybe(integ.cancellations_silverware) ??
-    moneyMaybe(integ.cancellations) ??
-    moneyMaybe(integ.cancellations_total) ??
-    moneyMaybe(integ.cancellationsTotal);
-
-  if (rawVoids != null && canc != null) {
-    return { value: Math.max(0, rawVoids - canc), label: "Auto: Silverware (Voids only)" };
-  }
-
-  // 3) fallback
-  if (rawVoids != null) {
-    return { value: rawVoids, label: "Auto: Silverware (Voids)" };
-  }
-
-  return { value: null, label: "—" };
-}
-
-
-// Deeply scan ANY Silverware DailyTotals blob and SUM all FOOD NetAmount
-function deepSumFoodNet(root){
-  if (!root || typeof root !== "object") return 0;
-  const seen = new Set();
-  let sum = 0;
-
-  const push = (v) => { if (v && typeof v === "object") stack.push(v); };
-  const stack = [root];
-
-  while (stack.length){
-    const cur = stack.pop();
-    if (!cur || typeof cur !== "object") continue;
-    if (seen.has(cur)) continue;
-    seen.add(cur);
-
-    // Case A: explicit FOOD category objects (Name or InterfaceID)
-    const name = cur?.Name ?? cur?.name;
-    const id   = cur?.InterfaceID ?? cur?.interfaceID ?? cur?.interfaceId;
-    const isFoodRow = (typeof name === "string" && name.toUpperCase() === "FOOD") || String(id||"") === "5000";
-    if (isFoodRow){
-      const net = toNum(cur?.NetAmount ?? cur?.netAmount ?? cur?.net ?? cur?.Net);
-      if (net) sum += net;
-    }
-
-    // Case B: “categories” style objects: { food: { net: ... } } or { FOOD: number }
-    const cat = cur?.food ?? cur?.FOOD;
-    if (cat != null){
-      const net = toNum(
-        (typeof cat === "object")
-          ? (cat?.net ?? cat?.Net ?? cat?.netAmount ?? cat?.NetAmount)
-          : cat
-      );
-      if (net) sum += net;
-    }
-
-    // Recurse
-    if (Array.isArray(cur)){
-      for (const v of cur) push(v);
-    } else {
-      for (const v of Object.values(cur)) push(v);
-    }
-  }
-  return normalizeCurrency(sum);
-}
-const asNum = (v) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-};
-
-// Returns FOOD-only weekly sales if found; otherwise falls back to daySum
-function getAutoFoodSales(integ, daySum){
-  // 1) explicit fields writers might set
-  const direct =
-    toNum(integ?.food_sales_total) ?? 
-    toNum(integ?.net_food_sales_silverware) ??
-    toNum(integ?.food_net_sales) ??
-    toNum(integ?.food_sales) ??
-    toNum(integ?.food);
-  if (direct && direct > 0) return { value: normalizeCurrency(direct), label: "Auto: Silverware DailyTotals (Food)" };
-
-  // 2) deep scan of any Sales/Categories blobs for FOOD=5000
-  const deep = deepSumFoodNet(integ);
-  if (deep && deep > 0) return { value: deep, label: "Auto: Silverware DailyTotals (Food)" };
-
-  // 3) fallback so the UI never blanks
-  return { value: daySum, label: "Days (fallback)" };
-}
-
-
-
-function effSalesFrom(base, ovr, integ){
-  const days = base?.days ?? [];
-  const SCALE = detectCurrencyScale(days);
-  const daySum = days.reduce((a,d)=> a + ((d.actual_sales ?? 0) * SCALE), 0);
-
-  if (isNum(ovr?.food_sales) && ovr.food_sales > 0) {
-    return Number(ovr.food_sales);
-  }
-  // Prefer food-only from integrations; fallback to daySum
-  return getAutoFoodSales(integ || {}, daySum).value;
-}
-
-// ---------------- Silverware: ACTUAL SALES (Total) helpers ----------------
-
-// Try to find a "DailyTotals report object" for a given date inside integ,
-// regardless of whether it's stored as a map, array, or nested blob.
-function findSilverwareReportForDate(integ, dayISO){
-  if (!integ || !dayISO) return null;
-
-  // Common “by date” containers writers often use
-  const candidates = [
-    integ.daily_totals_by_date,
-    integ.dailyTotalsByDate,
-    integ.daily_totals,
-    integ.dailyTotals,
-    integ.reports,
-    integ.byDate,
-    integ.by_date,
-    integ.days
-  ].filter(Boolean);
-
-  // 1) Direct map by date
-  for (const c of candidates){
-    if (c && typeof c === "object" && !Array.isArray(c)) {
-      if (c[dayISO]) return c[dayISO];
-    }
-  }
-
-  // 2) Array of daily rows
-  for (const c of candidates){
-    if (Array.isArray(c)) {
-      for (const row of c){
-        const d =
-          (row?.date || row?.day || row?.FromDate || row?.fromDate || row?.toDate || row?.ToDate || "")
-            .toString()
-            .slice(0,10);
-        if (d === dayISO) {
-          // sometimes row IS the report; sometimes row.report/data/payload holds it
-          return row?.report || row?.data || row?.payload || row;
-        }
+        if (lockWrap) lockWrap.style.display = "none";
+        updateFrozenUI(false);
+        return;
       }
-    }
-  }
 
-  // 3) Deep search fallback (walk the entire integ blob)
-  const seen = new Set();
-  const stack = [integ];
-  while (stack.length){
-    const cur = stack.pop();
-    if (!cur || typeof cur !== "object") continue;
-    if (seen.has(cur)) continue;
-    seen.add(cur);
+      attachIdle();
 
-    const fd = (cur?.FromDate || cur?.fromDate || cur?.date || cur?.day || "").toString().slice(0,10);
-    if (fd === dayISO && (cur?.Sales || cur?.sales)) return cur;
+      if (authStatus) authStatus.textContent = user.email || "Signed in";
+      if (signoutBtn) signoutBtn.style.display = "";
+      if (signinBtn) signinBtn.style.display = "none";
+      if (gateEl) gateEl.style.display = "none";
 
-    if (Array.isArray(cur)) {
-      for (const v of cur) stack.push(v);
-    } else {
-      for (const v of Object.values(cur)) stack.push(v);
-    }
-  }
+      if (userAvatar){
+        userAvatar.hidden = !user.photoURL;
+        if (user.photoURL) userAvatar.src = user.photoURL;
+      }
 
-  return null;
-}
+      if (!ALLOWED_UIDS.has(user.uid)) {
+        if (appEl) appEl.hidden = true;
+        if (deniedEl) deniedEl.style.display = "";
+        if (settingsBtn) settingsBtn.style.display = "none";
+        if (optimizerBtn) optimizerBtn.style.display = "none";
+        if (refreshBtn) refreshBtn.disabled = true;
+        if (refreshMsg) refreshMsg.textContent = "Not authorized to refresh.";
+        if (pdfBtn) { pdfBtn.disabled = true; pdfBtn.onclick = null; }
+        if (lockWrap) lockWrap.style.display = "none";
+        updateFrozenUI(false);
+        return;
+      }
 
-function extractSilverwareSalesTotal(report){
-  if (!report || typeof report !== "object") return null;
+      // authorized
+      if (appEl) appEl.hidden = false;
+      if (deniedEl) deniedEl.style.display = "none";
 
-  // Most common shape (matches what you saw in PowerShell):
-  // Sales: { Items:[...], TotalAmount: 145835.74 }
-  const total =
-    moneyMaybe(report?.Sales?.TotalAmount) ??
-    moneyMaybe(report?.sales?.TotalAmount) ??
-    moneyMaybe(report?.Sales?.Total?.Amount) ??
-    moneyMaybe(report?.sales?.total?.amount) ??
-    null;
+      IS_ADMIN = ADMIN_UIDS.has(user.uid);
+      CUR_USER = { uid: user.uid, email: user.email || "", name: user.displayName || "" };
 
-  if (total != null) return total;
+      if (lockWrap) lockWrap.style.display = "";
+      if (lockBtn) {
+        lockBtn.style.display = IS_ADMIN ? "" : "none";
+        lockBtn.disabled = !IS_ADMIN;
+        lockBtn.onclick  = IS_ADMIN ? toggleLock : null;
+      }
 
-  // Fallback: sum Sales.Items[].Amount if present
-  const items = report?.Sales?.Items || report?.sales?.items;
-  if (Array.isArray(items) && items.length){
-    const s = items.reduce((a,it)=> a + (moneyMaybe(it?.Amount) ?? moneyMaybe(it?.amount) ?? 0), 0);
-    return (s > 0) ? s : null;
-  }
+      if (settingsBtn) settingsBtn.style.display = IS_ADMIN ? "" : "none";
+      if (optimizerBtn) optimizerBtn.style.display = "";
 
-  return null;
-}
+      if (refreshBtn) { refreshBtn.disabled = false; if (refreshMsg) refreshMsg.textContent = ""; }
+      if (pdfBtn)      { pdfBtn.disabled = false; pdfBtn.onclick = downloadPdfAll; }
 
-// Returns Silverware total sales for that day (or null if not found)
-function silverwareActualSalesForDay(integ, dayISO){
-  // Prefer the per-day map written by fetch_silverware_daily_totals.mjs
-  const viaMap = getSwDayTotal(integ, dayISO);
-  if (viaMap != null && viaMap > 0) return viaMap;
+      load();
+    });
 
-  // Fallback: try to find an embedded report object if it exists
-  const rep = findSilverwareReportForDate(integ, dayISO);
-  const amt = extractSilverwareSalesTotal(rep);
-  return (amt != null && amt > 0) ? amt : null;
-}
-
-
-
-    // -------------- LOAD + RENDER (safe integrations read + prev week) --------------
+    // -------------- LOAD + RENDER --------------
     async function load(){
-      saveMsg.textContent = "";
+      if (saveMsg) saveMsg.textContent = "";
+
       const weekISO = weekInput.value;
       const locKey = locationSel.value;
 
@@ -1554,313 +1322,362 @@ function silverwareActualSalesForDay(integ, dayISO){
       ]);
 
       let integ = null;
-      try { const s = await getDoc(doc(db, integPath)); integ = s.exists() ? s.data() : null; } catch(_) {}
+      try {
+        const s = await getDoc(doc(db, integPath));
+        integ = s.exists() ? s.data() : null;
+      } catch (_) {
+        integ = null;
+      }
 
       const base = baseSnap.exists()? baseSnap.data(): null;
       const ovr  = ovrSnap.exists()? ovrSnap.data(): {};
 
-      // IMPORTANT: lock is per-week — reset UI based on THIS week doc
-updateFrozenUI(!!base?.frozen);
-
-      // also fetch PREVIOUS week for "Last Week Sales"
-      const prevISO = shiftDays(weekISO, -7);
-      const [pBaseSnap, pOvrSnap] = await Promise.all([
-        getDoc(doc(db, `companies/aidan/locations/${locKey}/labour/${prevISO}`)),
-        getDoc(doc(db, `companies/aidan/locations/${locKey}/overrides/${prevISO}`))
-      ]);
-      let pInteg = null;
-      try { const s = await getDoc(doc(db, `companies/aidan/locations/${locKey}/integrations/${prevISO}`)); pInteg = s.exists() ? s.data() : null; } catch(_) {}
-
-      let lastWeekSales = null;
-if (pBaseSnap.exists()){
-  const prevBase = pBaseSnap.data();
-  const pDays  = prevBase?.days || [];
-  const pScale = detectCurrencyScale(pDays);
-
-  // fallback: 7shifts sum
-  const fallback7 = pDays.reduce((a,d)=> a + ((d.actual_sales ?? 0) * pScale), 0);
-
-  // Silverware sum (preferred): sum day-by-day from Silverware reports
-  const swSum = pDays.reduce((a,d)=> a + (silverwareActualSalesForDay(pInteg || {}, d.date || "") || 0), 0);
-
-  lastWeekSales = (swSum > 0) ? swSum : fallback7;
-}
-
+      // lock is per-week (and auto-lock for past-month complete weeks, admin only)
+      await maybeAutoLock(base, weekISO);
 
       // fill inputs
-      inFoodSales.value = ovr.food_sales ?? "";
-      inVoids.value     = ovr.voids ?? "";
-      inPromos.value    = ovr.promos ?? "";
+      if (inFoodSales) inFoodSales.value = ovr.food_sales ?? "";
+      if (inVoids)     inVoids.value     = ovr.voids ?? "";
+      if (inPromos)    inPromos.value    = ovr.promos ?? "";
+
+      // previous week sales (prefer Silverware per-day if available)
+      const prevISO = shiftDays(weekISO, -7);
+      const [pBaseSnap] = await Promise.all([
+        getDoc(doc(db, `companies/aidan/locations/${locKey}/labour/${prevISO}`))
+      ]);
+
+      let lastWeekSales = null;
+      if (pBaseSnap.exists()){
+        const prevBase = pBaseSnap.data();
+        const pDays  = prevBase?.days || [];
+        const pScale = detectCurrencyScale(pDays);
+
+        let pInteg = null;
+        try {
+          const s = await getDoc(doc(db, `companies/aidan/locations/${locKey}/integrations/${prevISO}`));
+          pInteg = s.exists() ? s.data() : null;
+        } catch (_) {
+          pInteg = null;
+        }
+
+        const fallback7 = pDays.reduce((a,d)=> a + ((d.actual_sales ?? 0) * pScale), 0);
+        const swSum = pDays.reduce((a,d)=> a + (silverwareActualSalesForDay(pInteg || {}, d.date || "") || 0), 0);
+        lastWeekSales = (swSum > 0) ? swSum : fallback7;
+      }
 
       render(base, ovr, settings, integ, weekISO, lastWeekSales);
-      // TEMP: disable auto-dispatch while we fix the GitHub token in dispatchFetchWeek
-// ensureFreshness(base, integ, weekISO, locKey);
 
+      if (saveBtn) saveBtn.onclick = async () => {
+        if (FROZEN) { if (saveMsg) saveMsg.textContent = "Week is locked."; return; }
 
-      saveBtn.onclick = async () => {
         const newOvr = {
-          food_sales: num(inFoodSales.value),
-          voids: num(inVoids.value),
-          promos: num(inPromos.value)
+          food_sales: num(inFoodSales?.value),
+          voids: num(inVoids?.value),
+          promos: num(inPromos?.value)
         };
+
         try{
           await setDoc(doc(db, ovrPath), newOvr, { merge:true });
-          saveMsg.textContent = "Saved ✓";
+          if (saveMsg) saveMsg.textContent = "Saved ✓";
           render(base, newOvr, settings, integ, weekISO, lastWeekSales);
         }catch(e){
-          saveMsg.textContent = "Save failed: " + (e.message || e);
+          if (saveMsg) saveMsg.textContent = "Save failed: " + (e.message || e);
         }
       };
     }
 
-   function render(data, ovr={}, settings={}, integ=null, weekISO, lastWeekSales){
-  // effective target %
-  const weekTarget  = (typeof data?.target_labour_pct === "number") ? data.target_labour_pct : null;
-  const fallbackTgt = (typeof settings?.target_labour_pct === "number" && settings.target_labour_pct > 0)
-    ? settings.target_labour_pct : null;
-  const effTarget   = (weekTarget != null ? weekTarget : fallbackTgt);
-  document.getElementById("targetPill").textContent = (effTarget != null) ? fmtPct(effTarget) : "—";
+    function clearRender(){
+      const tbody = document.querySelector("#dailyTable tbody");
+      if (tbody) tbody.innerHTML = "";
+      ["tProjSales","tActSales","tProjLabour","tActLabour","tProjMin","tActMin","tLabourPct","tDelta"].forEach(id=>{
+        const el = document.getElementById(id);
+        if (el) el.textContent = "—";
+      });
+      if (kpiProjSales) kpiProjSales.textContent = "—";
+      if (kpiActSales)  kpiActSales.textContent  = "—";
+      if (kpiProjPct)   kpiProjPct.textContent   = "—";
+      if (kpiActPct)    kpiActPct.textContent    = "—";
+      if (vwAutoSales)  vwAutoSales.textContent  = "—";
+      if (vwVoids)      vwVoids.textContent      = "—";
+      if (vwPromos)     vwPromos.textContent     = "—";
+      if (vwLastWeek)   vwLastWeek.textContent   = "—";
+      if (vwProjSales)  vwProjSales.textContent  = "—";
+      if (bdgFood) bdgFood.textContent = "—";
+      if (bdgWine) bdgWine.textContent = "—";
+      if (bdgLiquor) bdgLiquor.textContent = "—";
+      if (bdgBeer) bdgBeer.textContent = "—";
+      if (salesSource) salesSource.textContent = "—";
+      if (extrasSource) extrasSource.textContent = "—";
+      if (syncLine) syncLine.textContent = "Last sync: —";
+      const tp = document.getElementById("targetPill");
+      if (tp) tp.textContent = "—";
+    }
 
-  // days + scale
-  const days  = data?.days ?? [];
-  const SCALE = detectCurrencyScale(days);
+    function render(data, ovr={}, settings={}, integ=null, weekISO, lastWeekSales){
+      if (!data || !Array.isArray(data?.days)) {
+        clearRender();
+        if (refreshMsg) refreshMsg.textContent = "No data for this week yet.";
+        return;
+      }
 
-  // table totals (raw)
-  const t = { projSales:0, actSalesDays:0, projLab:0, actLab:0, projMin:0, actMin:0 };
+      // effective target %
+      const weekTarget  = (typeof data?.target_labour_pct === "number") ? data.target_labour_pct : null;
+      const fallbackTgt = (typeof settings?.target_labour_pct === "number" && settings.target_labour_pct > 0)
+        ? settings.target_labour_pct : null;
+      const effTarget   = (weekTarget != null ? weekTarget : fallbackTgt);
+      const targetPill = document.getElementById("targetPill");
+      if (targetPill) targetPill.textContent = (effTarget != null) ? fmtPct(effTarget) : "—";
 
-const tbody = document.querySelector("#dailyTable tbody");
+      const days  = data?.days ?? [];
+      const SCALE = detectCurrencyScale(days);
 
-// IMPORTANT: these must be declared ONCE in render()
-const weekCutoffISO = cutoffForWeek(weekISO);
-const weekEndISO_   = shiftDays(weekISO, 6); // <-- ADD this (you reference weekEndISO_ later)
-const remitPct      = Number(settings.remit_pct) || 0;
+      const t = { projSales:0, actSalesDays:0, projLab:0, actLab:0, projMin:0, actMin:0 };
 
-tbody.innerHTML = "";
+      const tbody = document.querySelector("#dailyTable tbody");
+      if (!tbody) return;
 
-for (const d of days){
-  const ps = (d.projected_sales ?? 0)      * SCALE;
-  const as7 = (d.actual_sales ?? 0) * SCALE;  // fallback (7shifts)
-const asSW =
-  getSwDayTotal(integ || {}, d.date || "") ??
-  silverwareActualSalesForDay(integ || {}, d.date || "");
+      const weekCutoffISO = cutoffForWeek(weekISO);
+      const weekEndISO_   = shiftDays(weekISO, 6);
+      const remitPct      = Number(settings?.remit_pct) || 0;
+      const periodsFlat   = Array.isArray(settings?.mgr_salary_periods) ? settings.mgr_salary_periods : [];
 
-const as = (asSW != null) ? asSW : as7;
+      tbody.innerHTML = "";
 
-  const pl = (d.projected_labor_cost ?? 0) * SCALE;
+      for (const d of days) {
+        const dayISO = d.date || "";
 
-  // Hourly labour from 7shifts
-  const alHourly = (d.actual_labor_cost ?? 0) * SCALE;
+        const ps  = (d.projected_sales ?? 0) * SCALE;
+        const as7 = (d.actual_sales ?? 0) * SCALE;
 
-  // Daily salaried portion (weekly/7), only up to cutoff day
-  const dayISO = d.date || "";
-  const salDay = (dayISO && dayISO <= weekCutoffISO)
-    ? salaryForDay(settings?.mgr_salary_periods || [], dayISO)
-    : 0;
+        const asSW = silverwareActualSalesForDay(integ || {}, dayISO);
+        const as = (asSW != null) ? asSW : as7;
 
-  // Daily gross labour incl salary, then remittance
-  const grossLabDay = alHourly + salDay;
-  const adjLabDay   = grossLabDay + (remitPct * grossLabDay);
+        const plHourly = (d.projected_labor_cost ?? 0) * SCALE;
+        const alHourly = (d.actual_labor_cost ?? 0) * SCALE;
 
-  // accumulate totals (keep actLab = hourly only; salary is added later via salariedToDate)
-  t.projSales    += ps;
-  t.actSalesDays += as;
-  t.projLab      += pl;
-  t.actLab       += alHourly;
-  t.projMin      += d.projected_labor_minutes ?? 0;
-  t.actMin       += d.actual_labor_minutes ?? 0;
+        const salDayAll  = dayISO ? salaryForDay(periodsFlat, dayISO) : 0;
+        const salDayAct  = (dayISO && dayISO <= weekCutoffISO) ? salDayAll : 0;
+        const salDayProj = salDayAll;
 
-  const pct   = (adjLabDay && as) ? (adjLabDay / as) : null;
-  const delta = (pct!=null && effTarget!=null) ? (pct - effTarget) : null;
+        const projGrossLabDay = plHourly + salDayProj;
+        const projAdjLabDay   = projGrossLabDay + (remitPct * projGrossLabDay);
 
-  const tr = document.createElement("tr");
-  tr.innerHTML = `
-    <td>${d.date || "—"}</td>
-    <td>${fmtMoney(ps)}</td>
-    <td>${fmtMoney(as)}</td>
-    <td>${fmtMoney(pl)}</td>
-    <td>${fmtMoney(adjLabDay)}</td>
-    <td>${fmtInt(d.projected_labor_minutes)}</td>
-    <td>${fmtInt(d.actual_labor_minutes)}</td>
-    <td>${fmtPct(pct)}</td>
-    <td><span class="pill ${delta!=null?(delta<=0?"good":"bad"):""}">${delta!=null? (delta*100).toFixed(1)+" pp":"—"}</span></td>
-  `;
-  tbody.appendChild(tr);
-}
+        const grossLabDay = alHourly + salDayAct;
+        const adjLabDay   = grossLabDay + (remitPct * grossLabDay);
 
+        t.projSales    += ps;
+        t.actSalesDays += as;
+        t.projLab      += plHourly;
+        t.actLab       += alHourly;
+        t.projMin      += d.projected_labor_minutes ?? 0;
+        t.actMin       += d.actual_labor_minutes ?? 0;
 
-// Food-only for the right panel — totals/KPIs should use TOTAL sales.
-// Prefer Silverware WEEK total if present (because 7shifts day totals may not update after the fact).
-const swWeekTotal = getSwWeekTotal(integ || {});
-const totalActSales = (swWeekTotal != null && swWeekTotal > 0) ? swWeekTotal : t.actSalesDays;
+        const pct   = (adjLabDay && as) ? (adjLabDay / as) : null;
+        const delta = (pct != null && effTarget != null) ? (pct - effTarget) : null;
 
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${d.date || "—"}</td>
+          <td>${fmtMoney(ps)}</td>
+          <td>${fmtMoney(as)}</td>
+          <td>${fmtMoney(projAdjLabDay)}</td>
+          <td>${fmtMoney(adjLabDay)}</td>
+          <td>${fmtInt(d.projected_labor_minutes)}</td>
+          <td>${fmtInt(d.actual_labor_minutes)}</td>
+          <td>${fmtPct(pct)}</td>
+          <td><span class="pill ${delta!=null?(delta<=0?"good":"bad"):""}">${delta!=null? (delta*100).toFixed(1)+" pp":"—"}</span></td>
+        `;
+        tbody.appendChild(tr);
+      }
 
-// Prefer the explicit food-only values written by Silverware DailyTotals writers.
-// Fall back to deep scan, then finally to total days sum (so UI never blanks).
-const autoFoodDirect =
-  toNum(integ?.food_sales_total) ??
-  toNum(integ?.food_sales_silverware);
+      // TOTAL actual sales (prefer Silverware week total if present)
+      const swWeekTotal = getSwWeekTotal(integ || {});
+      const totalActSales = (swWeekTotal != null && swWeekTotal > 0) ? swWeekTotal : t.actSalesDays;
 
-const autoFood =
-  (autoFoodDirect != null && autoFoodDirect > 0)
-    ? normalizeCurrency(autoFoodDirect)
-    : (deepSumFoodNet(integ || {}) || totalActSales);
+      // Food-only (manual > auto)
+      const foodSalesEff = effSalesFrom(data || {}, ovr || {}, integ || {});
+      const autoFoodForPanel = getAutoFoodSales(integ || {}, foodSalesEff).value;
 
+      // Salary totals (to-date vs full week) for weekly KPIs
+      let salariedToDate = 0;
+      let salariedWeekFull = 0;
+      const sal = salaryFromPeriods(periodsFlat, weekISO, weekCutoffISO);
+      if (sal) {
+        salariedToDate   = sal.toDate;
+        salariedWeekFull = sal.fullWeek;
+      } else {
+        const legacyWeekly = sumLegacyWeekly(settings);
+        const elapsedDays  = daysElapsedInWeek(weekISO, weekCutoffISO);
+        const weekComplete = (weekCutoffISO === weekEndISO_);
+        salariedToDate     = legacyWeekly * (weekComplete ? 1 : (elapsedDays / 7));
+        salariedWeekFull   = legacyWeekly;
+      }
 
-  let salariedToDate = 0;
-  let salariedWeekFull = 0;
-  const sal = salaryFromPeriods(settings?.mgr_salary_periods, weekISO, weekCutoffISO);
-  if (sal) {
-    salariedToDate  = sal.toDate;
-    salariedWeekFull= sal.fullWeek;
-  } else {
-    const legacyWeekly = sumLegacyWeekly(settings);
-    const elapsedDays  = daysElapsedInWeek(weekISO, weekCutoffISO);
-    const weekComplete = (weekCutoffISO === weekEndISO_);
-    salariedToDate     = legacyWeekly * (weekComplete ? 1 : (elapsedDays / 7));
-    salariedWeekFull   = legacyWeekly;
-  }
+      const grossLabourToDate = (t.actLab || 0) + salariedToDate;
+      const remit             = remitPct * grossLabourToDate;
+      const adjustedActLab    = grossLabourToDate + remit;
 
-  const grossLabourToDate = (t.actLab || 0) + salariedToDate;
-  const remit             = (Number(settings.remit_pct) || 0) * grossLabourToDate;
-  const adjustedActLab    = grossLabourToDate + remit;
+      const weekPct   = totalActSales > 0 ? (adjustedActLab / totalActSales) : null;
+      const weekDelta = (weekPct!=null && effTarget!=null) ? (weekPct - effTarget) : null;
 
-  const weekPct   = totalActSales > 0 ? (adjustedActLab / totalActSales) : null;
-  const weekDelta = (weekPct!=null && effTarget!=null) ? (weekPct - effTarget) : null;
+      const grossProjLabour = (t.projLab || 0) + (salariedWeekFull || 0);
+      const projRemit       = remitPct * grossProjLabour;
+      const adjustedProjLab = grossProjLabour + projRemit;
 
-  // ----- Totals & KPIs -----
-  document.getElementById("tProjSales").textContent  = fmtMoney(t.projSales);
-  document.getElementById("tActSales").textContent   = fmtMoney(totalActSales);
-  document.getElementById("tProjLabour").textContent = fmtMoney(t.projLab);
-  document.getElementById("tActLabour").textContent  = fmtMoney(adjustedActLab);
+      // Totals & KPIs
+      document.getElementById("tProjSales").textContent  = fmtMoney(t.projSales);
+      document.getElementById("tActSales").textContent   = fmtMoney(totalActSales);
+      document.getElementById("tProjLabour").textContent = fmtMoney(adjustedProjLab);
+      document.getElementById("tActLabour").textContent  = fmtMoney(adjustedActLab);
 
-  const tPctEl = document.getElementById("tLabourPct");
-  tPctEl.textContent = fmtPct(weekPct);
-  applyPctClass(tPctEl, weekPct);
+      const tPctEl = document.getElementById("tLabourPct");
+      if (tPctEl){
+        tPctEl.textContent = fmtPct(weekPct);
+        applyPctClass(tPctEl, weekPct);
+      }
 
-  document.getElementById("tProjMin").textContent = fmtInt(t.projMin);
-  document.getElementById("tActMin").textContent  = fmtInt(t.actMin);
-  document.getElementById("tDelta").innerHTML     =
-    `<span class="pill ${weekDelta!=null?(weekDelta<=0?"good":"bad"):""}">${weekDelta!=null? (weekDelta*100).toFixed(1)+" pp":"—"}</span>`;
+      document.getElementById("tProjMin").textContent = fmtInt(t.projMin);
+      document.getElementById("tActMin").textContent  = fmtInt(t.actMin);
+      document.getElementById("tDelta").innerHTML     =
+        `<span class="pill ${weekDelta!=null?(weekDelta<=0?"good":"bad"):""}">${weekDelta!=null? (weekDelta*100).toFixed(1)+" pp":"—"}</span>`;
 
-  if (kpiProjSales) kpiProjSales.textContent = fmtMoney(t.projSales);
-  if (kpiActSales)  kpiActSales.textContent  = fmtMoney(totalActSales);
-  const projPct = (t.projLab && t.projSales) ? (t.projLab / t.projSales) : null;
-  if (kpiProjPct)  kpiProjPct.textContent = fmtPct(projPct);
-  if (kpiActPct)   { kpiActPct.textContent = fmtPct(weekPct); applyPctClass(kpiActPct, weekPct); }
+      if (kpiProjSales) kpiProjSales.textContent = fmtMoney(t.projSales);
+      if (kpiActSales)  kpiActSales.textContent  = fmtMoney(totalActSales);
 
-  // ----- Integration status & sources + extras view -----
-  const syncAt = integ?.synced_at;
-  let syncTxt = "—";
-  if (syncAt?.toDate)      syncTxt = integ.synced_at.toDate().toLocaleString();
-  else if (typeof syncAt==="string"){ const dt=new Date(syncAt); syncTxt = isNaN(dt)? syncAt : dt.toLocaleString(); }
-  syncLine.textContent = "Last sync: " + (syncTxt || "—");
+      const projPct = (adjustedProjLab && t.projSales) ? (adjustedProjLab / t.projSales) : null;
+      if (kpiProjPct) kpiProjPct.textContent = fmtPct(projPct);
+      if (kpiActPct)  { kpiActPct.textContent = fmtPct(weekPct); applyPctClass(kpiActPct, weekPct); }
 
-// Totals are from day documents; food-only is shown separately below
-const usingSwPerDay = (days || []).some(d => silverwareActualSalesForDay(integ || {}, d.date || "") != null);
+      // Integration status + sources
+      const syncAt = integ?.synced_at;
+      let syncTxt = "—";
+      if (syncAt?.toDate) syncTxt = integ.synced_at.toDate().toLocaleString();
+      else if (typeof syncAt==="string"){ const dt=new Date(syncAt); syncTxt = isNaN(dt)? syncAt : dt.toLocaleString(); }
+      if (syncLine) syncLine.textContent = "Last sync: " + (syncTxt || "—");
 
-salesSource.textContent =
-  usingSwPerDay ? "Silverware DailyTotals (per-day)" :
-  (swWeekTotal != null && swWeekTotal > 0 ? "Silverware DailyTotals (week total)" : "7shifts (day docs)");
+      const usingSwPerDay = (days || []).some(d => silverwareActualSalesForDay(integ || {}, d.date || "") != null);
+      if (salesSource) {
+        salesSource.textContent =
+          usingSwPerDay ? "Silverware DailyTotals (per-day)" :
+          (swWeekTotal != null && swWeekTotal > 0 ? "Silverware DailyTotals (week total)" : "7shifts (day docs)");
+      }
 
+      // Extras
+      const voidsAuto = getAutoVoidsOnly(integ || {});
+      const autoVoids = voidsAuto.value;
 
+      const autoPromos =
+        moneyMaybe(integ?.promos_silverware) ??
+        moneyMaybe(integ?.promos) ??
+        null;
 
-// Extras (manual > integration) — Voids ONLY (exclude cancellations)
-const voidsAuto = getAutoVoidsOnly(integ || {});
-const autoVoids = voidsAuto.value;
-  const autoPromos = isNum(integ?.promos_silverware) ? integ.promos_silverware : (isNum(integ?.promos) ? integ.promos : null);
-  const effVoids   = pickVal(Number(ovr.voids),  autoVoids);
-  const effPromos  = pickVal(Number(ovr.promos), autoPromos);
+      const effVoids   = pickVal(Number(ovr.voids),  autoVoids);
+      const effPromos  = pickVal(Number(ovr.promos), autoPromos);
 
-  if (vwAutoSales) vwAutoSales.textContent = fmtMoney(autoFood);
-  if (vwVoids)     vwVoids.textContent     = fmtMoney(effVoids);
-  if (vwPromos)    vwPromos.textContent    = fmtMoney(effPromos);
+      if (vwAutoSales) vwAutoSales.textContent = fmtMoney(autoFoodForPanel);
+      if (vwVoids)     vwVoids.textContent     = fmtMoney(effVoids);
+      if (vwPromos)    vwPromos.textContent    = fmtMoney(effPromos);
 
-pill(srcVoids,
-  (isNum(ovr.voids) && ovr.voids > 0) ? "Manual"
-    : voidsAuto.label,
-  (isNum(ovr.voids) && ovr.voids > 0) ? "bad" : null
-);
-  pill(srcPromos,
-       (isNum(ovr.promos) && ovr.promos > 0) ? "Manual"
-         : (integ?.source_extras ? `Auto: ${integ.source_extras}` : "—"));
+      pill(srcVoids,
+        (isNum(ovr.voids) && ovr.voids > 0) ? "Manual" : voidsAuto.label,
+        (isNum(ovr.voids) && ovr.voids > 0) ? "bad" : null
+      );
+      pill(srcPromos,
+        (isNum(ovr.promos) && ovr.promos > 0) ? "Manual" : (integ?.source_extras ? `Auto: ${integ.source_extras}` : "—"),
+        (isNum(ovr.promos) && ovr.promos > 0) ? "bad" : null
+      );
 
-  if (extrasSource) {
-  const manualExtras = (isNum(ovr.voids) && ovr.voids > 0) || (isNum(ovr.promos) && ovr.promos > 0);
-  extrasSource.textContent = manualExtras
-    ? "Manual override"
-    : (integ?.source_extras ? `Auto: ${integ.source_extras}` : "—");
-}
-  
-  // Last week (auto) & budgets
-  if (vwLastWeek)   vwLastWeek.textContent  = fmtMoney(isNum(lastWeekSales)? lastWeekSales : null);
-  if (vwProjSales)  vwProjSales.textContent = fmtMoney(t.projSales);
+      if (extrasSource) {
+        const manualExtras = (isNum(ovr.voids) && ovr.voids > 0) || (isNum(ovr.promos) && ovr.promos > 0);
+        extrasSource.textContent = manualExtras
+          ? "Manual override"
+          : (integ?.source_extras ? `Auto: ${integ.source_extras}` : "—");
+      }
 
-  const pFood   = Number(settings.budget_pct_food)||0;
-  const pWine   = Number(settings.budget_pct_wine)||0;
-  const pLiquor = Number(settings.budget_pct_liquor)||0;
-  const pBeer   = Number(settings.budget_pct_beer)||0;
+      if (vwLastWeek)   vwLastWeek.textContent  = fmtMoney(isNum(lastWeekSales)? lastWeekSales : null);
+      if (vwProjSales)  vwProjSales.textContent = fmtMoney(t.projSales);
 
-  const bdg = (pct)=> t.projSales * pct;
-  bdgFood.textContent   = fmtMoney(bdg(pFood));
-  bdgWine.textContent   = fmtMoney(bdg(pWine));
-  bdgLiquor.textContent = fmtMoney(bdg(pLiquor));
-  bdgBeer.textContent   = fmtMoney(bdg(pBeer));
-}
+      const pFood   = Number(settings.budget_pct_food)||0;
+      const pWine   = Number(settings.budget_pct_wine)||0;
+      const pLiquor = Number(settings.budget_pct_liquor)||0;
+      const pBeer   = Number(settings.budget_pct_beer)||0;
+
+      const bdg = (pct)=> t.projSales * pct;
+      if (bdgFood)   bdgFood.textContent   = fmtMoney(bdg(pFood));
+      if (bdgWine)   bdgWine.textContent   = fmtMoney(bdg(pWine));
+      if (bdgLiquor) bdgLiquor.textContent = fmtMoney(bdg(pLiquor));
+      if (bdgBeer)   bdgBeer.textContent   = fmtMoney(bdg(pBeer));
+    }
 
     // ---------------------- PDF GENERATOR ----------------------
     const LOC_LABEL = { beacon:"BEACON", tulia:"TULIA", cesoir:"CE SOIR", prohibition:"PROHIBITION" };
     const LOC_ORDER = ["beacon","tulia","cesoir","prohibition"];
-
     function pctClass(p){ const g=gradePct(p); return g? g : ""; }
 
     async function readWeekForLocation(locKey, weekISO){
       const basePath = `companies/aidan/locations/${locKey}/labour/${weekISO}`;
       const ovrPath  = `companies/aidan/locations/${locKey}/overrides/${weekISO}`;
-      const integPath = `companies/aidan/locations/${locKey}/integrations/${weekISO}`; 
+      const integPath = `companies/aidan/locations/${locKey}/integrations/${weekISO}`;
+
       const settings = await loadSettingsFor(locKey);
 
-const [baseSnap, ovrSnap, integSnap] = await Promise.all([
-  getDoc(doc(db, basePath)),
-  getDoc(doc(db, ovrPath)),
-  getDoc(doc(db, integPath)),
-]);
-const base = baseSnap.exists()? baseSnap.data(): null;
-const ovr  = ovrSnap.exists()? ovrSnap.data(): {};
-const integ= integSnap.exists()? integSnap.data(): null;
+      const [baseSnap, ovrSnap] = await Promise.all([
+        getDoc(doc(db, basePath)),
+        getDoc(doc(db, ovrPath)),
+      ]);
+
+      let integ = null;
+      try {
+        const integSnap = await getDoc(doc(db, integPath));
+        integ = integSnap.exists()? integSnap.data(): null;
+      } catch (_) {
+        integ = null;
+      }
+
+      const base = baseSnap.exists()? baseSnap.data(): null;
+      const ovr  = ovrSnap.exists()? ovrSnap.data(): {};
 
       const days = base?.days || [];
       const SCALE = detectCurrencyScale(days);
 
       let projSales=0, actSalesDays=0, projLab=0, actLab=0, projMin=0, actMin=0;
+
       for (const d of days){
-        projSales += (d.projected_sales ?? 0)       * SCALE;
-        actSalesDays  += (d.actual_sales ?? 0)      * SCALE;
-        projLab   += (d.projected_labor_cost ?? 0)  * SCALE;
-        actLab    += (d.actual_labor_cost ?? 0)     * SCALE;
+        projSales += (d.projected_sales ?? 0) * SCALE;
+
+        const as7 = (d.actual_sales ?? 0) * SCALE;
+        const asSW = silverwareActualSalesForDay(integ || {}, d.date || "");
+        const as = (asSW != null) ? asSW : as7;
+        actSalesDays += as;
+
+        projLab   += (d.projected_labor_cost ?? 0) * SCALE;
+        actLab    += (d.actual_labor_cost ?? 0) * SCALE;
         projMin   += d.projected_labor_minutes ?? 0;
         actMin    += d.actual_labor_minutes ?? 0;
       }
 
-// PDF stays on TOTAL sales (not food-only)
-const totalActSales = actSalesDays;
+      const swWeekTotal = getSwWeekTotal(integ || {});
+      const totalActSales = (swWeekTotal != null && swWeekTotal > 0) ? swWeekTotal : actSalesDays;
 
-    
-let salaried = 0;
-const salPdf = salaryFromPeriods(settings?.mgr_salary_periods, weekISO, shiftDays(weekISO, 6));
-if (salPdf) salaried = salPdf.fullWeek;
-else        salaried = sumLegacyWeekly(settings);
+      let salaried = 0;
+      const periodsFlat = Array.isArray(settings?.mgr_salary_periods) ? settings.mgr_salary_periods : [];
+      const salPdf = salaryFromPeriods(periodsFlat, weekISO, shiftDays(weekISO, 6));
+      if (salPdf) salaried = salPdf.fullWeek;
+      else        salaried = sumLegacyWeekly(settings);
 
-
-const grossLabour  = (actLab || 0) + salaried;
-
+      const grossLabour  = (actLab || 0) + salaried;
       const remit        = (Number(settings.remit_pct)||0) * grossLabour;
       const adjActLab    = grossLabour + remit;
 
-      const target = isNum(base?.target_labour_pct)
-  ? base.target_labour_pct
-  : (isNum(settings?.target_labour_pct) ? Number(settings.target_labour_pct) : null);
+      const grossProjLabour = (projLab || 0) + salaried;
+      const projRemit       = (Number(settings.remit_pct)||0) * grossProjLabour;
+      const adjProjLab      = grossProjLabour + projRemit;
 
-      const projPct = (projLab && projSales) ? projLab/projSales : null;
+      const target = isNum(base?.target_labour_pct)
+        ? base.target_labour_pct
+        : (isNum(settings?.target_labour_pct) ? Number(settings.target_labour_pct) : null);
+
+      const projPct = (adjProjLab && projSales) ? adjProjLab/projSales : null;
       const actPct  = (adjActLab && totalActSales) ? adjActLab/totalActSales : null;
       const delta   = (actPct!=null && target!=null) ? (actPct-target) : null;
 
@@ -1871,47 +1688,54 @@ const grossLabour  = (actLab || 0) + salaried;
         beer:   projSales * (Number(settings.budget_pct_beer)||0),
       };
 
-      // compute previous week for PDF "Last Week Sales"
+      // previous week for PDF "Last Week Sales" (prefer SW per-day)
       const prevISO = shiftDays(weekISO, -7);
-      const [pBaseSnap, pOvrSnap] = await Promise.all([
-        getDoc(doc(db, `companies/aidan/locations/${locKey}/labour/${prevISO}`)),
-        getDoc(doc(db, `companies/aidan/locations/${locKey}/overrides/${prevISO}`))
-      ]);
-let lastWeek = null;
-if (pBaseSnap.exists()){
-  const prevBase = pBaseSnap.data();
-  const pDays  = prevBase?.days || [];
-  const pScale = detectCurrencyScale(pDays);
-  lastWeek = pDays.reduce((a,d)=> a + ((d.actual_sales ?? 0) * pScale), 0); // TOTAL
-}
+      const pBaseSnap = await getDoc(doc(db, `companies/aidan/locations/${locKey}/labour/${prevISO}`));
 
-// --- PDF extras: use the same logic as the dashboard (manual > auto) ---
-const foodSales = effSalesFrom(base || {}, ovr || {}, integ || {});
+      let lastWeek = null;
+      if (pBaseSnap.exists()){
+        const prevBase = pBaseSnap.data();
+        const pDays  = prevBase?.days || [];
+        const pScale = detectCurrencyScale(pDays);
 
-// Voids ONLY (exclude cancellations)
-const voidsAuto = getAutoVoidsOnly(integ || {});
-const effVoids  = pickVal(Number(ovr.voids), voidsAuto.value);
+        let pInteg = null;
+        try {
+          const s = await getDoc(doc(db, `companies/aidan/locations/${locKey}/integrations/${prevISO}`));
+          pInteg = s.exists() ? s.data() : null;
+        } catch (_) { pInteg = null; }
 
-// Promos (manual > auto)
-const autoPromos =
-  moneyMaybe(integ?.promos_silverware) ??
-  moneyMaybe(integ?.promos) ??
-  null;
+        const fallback7 = pDays.reduce((a,d)=> a + ((d.actual_sales ?? 0) * pScale), 0);
+        const swSum = pDays.reduce((a,d)=> a + (silverwareActualSalesForDay(pInteg || {}, d.date || "") || 0), 0);
+        lastWeek = (swSum > 0) ? swSum : fallback7;
+      }
 
-const effPromos = pickVal(Number(ovr.promos), autoPromos);
+      // extras same logic as dashboard
+      const foodSales = effSalesFrom(base || {}, ovr || {}, integ || {});
+      const voidsAuto = getAutoVoidsOnly(integ || {});
+      const effVoids  = pickVal(Number(ovr.voids), voidsAuto.value);
 
+      const autoPromos =
+        moneyMaybe(integ?.promos_silverware) ??
+        moneyMaybe(integ?.promos) ??
+        null;
+      const effPromos = pickVal(Number(ovr.promos), autoPromos);
 
       return {
         locKey,
         target,
-        projSales, actSales: totalActSales,
-        projLab,   actLab: adjActLab,
-        projMin,   actMin,
-        projPct,   actPct, delta,
+        projSales,
+        actSales: totalActSales,
+        projLab: adjProjLab,
+        actLab: adjActLab,
+        projMin,
+        actMin,
+        projPct,
+        actPct,
+        delta,
         lastWeek,
-        foodSales,          // NEW
-        promos: effPromos,  // FIXED
-        voids:  effVoids,   // FIXED
+        foodSales,
+        promos: effPromos,
+        voids: effVoids,
         budgets
       };
     }
@@ -1947,7 +1771,7 @@ const effPromos = pickVal(Number(ovr.promos), autoPromos);
               <thead><tr><th colspan="2">Last Week & Extras</th></tr></thead>
               <tbody>
                 <tr><th>Last Week Sales</th><td>${fmtMoneyLocal(s.lastWeek)}</td></tr>
-                <tr><th>Food Sales (Silverware)</th><td>${fmtMoneyLocal(s.foodSales)}</td></tr> 
+                <tr><th>Food Sales (Silverware)</th><td>${fmtMoneyLocal(s.foodSales)}</td></tr>
                 <tr><th>Promos/Discounts</th><td>${fmtMoneyLocal(s.promos)}</td></tr>
                 <tr><th>Voids</th><td>${fmtMoneyLocal(s.voids)}</td></tr>
               </tbody>
@@ -2004,7 +1828,7 @@ const effPromos = pickVal(Number(ovr.promos), autoPromos);
       w.document.close();
       w.focus();
       w.print();
-    } // end downloadPdfAll
+    }
     // -------------------- end PDF GENERATOR --------------------
   </script>
 </body>
