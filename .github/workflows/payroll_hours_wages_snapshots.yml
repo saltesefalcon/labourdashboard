@@ -1,0 +1,131 @@
+name: Payroll hours & wages snapshots (7shifts)
+
+on:
+  workflow_dispatch:
+    inputs:
+      week_of:
+        description: "Week start Monday (YYYY-MM-DD). Leave blank = compute current Monday (Toronto time)."
+        required: false
+      weeks:
+        description: "How many weeks to write starting at week_of (1 or 2 recommended)"
+        required: false
+        default: "2"
+      locations:
+        description: "Comma-separated location keys (beacon,tulia,prohibition,cesoar)"
+        required: false
+        default: "beacon"
+      punches:
+        description: "true = worked hours (punches), false = scheduled hours"
+        required: false
+        default: "true"
+      detailed:
+        description: "true = include more report detail (bigger payload), false = keep compact"
+        required: false
+        default: "false"
+
+  schedule:
+    # Run at 10:00 and 11:00 UTC, then we guard so it only actually runs at 06:00 Toronto.
+    - cron: "0 10,11 * * *"
+
+jobs:
+  write_payroll_hours_wages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          elif [ -f package.json ]; then
+            npm install
+          else
+            echo "ERROR: No package.json found in repo root. This workflow expects firebase-admin installed."
+            exit 1
+          fi
+
+      - name: Skip unless 06:00 Toronto (schedule only)
+        if: github.event_name == 'schedule'
+        run: |
+          H=$(TZ=America/Toronto date +%H)
+          if [ "$H" != "06" ]; then
+            echo "Not 06:00 Toronto right now (Toronto hour=$H). Exiting."
+            exit 0
+          fi
+
+      - name: Compute run vars (week_of / weeks / locations / punches / detailed)
+        id: vars
+        env:
+          INPUT_WEEK_OF: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.week_of) || '' }}
+          INPUT_WEEKS:   ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.weeks)   || '' }}
+          INPUT_LOCS:    ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.locations) || '' }}
+          INPUT_PUNCHES: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.punches) || '' }}
+          INPUT_DETAILED:${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.detailed) || '' }}
+        run: |
+          WEEK_OF="$INPUT_WEEK_OF"
+          if [ -z "$WEEK_OF" ]; then
+            WEEK_OF=$(TZ=America/Toronto date -d 'monday this week' +%F)
+          fi
+
+          WEEKS="$INPUT_WEEKS"
+          if [ -z "$WEEKS" ]; then WEEKS="2"; fi
+
+          LOCS="$INPUT_LOCS"
+          if [ -z "$LOCS" ]; then LOCS="beacon"; fi
+
+          PUNCHES="$INPUT_PUNCHES"
+          if [ -z "$PUNCHES" ]; then PUNCHES="true"; fi
+
+          DETAILED="$INPUT_DETAILED"
+          if [ -z "$DETAILED" ]; then DETAILED="false"; fi
+
+          echo "week_of=$WEEK_OF"   >> "$GITHUB_OUTPUT"
+          echo "weeks=$WEEKS"       >> "$GITHUB_OUTPUT"
+          echo "locations=$LOCS"    >> "$GITHUB_OUTPUT"
+          echo "punches=$PUNCHES"   >> "$GITHUB_OUTPUT"
+          echo "detailed=$DETAILED" >> "$GITHUB_OUTPUT"
+
+          echo "Will run: week_of=$WEEK_OF weeks=$WEEKS locations=$LOCS punches=$PUNCHES detailed=$DETAILED"
+
+      - name: Write payroll hours & wages snapshots
+        env:
+          FIREBASE_SA_JSON: ${{ secrets.FIREBASE_SA_JSON }}
+
+          BEACON_TOKEN: ${{ secrets.BEACON_TOKEN }}
+          BEACON_COMPANY_ID: ${{ secrets.BEACON_COMPANY_ID }}
+          BEACON_LOCATION_ID: ${{ secrets.BEACON_LOCATION_ID }}
+
+          TULIA_TOKEN: ${{ secrets.TULIA_TOKEN }}
+          TULIA_COMPANY_ID: ${{ secrets.TULIA_COMPANY_ID }}
+          TULIA_LOCATION_ID: ${{ secrets.TULIA_LOCATION_ID }}
+
+          PROHIBITION_TOKEN: ${{ secrets.PROHIBITION_TOKEN }}
+          PROHIBITION_COMPANY_ID: ${{ secrets.PROHIBITION_COMPANY_ID }}
+          PROHIBITION_LOCATION_ID: ${{ secrets.PROHIBITION_LOCATION_ID }}
+
+          CESOIR_TOKEN: ${{ secrets.CESOIR_TOKEN }}
+          CESOIR_COMPANY_ID: ${{ secrets.CESOIR_COMPANY_ID }}
+          CESOIR_LOCATION_ID: ${{ secrets.CESOIR_LOCATION_ID }}
+        run: |
+          set -e
+
+          SCRIPT="scripts/write_payroll_hours_wages_snapshot.cjs"
+          if [ ! -f "$SCRIPT" ]; then
+            echo "ERROR: Could not find $SCRIPT"
+            exit 1
+          fi
+
+          node "$SCRIPT" \
+            --week_of "${{ steps.vars.outputs.week_of }}" \
+            --weeks "${{ steps.vars.outputs.weeks }}" \
+            --locations "${{ steps.vars.outputs.locations }}" \
+            --punches "${{ steps.vars.outputs.punches }}" \
+            --detailed "${{ steps.vars.outputs.detailed }}"
