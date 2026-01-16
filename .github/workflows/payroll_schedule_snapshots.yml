@@ -1,0 +1,82 @@
+name: Payroll schedule snapshots (7shifts)
+
+on:
+  # We run at 10:05 UTC and 11:05 UTC every day,
+  # then we only continue if it's 06:xx in America/Toronto.
+  # This keeps 6am correct across DST changes.
+  schedule:
+    - cron: "5 10 * * *"
+    - cron: "5 11 * * *"
+
+  # Manual “click to run” from GitHub Actions tab
+  workflow_dispatch:
+    inputs:
+      locations:
+        description: "Comma-separated locations (example: beacon)"
+        required: false
+        default: "beacon"
+      weeks:
+        description: "How many weeks to write (1 or 2 recommended)"
+        required: false
+        default: "2"
+      week_of:
+        description: "Override week_of Monday (YYYY-MM-DD). Leave blank for current week."
+        required: false
+        default: ""
+
+jobs:
+  write_payroll_schedule:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Decide if we should run now (6am Toronto)
+        id: toronto
+        run: |
+          H=$(TZ=America/Toronto date +%H)
+          echo "hour=$H" >> $GITHUB_OUTPUT
+          echo "Toronto hour is $H"
+
+      - name: Exit if not 6am Toronto (scheduled runs only)
+        if: github.event_name == 'schedule' && steps.toronto.outputs.hour != '06'
+        run: |
+          echo "Not 6am in Toronto; exiting."
+          exit 0
+
+      - name: Compute week_of (Monday in Toronto)
+        id: wk
+        run: |
+          if [ -n "${{ inputs.week_of }}" ]; then
+            echo "week_of=${{ inputs.week_of }}" >> $GITHUB_OUTPUT
+          else
+            WEEK_OF=$(TZ=America/Toronto date -d 'monday this week' +%F)
+            echo "week_of=$WEEK_OF" >> $GITHUB_OUTPUT
+          fi
+          echo "Using week_of=${{ steps.wk.outputs.week_of }}"
+
+      - name: Write payrollSchedule snapshots
+        env:
+          FIREBASE_SA_JSON: ${{ secrets.FIREBASE_SA_JSON }}
+
+          # Beacon (required for beacon runs)
+          BEACON_TOKEN: ${{ secrets.BEACON_TOKEN }}
+          BEACON_COMPANY_ID: ${{ secrets.BEACON_COMPANY_ID }}
+          BEACON_LOCATION_ID: ${{ secrets.BEACON_LOCATION_ID }}
+        run: |
+          LOCS="${{ inputs.locations }}"
+          if [ -z "$LOCS" ]; then LOCS="beacon"; fi
+
+          WEEKS="${{ inputs.weeks }}"
+          if [ -z "$WEEKS" ]; then WEEKS="2"; fi
+
+          node scripts/write_payroll_schedule_snapshot.cjs \
+            --week_of "${{ steps.wk.outputs.week_of }}" \
+            --weeks "$WEEKS" \
+            --locations "$LOCS"
