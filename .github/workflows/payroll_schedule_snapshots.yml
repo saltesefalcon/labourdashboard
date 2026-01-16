@@ -1,82 +1,107 @@
 name: Payroll schedule snapshots (7shifts)
 
 on:
-  # We run at 10:05 UTC and 11:05 UTC every day,
-  # then we only continue if it's 06:xx in America/Toronto.
-  # This keeps 6am correct across DST changes.
-  schedule:
-    - cron: "5 10 * * *"
-    - cron: "5 11 * * *"
-
-  # Manual “click to run” from GitHub Actions tab
   workflow_dispatch:
     inputs:
-      locations:
-        description: "Comma-separated locations (example: beacon)"
+      week_of:
+        description: "Week start Monday (YYYY-MM-DD). Leave blank = compute current Monday (Toronto time)."
         required: false
-        default: "beacon"
       weeks:
-        description: "How many weeks to write (1 or 2 recommended)"
+        description: "How many weeks to write starting at week_of (1 or 2 recommended)"
         required: false
         default: "2"
-      week_of:
-        description: "Override week_of Monday (YYYY-MM-DD). Leave blank for current week."
+      locations:
+        description: "Comma-separated location keys (beacon,tulia,prohibition,cesoar)"
         required: false
-        default: ""
+        default: "beacon"
+  schedule:
+    # GitHub cron is UTC.
+    # 11:00 UTC = 06:00 Toronto (EST, winter). During DST it will run at 07:00 Toronto.
+    - cron: "0 11 * * *"
 
 jobs:
   write_payroll_schedule:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node (needs fetch)
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: Decide if we should run now (6am Toronto)
-        id: toronto
+      - name: Install dependencies
         run: |
-          H=$(TZ=America/Toronto date +%H)
-          echo "hour=$H" >> $GITHUB_OUTPUT
-          echo "Toronto hour is $H"
-
-      - name: Exit if not 6am Toronto (scheduled runs only)
-        if: github.event_name == 'schedule' && steps.toronto.outputs.hour != '06'
-        run: |
-          echo "Not 6am in Toronto; exiting."
-          exit 0
-
-      - name: Compute week_of (Monday in Toronto)
-        id: wk
-        run: |
-          if [ -n "${{ inputs.week_of }}" ]; then
-            echo "week_of=${{ inputs.week_of }}" >> $GITHUB_OUTPUT
+          if [ -f package-lock.json ]; then
+            npm ci
+          elif [ -f package.json ]; then
+            npm install
           else
-            WEEK_OF=$(TZ=America/Toronto date -d 'monday this week' +%F)
-            echo "week_of=$WEEK_OF" >> $GITHUB_OUTPUT
+            echo "ERROR: No package.json found in repo root. This workflow expects firebase-admin installed."
+            exit 1
           fi
-          echo "Using week_of=${{ steps.wk.outputs.week_of }}"
 
-      - name: Write payrollSchedule snapshots
+      - name: Compute run vars (week_of / weeks / locations)
+        id: vars
+        env:
+          INPUT_WEEK_OF: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.week_of) || '' }}
+          INPUT_WEEKS:   ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.weeks)   || '' }}
+          INPUT_LOCS:    ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.locations) || '' }}
+        run: |
+          WEEK_OF="$INPUT_WEEK_OF"
+          if [ -z "$WEEK_OF" ]; then
+            WEEK_OF=$(TZ=America/Toronto date -d 'monday this week' +%F)
+          fi
+
+          WEEKS="$INPUT_WEEKS"
+          if [ -z "$WEEKS" ]; then WEEKS="2"; fi
+
+          LOCS="$INPUT_LOCS"
+          if [ -z "$LOCS" ]; then LOCS="beacon"; fi
+
+          echo "week_of=$WEEK_OF" >> "$GITHUB_OUTPUT"
+          echo "weeks=$WEEKS"     >> "$GITHUB_OUTPUT"
+          echo "locations=$LOCS" >> "$GITHUB_OUTPUT"
+
+          echo "Will run: week_of=$WEEK_OF weeks=$WEEKS locations=$LOCS"
+
+      - name: Write payroll schedule snapshots
         env:
           FIREBASE_SA_JSON: ${{ secrets.FIREBASE_SA_JSON }}
 
-          # Beacon (required for beacon runs)
           BEACON_TOKEN: ${{ secrets.BEACON_TOKEN }}
           BEACON_COMPANY_ID: ${{ secrets.BEACON_COMPANY_ID }}
           BEACON_LOCATION_ID: ${{ secrets.BEACON_LOCATION_ID }}
+
+          TULIA_TOKEN: ${{ secrets.TULIA_TOKEN }}
+          TULIA_COMPANY_ID: ${{ secrets.TULIA_COMPANY_ID }}
+          TULIA_LOCATION_ID: ${{ secrets.TULIA_LOCATION_ID }}
+
+          PROHIBITION_TOKEN: ${{ secrets.PROHIBITION_TOKEN }}
+          PROHIBITION_COMPANY_ID: ${{ secrets.PROHIBITION_COMPANY_ID }}
+          PROHIBITION_LOCATION_ID: ${{ secrets.PROHIBITION_LOCATION_ID }}
+
+          CESOIR_TOKEN: ${{ secrets.CESOIR_TOKEN }}
+          CESOIR_COMPANY_ID: ${{ secrets.CESOIR_COMPANY_ID }}
+          CESOIR_LOCATION_ID: ${{ secrets.CESOIR_LOCATION_ID }}
         run: |
-          LOCS="${{ inputs.locations }}"
-          if [ -z "$LOCS" ]; then LOCS="beacon"; fi
+          set -e
 
-          WEEKS="${{ inputs.weeks }}"
-          if [ -z "$WEEKS" ]; then WEEKS="2"; fi
+          SCRIPT="scripts/write_payroll_schedule_snapshot.cjs"
+          if [ ! -f "$SCRIPT" ]; then
+            SCRIPT="write_payroll_schedule_snapshot.cjs"
+          fi
 
-          node scripts/write_payroll_schedule_snapshot.cjs \
-            --week_of "${{ steps.wk.outputs.week_of }}" \
-            --weeks "$WEEKS" \
-            --locations "$LOCS"
+          if [ ! -f "$SCRIPT" ]; then
+            echo "ERROR: Could not find write_payroll_schedule_snapshot.cjs"
+            echo "Looked for scripts/write_payroll_schedule_snapshot.cjs and write_payroll_schedule_snapshot.cjs"
+            exit 1
+          fi
+
+          node "$SCRIPT" \
+            --week_of "${{ steps.vars.outputs.week_of }}" \
+            --weeks "${{ steps.vars.outputs.weeks }}" \
+            --locations "${{ steps.vars.outputs.locations }}"
