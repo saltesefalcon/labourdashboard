@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Payroll — Beacon</title>
+
+  <style>
+    :root{
+      --bg:#0b1220; --card:#101a2e; --ink:#e8edf7; --muted:#9aa6bf;
+      --accent:#22c55e; --warn:#ef4444; --line:rgba(255,255,255,.12);
+      --btn:#1f2a44;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial}
+    .wrap{max-width:1100px;margin:18px auto;padding:14px}
+    .topbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .title{display:flex;flex-direction:column;gap:2px}
+    .title h1{margin:0;font-size:1.25rem}
+    .title .sub{color:var(--muted);font-size:.9rem}
+    .btn{background:var(--btn);color:var(--ink);border:1px solid var(--line);padding:9px 12px;border-radius:10px;cursor:pointer}
+    .btn:hover{filter:brightness(1.05)}
+    .btn.primary{border-color:rgba(34,197,94,.4)}
+    .btn.danger{border-color:rgba(239,68,68,.5)}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+    .card h2{margin:0 0 10px;font-size:1.05rem}
+    .pill{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);font-size:.85rem}
+    .pill b{color:var(--ink)}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media (max-width: 900px){ .grid2{grid-template-columns:1fr} }
+    .hr{height:1px;background:var(--line);margin:12px 0}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:.9rem}
+    .muted{color:var(--muted)}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap}
+    .tab{padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
+    .tab.active{border-color:rgba(34,197,94,.5)}
+    .hidden{display:none !important}
+    .note{font-size:.9rem;color:var(--muted);line-height:1.35}
+    .statusOk{color:var(--accent)}
+    .statusBad{color:var(--warn)}
+    /* --- Wage mismatch modal --- */
+    .modalOverlay{
+      position:fixed; inset:0;
+      background:rgba(0,0,0,.55);
+      display:flex; align-items:center; justify-content:center;
+      padding:16px;
+      z-index:9999;
+    }
+    .modalCard{
+      width:min(980px, 100%);
+      max-height:85vh;
+      overflow:auto;
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:14px;
+      box-shadow:0 12px 40px rgba(0,0,0,.45);
+    }
+    .modalHeader{
+      display:flex; justify-content:space-between; align-items:flex-start; gap:10px;
+    }
+    .modalHeader h3{ margin:0; font-size:1.05rem; }
+    .modalActions{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; margin-top:12px; }
+    .smallMuted{ color:var(--muted); font-size:.9rem; line-height:1.35; }
+    .radioWrap{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .badge{
+      display:inline-flex; align-items:center; gap:6px;
+      padding:4px 8px; border-radius:999px; border:1px solid var(--line);
+      font-size:.85rem; color:var(--muted);
+    }
+    .badge b{ color:var(--ink); }
+  </style>
+
+  <!-- Firebase (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="title">
+        <h1>Payroll — Beacon</h1>
+        <div class="sub">Companion app (separate from Labour Dashboard)</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="loginBtn" class="btn primary">Login</button>
+        <button id="logoutBtn" class="btn danger hidden">Logout</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="pill"><b>Location</b> <span id="locPill">beacon</span></div>
+      <div class="pill"><b>User</b> <span id="userPill" class="muted">Not signed in</span></div>
+      <div class="pill"><b>Admin</b> <span id="adminPill" class="statusBad">No</span></div>
+      <div class="pill"><b>Status</b> <span id="statusPill" class="muted">Idle</span></div>
+    </div>
+
+    <div class="hr"></div>
+
+    <div id="accessDenied" class="card hidden">
+      <h2>Access denied</h2>
+      <div class="note">
+        You are signed in, but your account is not allow-listed for this tool.
+      </div>
+    </div>
+
+    <div id="app" class="card hidden">
+      <div class="tabs">
+        <button class="tab active" data-tab="main">Pay Period (Main)</button>
+        <button class="tab" data-tab="roster">Roster</button>
+        <button class="tab" data-tab="summary">Hours &amp; Wages Summary</button>
+      </div>
+
+      <div class="hr"></div>
+
+      <div id="tab-main">
+        <h2>Pay Period (Main)</h2>
+
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0 14px">
+          <button id="prevPeriodBtn" class="btn">← Prev pay period</button>
+
+          <div class="pill"><b>Pay Period</b> <span id="periodLabel" class="muted">—</span></div>
+
+          <button id="nextPeriodBtn" class="btn">Next pay period →</button>
+
+          <div class="pill"><b>Locked</b> <span id="lockedLabel" class="statusBad">No</span></div>
+
+          <button id="lockBtn" class="btn danger hidden">Lock</button>
+          <button id="unlockBtn" class="btn primary hidden">Unlock</button>
+        </div>
+
+        <div class="note">
+          This page is now reading/writing:
+          <span class="mono">payrollSettings/app</span> (anchorMonday)
+          and <span class="mono">payrollPeriods/{periodId}</span> (lock state).
+          Next we’ll mirror the <span class="mono">example.xlsx</span> layout here.
+        </div>
+      </div>
+
+      <div id="tab-roster" class="hidden">
+        <h2>Roster</h2>
+
+        <div class="note" style="margin-bottom:10px">
+          Auto-sync pulls scheduled employees from 7shifts snapshots and <b>only adds</b> new names.
+          No one is removed automatically. Removals are manual (admin) and do not affect past pay periods.
+        </div>
+
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0 14px">
+          <button id="sync7Btn" class="btn primary">Sync from 7shifts</button>
+          <button id="addEmpBtn" class="btn">+ Add employee</button>
+          <button id="saveRosterBtn" class="btn primary">Save roster</button>
+          <span class="pill"><b>Roster status</b> <span id="rosterStatus" class="muted">Not loaded</span></span>
+        </div>
+
+        <div class="grid2">
+          <div class="card">
+            <h2>FOH</h2>
+            <div style="overflow:auto">
+              <table style="width:100%;border-collapse:collapse" id="fohTable">
+                <thead>
+                  <tr style="text-align:left">
+                    <th style="padding:8px;border-bottom:1px solid var(--line)">First</th>
+                    <th style="padding:8px;border-bottom:1px solid var(--line)">Last</th>
+                    <th style="padding:8px;border-bottom:1px solid var(--line)">Emp #</th>
+                    <th style="padding:8px;border-bottom:1px solid var(--line)">Wage</th>
+                    <th style="padding:8px;border-bottom:1px solid var(--line)"></th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>BOH</h2>
+            <div style="overflow:auto">
+              <table style="width:100%;border-collapse:collapse" id="bohTable">
+                <thead>
+                  <tr style="text-align:left">
+                    <th style="padding:8px;border-bottom:1px solid var(--line)">First</th>
+                    <th style="padding:8px;border-bottom:1px solid var(--line)">Last</th>
+                    <th style="padding:8px;border-bottom:1px solid var(--line)">Emp #</th>
+                    <th style="padding:8px;border-bottom:1px solid var(--line)">Wage</th>
+                    <th style="padding:8px;border-bottom:1px solid var(--line)"></th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="note" style="margin-top:10px">
+          Sorting: alphabetized by first name inside each department.
+        </div>
+      </div>
+
+      <div id="tab-summary" class="hidden">
+        <h2>Hours &amp; Wages Summary</h2>
+        <div class="note">
+          Next: we’ll render the Dayforce-style table to match your CSV, make it editable when unlocked, and printable.
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="mono muted">
+        Firestore root we will use (new, payroll-only):
+        <div>companies/aidan/locations/<span id="locPath">beacon</span>/payrollPeriods/{periodId}</div>
+        <div>companies/aidan/locations/<span id="locPath2">beacon</span>/payrollRosters/{periodId}</div>
+        <div>companies/aidan/locations/<span id="locPath3">beacon</span>/payrollSettings/app</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Wage mismatch review modal -->
+  <div id="wageMismatchModal" class="modalOverlay hidden">
+    <div class="modalCard">
+      <div class="modalHeader">
+        <div>
+          <h3>Wage mismatch detected</h3>
+          <div class="smallMuted">
+            7shifts wage differs from what’s saved in the roster.
+            Choose which wage to keep for each employee. Default is <b>Keep existing</b>.
+          </div>
+        </div>
+        <div class="badge"><b id="wageMismatchCount">0</b> mismatches</div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div style="overflow:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="text-align:left">
+              <th style="padding:8px;border-bottom:1px solid var(--line)">Employee</th>
+              <th style="padding:8px;border-bottom:1px solid var(--line)">Dept</th>
+              <th style="padding:8px;border-bottom:1px solid var(--line)">Saved wage</th>
+              <th style="padding:8px;border-bottom:1px solid var(--line)">7shifts wage</th>
+              <th style="padding:8px;border-bottom:1px solid var(--line)">Choose</th>
+            </tr>
+          </thead>
+          <tbody id="wageMismatchTbody"></tbody>
+        </table>
+      </div>
+
+      <div class="modalActions">
+        <button id="wageMismatchCancelBtn" class="btn">Cancel (keep existing)</button>
+        <button id="wageMismatchApplyBtn" class="btn primary">Apply selections</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyDVULptnW9wPbhH6Qn7ys8RGmLqIxUwuCI",
+    authDomain: "labour-dashboard.firebaseapp.com",
+    projectId: "labour-dashboard",
+    storageBucket: "labour-dashboard.appspot.com",
+    messagingSenderId: "174483804575",
+    appId: "1:174483804575:web:84f6858e812c9705fe6daa"
+  };
+
+  const ALLOWED_UIDS = [
+    "e0G8FBe3xlYExc3HvSGtIk5Osgw1",
+    "BslFJsAMikSucxwbL8S7qPXcC6r2",
+    "nW1IbxeaZJT0hAoORZhDtgOlAdd2",
+    "zbpmXxrpweXQzf7Z7JMx8kUblQi1",
+    "n1xq8sI8QWSfmQni7G5Qw5jS74b2",
+    "CfNm6og5ydXhOAcKlSvJEABWsT23",
+    "Yf1EPiMfQVNvgKVVMZD4h6zjpRX2",
+    "4Paoa0SWHybPzwP7uNjOx2VgbiJ2",
+    "9aQ5evQ3nbYt0kjw91ruil5Igq52"
+  ];
+  const ADMIN_UIDS = [
+    "e0G8FBe3xlYExc3HvSGtIk5Osgw1",
+    "BslFJsAMikSucxwbL8S7qPXcC6r2",
+    "nW1IbxeaZJT0hAoORZhDtgOlAdd2",
+    "zbpmXxrpweXQzf7Z7JMx8kUblQi1",
+    "nW1IbxeaZJT0hAoORZhDtgOlAdd2",
+    "n1xq8sI8QWSfmQni7G5Qw5jS74b2",
+    "CfNm6og5ydXhOAcKlSvJEABWsT23",
+    "Yf1EPiMfQVNvgKVVMZD4h6zjpRX2",
+    "4Paoa0SWHybPzwP7uNjOx2VgbiJ2",
+    "9aQ5evQ3nbYt0kjw91ruil5Igq52"
+  ];
+
+  const LOC_KEY = "beacon";
+
+  const els = {
+    loginBtn: document.getElementById("loginBtn"),
+    logoutBtn: document.getElementById("logoutBtn"),
+    locPill: document.getElementById("locPill"),
+    userPill: document.getElementById("userPill"),
+    adminPill: document.getElementById("adminPill"),
+    statusPill: document.getElementById("statusPill"),
+    accessDenied: document.getElementById("accessDenied"),
+    app: document.getElementById("app"),
+    locPath: document.getElementById("locPath"),
+    locPath2: document.getElementById("locPath2"),
+    locPath3: document.getElementById("locPath3"),
+  };
+
+  els.locPill.textContent = LOC_KEY;
+  els.locPath.textContent = LOC_KEY;
+  els.locPath2.textContent = LOC_KEY;
+  els.locPath3.textContent = LOC_KEY;
+
+  function setStatus(text){ els.statusPill.textContent = text; }
+
+  function showApp(isAllowed){
+    els.accessDenied.classList.toggle("hidden", isAllowed);
+    els.app.classList.toggle("hidden", !isAllowed);
+  }
+
+  function setAdmin(isAdmin){
+    els.adminPill.textContent = isAdmin ? "Yes" : "No";
+    els.adminPill.className = isAdmin ? "statusOk" : "statusBad";
+  }
+
+  function wireTabs(){
+    const tabs = document.querySelectorAll(".tab");
+    const map = {
+      main: document.getElementById("tab-main"),
+      roster: document.getElementById("tab-roster"),
+      summary: document.getElementById("tab-summary"),
+    };
+    tabs.forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        tabs.forEach(t=>t.classList.remove("active"));
+        btn.classList.add("active");
+        Object.values(map).forEach(x=>x.classList.add("hidden"));
+        map[btn.dataset.tab].classList.remove("hidden");
+      });
+    });
+  }
+  wireTabs();
+
+  const COMPANY_ID = "aidan";
+  let db = null;
+
+  const ui = {
+    prevPeriodBtn: document.getElementById("prevPeriodBtn"),
+    nextPeriodBtn: document.getElementById("nextPeriodBtn"),
+    periodLabel: document.getElementById("periodLabel"),
+    lockedLabel: document.getElementById("lockedLabel"),
+    lockBtn: document.getElementById("lockBtn"),
+    unlockBtn: document.getElementById("unlockBtn"),
+  };
+
+  let session = {
+    user: null,
+    isAdmin: false,
+    anchorISO: null,
+    periodStartISO: null,
+    periodEndISO: null,
+    locked: false,
+    rosterEmployees: []
+  };
+
+  const MS_DAY = 86400000;
+
+  function utcDateFromISO(iso){
+    const [y,m,d] = iso.split("-").map(Number);
+    return new Date(Date.UTC(y, m-1, d));
+  }
+  function isoFromUTC(d){
+    return d.toISOString().slice(0,10);
+  }
+  function addDaysUTC(d, days){
+    return new Date(d.getTime() + days * MS_DAY);
+  }
+  function todayUTC(){
+    const now = new Date();
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  }
+  function periodStartForDate(dateUTC, anchorUTC){
+    const diffDays = Math.floor((dateUTC.getTime() - anchorUTC.getTime()) / MS_DAY);
+    const k = Math.floor(diffDays / 14);
+    return addDaysUTC(anchorUTC, k * 14);
+  }
+
+  function locRoot(){
+    return db.collection("companies").doc(COMPANY_ID)
+      .collection("locations").doc(LOC_KEY);
+  }
+  function settingsRef(){
+    return locRoot().collection("payrollSettings").doc("app");
+  }
+  function periodRef(periodId){
+    return locRoot().collection("payrollPeriods").doc(periodId);
+  }
+
+  function masterRosterRef(){
+    return locRoot().collection("payrollSettings").doc("roster");
+  }
+  function rosterRef(periodId){
+    return locRoot().collection("payrollRosters").doc(periodId);
+  }
+
+  // schedule snapshot collection
+  function payrollScheduleRef(weekStartISO){
+    return locRoot().collection("payrollSchedule").doc(weekStartISO);
+  }
+
+  function setRosterStatus(msg){
+    const el = document.getElementById("rosterStatus");
+    if (el) el.textContent = msg;
+  }
+
+  function money2(n){
+    const x = Number(n);
+    if (!isFinite(x)) return "";
+    return x.toFixed(2);
+  }
+
+  function moneyLabel(n){
+    const x = Number(n);
+    if (!isFinite(x)) return "—";
+    return `$${x.toFixed(2)}`;
+  }
+
+  function sameWage(a,b){
+    const x = Number(a), y = Number(b);
+    if (!isFinite(x) || !isFinite(y)) return false;
+    return Math.round(x * 100) === Math.round(y * 100);
+  }
+
+  function normName(s){
+    return String(s || "").trim().toLowerCase();
+  }
+  function keyForEmp(e){
+    const id = e.empId || e.employeeId || e.id;
+    if (id) return `id:${String(id)}`;
+    return `name:${normName(e.first)}|${normName(e.last)}`;
+  }
+
+  function setWageByKey(list, key, wage){
+    if (!Array.isArray(list)) return false;
+    let changed = false;
+    for (const e of list) {
+      if (keyForEmp(e) === key) {
+        const cur = Number(e.wage);
+        if (!isFinite(cur) || Math.round(cur*100) !== Math.round(Number(wage)*100)) {
+          e.wage = Number(wage);
+          changed = true;
+        }
+      }
+    }
+    return changed;
+  }
+
+  async function showWageMismatchModal(mismatches){
+    const modal = document.getElementById("wageMismatchModal");
+    const tbody = document.getElementById("wageMismatchTbody");
+    const countEl = document.getElementById("wageMismatchCount");
+    const btnApply = document.getElementById("wageMismatchApplyBtn");
+    const btnCancel = document.getElementById("wageMismatchCancelBtn");
+
+    if (!modal || !tbody || !countEl || !btnApply || !btnCancel) {
+      const decisions = new Map();
+      for (const m of mismatches) {
+        const msg =
+          `Wage mismatch for ${m.name}\n\n` +
+          `Saved: ${moneyLabel(m.currentWage)}\n` +
+          `7shifts: ${moneyLabel(m.incomingWage)}\n\n` +
+          `OK = Use 7shifts wage\nCancel = Keep saved wage`;
+        const use7 = confirm(msg);
+        decisions.set(m.key, use7 ? "use7" : "keep");
+      }
+      return { applied:true, decisions };
+    }
+
+    countEl.textContent = String(mismatches.length);
+    tbody.innerHTML = "";
+
+    mismatches.forEach((m, i) => {
+      const tr = document.createElement("tr");
+
+      function cell(text){
+        const td = document.createElement("td");
+        td.style.padding = "8px";
+        td.style.borderBottom = "1px solid var(--line)";
+        td.textContent = text;
+        return td;
+      }
+
+      tr.appendChild(cell(m.name));
+      tr.appendChild(cell(m.dept || "FOH"));
+      tr.appendChild(cell(moneyLabel(m.currentWage)));
+      tr.appendChild(cell(moneyLabel(m.incomingWage)));
+
+      const tdChoice = document.createElement("td");
+      tdChoice.style.padding = "8px";
+      tdChoice.style.borderBottom = "1px solid var(--line)";
+
+      const wrap = document.createElement("div");
+      wrap.className = "radioWrap";
+
+      const name = `wm_${i}`;
+      wrap.innerHTML = `
+        <label style="display:flex;gap:6px;align-items:center;cursor:pointer">
+          <input type="radio" name="${name}" value="keep" checked />
+          Keep existing
+        </label>
+        <label style="display:flex;gap:6px;align-items:center;cursor:pointer">
+          <input type="radio" name="${name}" value="use7" />
+          Use 7shifts
+        </label>
+      `;
+
+      tdChoice.appendChild(wrap);
+      tr.appendChild(tdChoice);
+      tbody.appendChild(tr);
+    });
+
+    modal.classList.remove("hidden");
+
+    return await new Promise((resolve) => {
+      const cleanup = () => {
+        btnApply.onclick = null;
+        btnCancel.onclick = null;
+        modal.classList.add("hidden");
+      };
+
+      btnCancel.onclick = () => {
+        cleanup();
+        resolve({ applied:false, decisions: new Map() });
+      };
+
+      btnApply.onclick = () => {
+        const decisions = new Map();
+        mismatches.forEach((m, i) => {
+          const groupName = `wm_${i}`;
+          const chosen = modal.querySelector(`input[name="${groupName}"]:checked`)?.value || "keep";
+          decisions.set(m.key, chosen);
+        });
+        cleanup();
+        resolve({ applied:true, decisions });
+      };
+    });
+  }
+
+  function lockStyleInput(inp, locked){
+    inp.readOnly = locked;
+    inp.style.border = locked ? "1px solid transparent" : "1px solid var(--line)";
+    inp.style.background = "transparent";
+    inp.style.color = "var(--ink)";
+    inp.style.borderRadius = "8px";
+    inp.style.padding = "6px 8px";
+  }
+  function makeInput(value, placeholder=""){
+    const inp = document.createElement("input");
+    inp.value = value ?? "";
+    inp.placeholder = placeholder;
+    inp.style.width = "100%";
+    inp.style.fontSize = "0.95rem";
+    return inp;
+  }
+
+  function setRosterButtonsEnabled(){
+    const addBtn = document.getElementById("addEmpBtn");
+    const saveBtn = document.getElementById("saveRosterBtn");
+    const syncBtn = document.getElementById("sync7Btn");
+    const canEdit = !!session.user && session.isAdmin && !session.locked;
+    if (addBtn) addBtn.disabled = !canEdit;
+    if (saveBtn) saveBtn.disabled = !canEdit;
+    if (syncBtn) syncBtn.disabled = !canEdit;
+  }
+
+  // --- master roster ---
+  async function loadMasterRoster(){
+    const snap = await masterRosterRef().get();
+    const d = snap.exists ? (snap.data() || {}) : {};
+    const list = Array.isArray(d.employees) ? d.employees : [];
+    return list.map(e => ({ ...e, active: e.active !== false }));
+  }
+  async function saveMasterRoster(list){
+    await masterRosterRef().set({
+      employees: list,
+      updated_at: new Date().toISOString(),
+      updated_by_uid: session.user.uid,
+      updated_by_email: session.user.email
+    }, { merge:true });
+  }
+
+  // --- schedule doc extractor ---
+  function splitName(full){
+    const parts = String(full || "").trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return {first:"", last:""};
+    return { first: parts[0], last: parts.slice(1).join(" ") };
+  }
+  function normalizeFromObj(obj, deptHint){
+    const o = obj || {};
+    const full = o.name || o.full_name || o.fullName || "";
+    const sp = full ? splitName(full) : null;
+
+    const first = o.first || o.first_name || o.firstName || (sp?.first || "");
+    const last  = o.last || o.last_name || o.lastName || (sp?.last || "");
+
+    const empId = o.employee_id || o.employeeId || o.user_id || o.userId || o.id || null;
+    const empNo = o.employee_number || o.employeeNumber || o.empNo || o.emp_no || "";
+
+    const wage = (o.wage ?? o.hourly_rate ?? o.hourlyRate ?? o.rate ?? o.pay_rate ?? o.payRate ?? null);
+
+    return {
+      dept: deptHint || (o.dept || o.department || "FOH"),
+      empId: empId ? String(empId) : null,
+      empNo: String(empNo || ""),
+      first: String(first || "").trim(),
+      last: String(last || "").trim(),
+      wage: wage == null ? null : Number(wage),
+      active: true,
+      _editing: false
+    };
+  }
+
+  function extractEmployeesFromPayrollScheduleDoc(docData){
+    if (!docData) return [];
+    const raw = docData.employees;
+    if (!Array.isArray(raw)) return [];
+
+    const out = [];
+
+    for (const item of raw) {
+      if (!item) continue;
+
+      if (typeof item === "string") {
+        const { first, last } = splitName(item);
+        if (first || last) {
+          out.push({
+            dept: "FOH",
+            empId: null,
+            empNo: "",
+            first,
+            last,
+            wage: null,
+            active: true,
+            _editing: false
+          });
+        }
+        continue;
+      }
+
+      if (typeof item === "object") {
+        out.push(normalizeFromObj(item, item.dept || item.department || "FOH"));
+      }
+    }
+
+    return out.filter(e => e.first || e.last);
+  }
+
+  // --- merge add-only ---
+  function mergeAddOnly(baseList, incomingList){
+    const map = new Map();
+    baseList.forEach(e => map.set(keyForEmp(e), e));
+    let added = 0;
+
+    for (const inc of incomingList) {
+      const k = keyForEmp(inc);
+
+      if (!map.has(k)) {
+        map.set(k, { ...inc, _editing:false });
+        added++;
+        continue;
+      }
+
+      const cur = map.get(k);
+
+      if (!cur.empNo && inc.empNo) cur.empNo = inc.empNo;
+
+      const curW = Number(cur.wage);
+      const incW = Number(inc.wage);
+      const curHasGoodWage = isFinite(curW) && curW > 0;
+      const incHasGoodWage = isFinite(incW) && incW > 0;
+
+      if (!curHasGoodWage && incHasGoodWage) {
+        cur.wage = incW;
+      }
+
+      if (!cur.empId && inc.empId) cur.empId = inc.empId;
+
+      const curDept = String(cur.dept || "").toUpperCase();
+      const incDept = String(inc.dept || "").toUpperCase();
+
+      if (!curDept && incDept) cur.dept = incDept;
+      if (curDept === "FOH" && incDept === "BOH") cur.dept = "BOH";
+    }
+
+    return { list: Array.from(map.values()), added };
+  }
+
+  // --- render roster (per-row edit/done) ---
+  function renderRoster(){
+    const fohBody = document.querySelector("#fohTable tbody");
+    const bohBody = document.querySelector("#bohTable tbody");
+    if (!fohBody || !bohBody) return;
+
+    fohBody.innerHTML = "";
+    bohBody.innerHTML = "";
+
+    const list = (session.rosterEmployees || []).slice();
+
+    const foh = list.filter(e => (e.dept || "FOH").toUpperCase() !== "BOH")
+      .sort((a,b)=> String(a.first||"").localeCompare(String(b.first||""), undefined, {sensitivity:"base"}));
+
+    const boh = list.filter(e => (e.dept || "BOH").toUpperCase() === "BOH")
+      .sort((a,b)=> String(a.first||"").localeCompare(String(b.first||""), undefined, {sensitivity:"base"}));
+
+    function addRow(tbody, emp){
+      const tr = document.createElement("tr");
+
+      function td(node){
+        const cell = document.createElement("td");
+        cell.style.padding = "8px";
+        cell.style.borderBottom = "1px solid var(--line)";
+        cell.appendChild(node);
+        return cell;
+      }
+
+      const canEditThisRow = !!session.user && session.isAdmin && !session.locked;
+      const isEditing = !!emp._editing;
+
+      const firstInp = makeInput(emp.first || "", "First");
+      const lastInp  = makeInput(emp.last || "", "Last");
+      const numInp   = makeInput(emp.empNo || "", "1234");
+      const wageInp  = makeInput(emp.wage != null ? money2(emp.wage) : "", "0.00");
+
+      const shouldLock = !(canEditThisRow && isEditing);
+      lockStyleInput(firstInp, shouldLock);
+      lockStyleInput(lastInp, shouldLock);
+      lockStyleInput(numInp, shouldLock);
+      lockStyleInput(wageInp, shouldLock);
+
+      firstInp.oninput = () => { if (!shouldLock) emp.first = firstInp.value.trim(); };
+      lastInp.oninput  = () => { if (!shouldLock) emp.last  = lastInp.value.trim(); };
+      numInp.oninput   = () => { if (!shouldLock) emp.empNo = numInp.value.trim(); };
+      wageInp.oninput  = () => { if (!shouldLock) emp.wage  = Number(wageInp.value); };
+
+      tr.appendChild(td(firstInp));
+      tr.appendChild(td(lastInp));
+      tr.appendChild(td(numInp));
+      tr.appendChild(td(wageInp));
+
+      const actionWrap = document.createElement("div");
+      actionWrap.style.display = "flex";
+      actionWrap.style.gap = "8px";
+      actionWrap.style.justifyContent = "flex-end";
+
+      const editBtn = document.createElement("button");
+      editBtn.className = "btn";
+      editBtn.textContent = isEditing ? "Done" : "Edit";
+      editBtn.disabled = !canEditThisRow;
+      editBtn.onclick = () => {
+        if (!canEditThisRow) return;
+        emp._editing = !emp._editing;
+        setRosterStatus("Edited (not saved)");
+        renderRoster();
+      };
+
+      const rmBtn = document.createElement("button");
+      rmBtn.className = "btn danger";
+      rmBtn.textContent = "Remove";
+      rmBtn.disabled = !canEditThisRow;
+
+      rmBtn.onclick = async () => {
+        if (!canEditThisRow) return;
+
+        const label = `${emp.first || ""} ${emp.last || ""}`.trim() || "(unnamed)";
+        const ok = confirm(`Are you sure you would like to remove this employee?\n\n${label}`);
+        if (!ok) return;
+
+        // remove from current pay period roster (UI state)
+        session.rosterEmployees = (session.rosterEmployees || []).filter(x => x !== emp);
+
+        // mark inactive in MASTER roster (so future periods won't include them)
+        const master = await loadMasterRoster();
+        const k = keyForEmp(emp);
+
+        const nextMaster = master.map(m => {
+          if (keyForEmp(m) !== k) return m;
+          return {
+            ...m,
+            active: false,
+            inactive_at: new Date().toISOString(),
+            inactive_by: session.user.email
+          };
+        });
+
+        await saveMasterRoster(nextMaster);
+
+        setRosterStatus("Removed (save roster)");
+        renderRoster();
+      };
+
+      actionWrap.appendChild(editBtn);
+      actionWrap.appendChild(rmBtn);
+
+      const tdActions = document.createElement("td");
+      tdActions.style.padding = "8px";
+      tdActions.style.borderBottom = "1px solid var(--line)";
+      tdActions.appendChild(actionWrap);
+
+      tr.appendChild(tdActions);
+      tbody.appendChild(tr);
+    }
+
+    // ✅ actually render rows
+    foh.forEach(emp => addRow(fohBody, emp));
+    boh.forEach(emp => addRow(bohBody, emp));
+  }
+
+  // ✅ Sync from payrollSchedule snapshots (add-only) + wage mismatch review
+  async function syncRosterFrom7shifts(){
+    if (!session.periodStartISO) return { added: 0 };
+
+    setRosterStatus("Syncing 7shifts…");
+
+    const week1 = session.periodStartISO;
+    const week2 = isoFromUTC(addDaysUTC(utcDateFromISO(session.periodStartISO), 7));
+
+    const snaps = await Promise.all([
+      payrollScheduleRef(week1).get(),
+      payrollScheduleRef(week2).get(),
+    ]);
+
+    const from7 = [];
+    snaps.forEach(s => {
+      if (!s.exists) return;
+      const d = s.data() || {};
+      from7.push(...extractEmployeesFromPayrollScheduleDoc(d));
+    });
+
+    if (!from7.length) {
+      setRosterStatus("No payrollSchedule snapshots found for this pay period.");
+      return { added: 0 };
+    }
+
+    const master = await loadMasterRoster();
+    const activeMaster = master.filter(e => e.active !== false);
+
+    const mergedMaster = mergeAddOnly(activeMaster, from7);
+    const addedToMaster = mergedMaster.added;
+
+    const inactive = master.filter(e => e.active === false);
+    const nextMaster = [...inactive, ...mergedMaster.list];
+
+    const base = session.rosterEmployees || [];
+    const mergedPeriod = mergeAddOnly(base, from7);
+
+    const periodMap = new Map((mergedPeriod.list || []).map(e => [keyForEmp(e), e]));
+    const masterMap = new Map((nextMaster || []).map(e => [keyForEmp(e), e]));
+    const incomingMap = new Map(from7.map(e => [keyForEmp(e), e]));
+
+    const mismatches = [];
+    for (const [k, inc] of incomingMap.entries()) {
+      const incW = Number(inc.wage);
+      if (!isFinite(incW) || incW <= 0) continue;
+
+      const per = periodMap.get(k);
+      const mas = masterMap.get(k);
+
+      const savedW = per?.wage ?? mas?.wage;
+      const curW = Number(savedW);
+
+      if (isFinite(curW) && curW > 0 && !sameWage(curW, incW)) {
+        const name =
+          `${(per?.first || mas?.first || inc.first || "").trim()} ${(per?.last || mas?.last || inc.last || "").trim()}`
+          .trim() || "(unnamed)";
+
+        const dept = (per?.dept || mas?.dept || inc.dept || "FOH");
+        mismatches.push({ key: k, name, dept, currentWage: curW, incomingWage: incW });
+      }
+    }
+
+    let masterDirty = false;
+    let periodDirty = false;
+
+    if (mismatches.length) {
+      setRosterStatus(`⚠️ Wage mismatches: ${mismatches.length} (review required)`);
+      const res = await showWageMismatchModal(mismatches);
+
+      if (res?.applied) {
+        for (const m of mismatches) {
+          const choice = res.decisions.get(m.key) || "keep";
+          if (choice === "use7") {
+            if (setWageByKey(nextMaster, m.key, m.incomingWage)) masterDirty = true;
+            if (setWageByKey(mergedPeriod.list, m.key, m.incomingWage)) periodDirty = true;
+          }
+        }
+      }
+    }
+
+    if (addedToMaster > 0 || masterDirty) {
+      await saveMasterRoster(nextMaster);
+    }
+
+    session.rosterEmployees = (mergedPeriod.list || []).map(e => ({ ...e, _editing: false }));
+    renderRoster();
+
+    if (mergedPeriod.added > 0) {
+      setRosterStatus(`Synced: +${mergedPeriod.added} new (save roster)`);
+    } else if (periodDirty) {
+      setRosterStatus("Synced: wages updated (save roster)");
+    } else if (mismatches.length) {
+      setRosterStatus("Synced: wage review completed (save roster if you changed anything)");
+    } else {
+      setRosterStatus("Synced: no new employees");
+    }
+
+    return { added: mergedPeriod.added };
+  }
+
+  async function loadRosterForCurrentPeriod(){
+    if (!session.periodStartISO) return;
+
+    setRosterStatus("Loading…");
+
+    const snap = await rosterRef(session.periodStartISO).get();
+
+    if (!snap.exists) {
+      const master = await loadMasterRoster();
+      session.rosterEmployees = master.filter(e => e.active !== false).map(e => ({ ...e, _editing:false }));
+      renderRoster();
+
+      await syncRosterFrom7shifts();
+      return;
+    }
+
+    const d = snap.data() || {};
+    session.rosterEmployees = Array.isArray(d.employees) ? d.employees.map(e => ({ ...e, _editing:false })) : [];
+    renderRoster();
+
+    await syncRosterFrom7shifts();
+  }
+
+  async function saveRosterForCurrentPeriod(){
+    if (!session.periodStartISO) return;
+
+    if (session.locked) {
+      alert("This pay period is locked. Unlock it to edit the roster.");
+      return;
+    }
+
+    setRosterStatus("Saving…");
+
+    const clean = (session.rosterEmployees || []).map(e => {
+      const { _editing, ...rest } = e;
+      return rest;
+    });
+
+    await rosterRef(session.periodStartISO).set({
+      periodStart: session.periodStartISO,
+      periodEnd: session.periodEndISO,
+      employees: clean,
+      updated_at: new Date().toISOString(),
+      updated_by_uid: session.user.uid,
+      updated_by_email: session.user.email
+    }, { merge:true });
+
+    setRosterStatus("Saved");
+  }
+
+  function addEmployeeBlank(){
+    if (session.locked) {
+      alert("This pay period is locked. Unlock it to edit the roster.");
+      return;
+    }
+
+    const dept = prompt("Department? Enter FOH or BOH:", "FOH");
+    if (!dept) return;
+    const D = dept.trim().toUpperCase() === "BOH" ? "BOH" : "FOH";
+
+    session.rosterEmployees = session.rosterEmployees || [];
+    session.rosterEmployees.push({
+      dept: D,
+      empId: null,
+      empNo: "",
+      first: "",
+      last: "",
+      wage: null,
+      active: true,
+      _editing: true
+    });
+
+    setRosterStatus("Added (not saved)");
+    renderRoster();
+  }
+
+  function setLockedUI(locked){
+    session.locked = !!locked;
+    ui.lockedLabel.textContent = locked ? "Yes" : "No";
+    ui.lockedLabel.className = locked ? "statusOk" : "statusBad";
+    setRosterButtonsEnabled();
+    renderRoster();
+
+    ui.lockBtn.classList.toggle("hidden", !session.isAdmin || locked);
+    ui.unlockBtn.classList.toggle("hidden", !session.isAdmin || !locked);
+  }
+
+  function setPeriodLabel(){
+    if(!session.periodStartISO || !session.periodEndISO) return;
+    ui.periodLabel.textContent = `${session.periodStartISO} → ${session.periodEndISO}`;
+  }
+
+  async function loadOrCreateAnchor(){
+    const snap = await settingsRef().get();
+    const data = snap.exists ? snap.data() : null;
+
+    if (data?.anchorMonday) {
+      session.anchorISO = data.anchorMonday;
+      return;
+    }
+
+    session.anchorISO = "2026-01-05";
+
+    if (session.isAdmin) {
+      await settingsRef().set({
+        anchorMonday: session.anchorISO,
+        updated_at: new Date().toISOString(),
+        updated_by_uid: session.user.uid,
+        updated_by_email: session.user.email
+      }, { merge:true });
+    }
+  }
+
+  async function loadPeriod(periodStartISO){
+    session.periodStartISO = periodStartISO;
+    session.periodEndISO = isoFromUTC(addDaysUTC(utcDateFromISO(periodStartISO), 13));
+    setPeriodLabel();
+
+    setStatus("Loading pay period…");
+
+    const snap = await periodRef(periodStartISO).get();
+
+    if (!snap.exists) {
+      await periodRef(periodStartISO).set({
+        periodStart: session.periodStartISO,
+        periodEnd: session.periodEndISO,
+        locked: false,
+        created_at: new Date().toISOString(),
+      }, { merge:true });
+
+      setLockedUI(false);
+      await loadRosterForCurrentPeriod();
+      setStatus("✅ Ready");
+      return;
+    }
+
+    const d = snap.data() || {};
+    setLockedUI(!!d.locked);
+    await loadRosterForCurrentPeriod();
+    setStatus("✅ Ready");
+  }
+
+  async function gotoRelativePeriod(deltaPeriods){
+    const startUTC = utcDateFromISO(session.periodStartISO);
+    const nextUTC = addDaysUTC(startUTC, deltaPeriods * 14);
+    await loadPeriod(isoFromUTC(nextUTC));
+  }
+
+  async function setLock(desired){
+    if (!session.isAdmin) return;
+    await periodRef(session.periodStartISO).set({
+      periodStart: session.periodStartISO,
+      periodEnd: session.periodEndISO,
+      locked: !!desired,
+      locked_at: new Date().toISOString(),
+      locked_by_uid: session.user.uid,
+      locked_by_email: session.user.email
+    }, { merge:true });
+
+    setLockedUI(!!desired);
+  }
+
+  function wirePayrollButtons(){
+    if (ui.prevPeriodBtn) ui.prevPeriodBtn.onclick = () => gotoRelativePeriod(-1);
+    if (ui.nextPeriodBtn) ui.nextPeriodBtn.onclick = () => gotoRelativePeriod(1);
+    if (ui.lockBtn) ui.lockBtn.onclick = () => setLock(true);
+    if (ui.unlockBtn) ui.unlockBtn.onclick = () => setLock(false);
+  }
+  wirePayrollButtons();
+
+  async function initPayroll(user, isAdmin){
+    session.user = user;
+    session.isAdmin = isAdmin;
+
+    db = firebase.firestore();
+
+    await loadOrCreateAnchor();
+
+    const anchorUTC = utcDateFromISO(session.anchorISO);
+    const startUTC = periodStartForDate(todayUTC(), anchorUTC);
+    const startISO = isoFromUTC(startUTC);
+
+    await loadPeriod(startISO);
+  }
+
+  document.getElementById("sync7Btn")?.addEventListener("click", syncRosterFrom7shifts);
+  document.getElementById("addEmpBtn")?.addEventListener("click", addEmployeeBlank);
+  document.getElementById("saveRosterBtn")?.addEventListener("click", saveRosterForCurrentPeriod);
+
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+
+  els.loginBtn.addEventListener("click", async () => {
+    const email = prompt("Email:");
+    const pass  = prompt("Password:");
+    if(!email || !pass) return;
+    setStatus("Signing in…");
+    try {
+      await auth.signInWithEmailAndPassword(email.trim(), pass);
+    } catch (e) {
+      console.error(e);
+      setStatus("❌ Login failed (check console).");
+      alert(e.message || String(e));
+    }
+  });
+
+  els.logoutBtn.addEventListener("click", async () => {
+    setStatus("Signing out…");
+    await auth.signOut();
+  });
+
+  auth.onAuthStateChanged((user) => {
+    if (!user) {
+      els.userPill.textContent = "Not signed in";
+      els.loginBtn.classList.remove("hidden");
+      els.logoutBtn.classList.add("hidden");
+      setAdmin(false);
+      showApp(false);
+      setStatus("Signed out");
+      return;
+    }
+
+    const isAllowed = ALLOWED_UIDS.includes(user.uid) || ADMIN_UIDS.includes(user.uid);
+    const isAdmin = ADMIN_UIDS.includes(user.uid);
+
+    els.userPill.textContent = `${user.email} (${user.uid.slice(0,6)}…)`;
+    els.loginBtn.classList.add("hidden");
+    els.logoutBtn.classList.remove("hidden");
+    setAdmin(isAdmin);
+    showApp(isAllowed);
+
+    setStatus(isAllowed ? "✅ Ready" : "🚫 Not allow-listed");
+
+    if (isAllowed) {
+      initPayroll(user, isAdmin).catch(err => {
+        console.error(err);
+        setStatus("❌ Payroll init failed: " + (err?.code || err?.message || String(err)));
+      });
+    }
+  });
+</script>
+</body>
+</html>
