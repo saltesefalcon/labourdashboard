@@ -64,13 +64,12 @@ function normalizeLocKey(k) {
   const s = String(k || "").trim().toLowerCase();
   if (s === "cesoar") return "cesoar"; // keep if you used this typo anywhere
   if (s === "ceso ir" || s === "ce soir") return "cesoar";
+  if (s === "ceso i r") return "cesoar";
   if (s === "cesoir") return "cesoar";
   return s;
 }
 
 function locEnvPrefix(locKey) {
-  // Map your location key -> env prefix
-  // NOTE: your payroll app uses keys like: beacon, tulia, prohibition, cesoar
   switch (normalizeLocKey(locKey)) {
     case "beacon": return "BEACON";
     case "tulia": return "TULIA";
@@ -97,33 +96,6 @@ function initFirebaseAdminFromEnv() {
   admin.initializeApp({
     credential: admin.credential.cert(sa),
   });
-}
-
-// ---------- helpers ----------
-function firstDefined(...vals) {
-  for (const v of vals) {
-    if (v !== undefined && v !== null && v !== "") return v;
-  }
-  return null;
-}
-
-function numOrNull(v) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-
-// 7shifts sometimes represents wage as cents (e.g., 2300 => $23.00).
-// Heuristic: if it's an integer >= 100 (and not crazy huge), treat as cents.
-function wageToDollarsMaybe(v) {
-  if (v == null) return null;
-  const n = Number(v);
-  if (!Number.isFinite(n)) return null;
-
-  const isInt = Math.floor(n) === n;
-  if (isInt && n >= 100 && n <= 20000) {
-    return n / 100;
-  }
-  return n;
 }
 
 // ---------- 7shifts fetch ----------
@@ -154,8 +126,6 @@ function pickTotals(t) {
     "regular_pay",
     "overtime_hours",
     "overtime_pay",
-    "double_overtime_hours",
-    "double_overtime_pay",
     "holiday_hours",
     "holiday_pay",
     "compliance_exceptions_pay",
@@ -183,7 +153,6 @@ function pickTotals(t) {
 }
 
 function safeUserInfo(u) {
-  // 7shifts report users typically have u.user containing identity fields
   const ui = u?.user || u?.user_information || u?.userInfo || {};
   const id =
     ui.id ??
@@ -200,86 +169,87 @@ function safeUserInfo(u) {
   };
 }
 
-// Convert a single shift object from 7shifts detailed report into a compact row.
-// We keep it flexible because the exact keys can vary per account/report version.
-function shiftToRow(s, ui, locKey) {
-  const src = s || {};
+// ---- NEW: shift row normalizer (keeps docs small but UI-friendly) ----
+function num(v) {
+  const x = Number(v);
+  return Number.isFinite(x) ? x : null;
+}
 
-  const roleId = firstDefined(src.role_id, src.roleId, src.position_id, src.positionId, src.role, src.roleID);
+function totalPayFromRow(r) {
+  const explicit = num(r.total_pay);
+  if (explicit != null) return explicit;
+  const sum =
+    (num(r.regular_pay) ?? 0) +
+    (num(r.overtime_pay) ?? 0) +
+    (num(r.double_overtime_pay) ?? 0) +
+    (num(r.holiday_pay) ?? 0);
+  return sum;
+}
 
-  const wageRaw = firstDefined(
-    src.hourly_wage,
-    src.hourlyWage,
-    src.wage,
-    src.hourly_rate,
-    src.hourlyRate,
-    src.pay_rate,
-    src.payRate
-  );
-
-  // Date/time fields commonly seen: date + label (e.g., "2026-01-09 11:44:00", "11:44AM - 2:45PM")
-  const dateStr = firstDefined(src.date, src.shift_date, src.shiftDate);
-  const label = firstDefined(src.label, src.time_label, src.timeLabel);
-
-  // Store in/out if present; otherwise keep label and parse later in the app.
-  const inTime = firstDefined(src.in_time, src.inTime, src.start, src.start_time, src.startTime);
-  const outTime = firstDefined(src.out_time, src.outTime, src.end, src.end_time, src.endTime);
-
-  // Totals at shift-level (best-effort)
-  const regularHours = numOrNull(firstDefined(src.regular_hours, src.regularHours));
-  const overtimeHours = numOrNull(firstDefined(src.overtime_hours, src.overtimeHours));
-  const doubleOvertimeHours = numOrNull(firstDefined(src.double_overtime_hours, src.doubleOvertimeHours));
-  const holidayHours = numOrNull(firstDefined(src.holiday_hours, src.holidayHours));
-
-  const regularPay = numOrNull(firstDefined(src.regular_pay, src.regularPay));
-  const overtimePay = numOrNull(firstDefined(src.overtime_pay, src.overtimePay));
-  const doubleOvertimePay = numOrNull(firstDefined(src.double_overtime_pay, src.doubleOvertimePay));
-  const holidayPay = numOrNull(firstDefined(src.holiday_pay, src.holidayPay));
-  const totalPay = numOrNull(firstDefined(src.total_pay, src.totalPay));
-
-  const row = {
+function normalizeShiftRow(shift, ui, locKey, weekStartISO) {
+  const s = shift || {};
+  return {
     locKey,
-    location_id: firstDefined(src.location_id, src.locationId) ?? null,
+    weekStart: weekStartISO,
 
     // identity
-    user_id: ui?.user_id ?? (src.user_id ?? null),
-    employee_id: ui?.employee_id ?? null,
-    punch_id: ui?.punch_id ?? null,
-    first_name: ui?.first_name ?? "",
-    last_name: ui?.last_name ?? "",
+    user_id: ui.user_id ?? null,
+    employee_id: ui.employee_id ?? null,
+    first_name: String(ui.first_name || "").trim(),
+    last_name: String(ui.last_name || "").trim(),
 
-    // shift
-    shift_id: firstDefined(src.id, src.shift_id, src.shiftId) ?? null,
-    week_label: firstDefined(src.week_label, src.weekLabel) ?? null,
-    day_label: firstDefined(src.day_label, src.dayLabel) ?? null,
-    date: dateStr ?? null,
-    label: label ?? null,
-    in_time: inTime ?? null,
-    out_time: outTime ?? null,
+    // time/label (7shifts shapes vary; keep what we can)
+    date: s.date ?? s.day ?? s.shift_date ?? s.work_date ?? null,
+    label: s.label ?? s.shift_label ?? null,
+    in_time: s.in_time ?? s.inTime ?? s.clock_in ?? null,
+    out_time: s.out_time ?? s.outTime ?? s.clock_out ?? null,
 
-    role_id: roleId == null ? null : Number(roleId),
+    // role + wage
+    role_id: s.role_id ?? s.roleId ?? s.role ?? null,
+    wage: num(s.wage ?? s.hourly_wage ?? s.rate ?? s.hourly_rate),
 
-    // wage
-    wage_raw: wageRaw == null ? null : wageRaw,
-    wage: wageRaw == null ? null : wageToDollarsMaybe(wageRaw),
+    // hours
+    regular_hours: num(s.regular_hours),
+    overtime_hours: num(s.overtime_hours),
+    double_overtime_hours: num(s.double_overtime_hours),
+    holiday_hours: num(s.holiday_hours),
 
-    // hours/pay fields (best effort)
-    regular_hours: regularHours,
-    overtime_hours: overtimeHours,
-    double_overtime_hours: doubleOvertimeHours,
-    holiday_hours: holidayHours,
-
-    regular_pay: regularPay,
-    overtime_pay: overtimePay,
-    double_overtime_pay: doubleOvertimePay,
-    holiday_pay: holidayPay,
-    total_pay: totalPay,
-
-    // breaks as strings if present
-    breaks: Array.isArray(src.breaks) ? src.breaks : [],
+    // pay
+    regular_pay: num(s.regular_pay),
+    overtime_pay: num(s.overtime_pay),
+    double_overtime_pay: num(s.double_overtime_pay),
+    holiday_pay: num(s.holiday_pay),
+    total_pay: totalPayFromRow(s),
   };
+}
 
-  return row;
+function extractShiftRows(report, users, locKey, weekStartISO) {
+  // Some variants return a top-level array
+  if (Array.isArray(report?.shift_rows)) {
+    return report.shift_rows.map(r => ({ ...r, locKey, weekStart: weekStartISO }));
+  }
+
+  // Common variant: per-user per-week shifts
+  const out = [];
+  const uArr = Array.isArray(users) ? users : [];
+  for (const u of uArr) {
+    const ui = safeUserInfo(u);
+    const weeks = Array.isArray(u?.weeks) ? u.weeks : [];
+    for (const w of weeks) {
+      const shifts = Array.isArray(w?.shifts) ? w.shifts : [];
+      for (const sh of shifts) {
+        out.push(normalizeShiftRow(sh, ui, locKey, weekStartISO));
+      }
+    }
+
+    // Sometimes "shifts" is directly on the user object
+    if (!weeks.length && Array.isArray(u?.shifts)) {
+      for (const sh of u.shifts) {
+        out.push(normalizeShiftRow(sh, ui, locKey, weekStartISO));
+      }
+    }
+  }
+  return out;
 }
 
 // ---------- firestore refs ----------
@@ -304,7 +274,7 @@ async function main() {
   // punches=true => worked hours/wages; punches=false => scheduled hours/wages
   const punches = String(args.punches ?? "true").toLowerCase() !== "false";
 
-  // Keep docs small by default: detailed=false (no shift rows)
+  // detailed=true => include shift-level rows (shift_rows)
   const detailed = String(args.detailed ?? "false").toLowerCase() === "true";
 
   if (!isISODate(weekOf)) {
@@ -352,7 +322,6 @@ async function main() {
       const wStart = utcDateFromISO(w);
       const wEndISO = isoFromUTC(addDaysUTC(wStart, 6)); // Monday->Sunday
 
-      // 7shifts Hours & Wages endpoint (report)
       const base = "https://api.7shifts.com/v2/reports/hours_and_wages";
       const qs = new URLSearchParams();
       qs.set("company_id", String(companyId));
@@ -369,24 +338,14 @@ async function main() {
 
       const raw = await fetchJson(url, token);
 
-      // Some 7shifts endpoints wrap in { data: ... }
       const report = raw?.data ?? raw ?? {};
       const total = pickTotals(report.total || {});
       const settings = report.settings || report.filters || null;
 
       const users = Array.isArray(report.users) ? report.users : [];
 
-      // --- NEW: shift_rows when detailed=true ---
-      const shiftRows = [];
-      if (detailed) {
-        for (const u of users) {
-          const ui = safeUserInfo(u);
-          const shifts = Array.isArray(u.shifts) ? u.shifts : [];
-          for (const s of shifts) {
-            shiftRows.push(shiftToRow(s, ui, locKey));
-          }
-        }
-      }
+      // ✅ NEW: extract shift rows when detailed=true
+      const shift_rows = detailed ? extractShiftRows(report, users, locKey, w) : [];
 
       const slimUsers = users.map(u => {
         const ui = safeUserInfo(u);
@@ -396,6 +355,7 @@ async function main() {
               week: x.week || null,
               salaried: !!x.salaried,
               total: pickTotals(x.total || {}),
+              // shifts are intentionally NOT stored here (we store shift_rows at top-level)
             }))
           : [];
 
@@ -417,18 +377,17 @@ async function main() {
         settings,
         user_count: slimUsers.length,
         users: slimUsers,
-        // ✅ only present when detailed=true (so compact snapshots stay small)
-        ...(detailed ? { shift_rows: shiftRows } : {}),
+
+        // ✅ what the UI table reads:
+        shift_row_count: shift_rows.length,
+        shift_rows,
+
         fetched_at: new Date().toISOString(),
         source: "7shifts:reports/hours_and_wages",
       };
 
       await payrollHoursWagesRef(db, locKey, w).set(doc, { merge: true });
-
-      console.log(
-        `[WRITE] companies/aidan/locations/${locKey}/payrollHoursWages/${w} users=${slimUsers.length}` +
-        (detailed ? ` shift_rows=${shiftRows.length}` : "")
-      );
+      console.log(`[WRITE] companies/aidan/locations/${locKey}/payrollHoursWages/${w} users=${slimUsers.length} shift_rows=${shift_rows.length}`);
     }
   }
 

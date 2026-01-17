@@ -74,7 +74,7 @@
     .badge b{ color:var(--ink); }
 
     table { width:100%; border-collapse:collapse; }
-    th, td { border-bottom:1px solid var(--line); padding:8px; text-align:left; }
+    th, td { border-bottom:1px solid var(--line); padding:8px; text-align:left; white-space:nowrap; }
     th { color:var(--muted); font-weight:600; }
   </style>
 
@@ -230,6 +230,51 @@
         <div class="note" style="margin-top:10px">
           If a week shows “No snapshot found”, run the GitHub Action and backfill that <span class="mono">week_of</span>.
         </div>
+
+        <!-- ✅ NEW: Detailed shift rows table -->
+        <div class="card" style="margin-top:12px">
+          <h2>Detailed shift rows <span class="muted">(one row per shift)</span></h2>
+
+          <div class="note" style="margin-bottom:10px">
+            This table is built from <span class="mono">shift_rows</span> inside Week A + Week B snapshots.
+            It requires snapshots written with <span class="mono">detailed=true</span>.
+            Sort: <b>Last, First</b> A→Z, then shift start time (earliest → latest).
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0 12px">
+            <span class="pill"><b>Rows</b> <span id="hwRowsStatus" class="muted">—</span></span>
+          </div>
+
+          <div style="overflow:auto">
+            <table id="hwDetailTable">
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Date</th>
+                  <th>First</th>
+                  <th>Last</th>
+                  <th>Location</th>
+                  <th>In Time</th>
+                  <th>Out Time</th>
+                  <th>Role</th>
+                  <th>Wage</th>
+                  <th>Regular hours</th>
+                  <th>OT hours</th>
+                  <th>Double OT hours</th>
+                  <th>Holiday hours</th>
+                  <th>Regular pay</th>
+                  <th>OT pay</th>
+                  <th>Double OT pay</th>
+                  <th>Holiday pay</th>
+                  <th>Total pay</th>
+                </tr>
+              </thead>
+              <tbody id="hwDetailTbody"></tbody>
+            </table>
+          </div>
+
+          <div id="hwRowsHint" class="note" style="margin-top:10px"></div>
+        </div>
       </div>
 
       <div class="hr"></div>
@@ -381,6 +426,11 @@
     hwWeekBRange: document.getElementById("hwWeekBRange"),
     hwWeekABody: document.getElementById("hwWeekABody"),
     hwWeekBBody: document.getElementById("hwWeekBBody"),
+
+    // ✅ NEW
+    hwRowsStatus: document.getElementById("hwRowsStatus"),
+    hwDetailTbody: document.getElementById("hwDetailTbody"),
+    hwRowsHint: document.getElementById("hwRowsHint"),
   };
 
   let session = {
@@ -458,6 +508,190 @@
     return Math.round(x * 100) === Math.round(y * 100);
   }
   function normName(s){ return String(s || "").trim().toLowerCase(); }
+
+  // ✅ for table: trim trailing zeros (18.20 -> 18.2, 19.00 -> 19)
+  function fmtNum(n, decimals=2){
+    const x = Number(n);
+    if (!isFinite(x)) return "";
+    let s = x.toFixed(decimals);
+    s = s.replace(/\.?0+$/,"");
+    return s;
+  }
+
+  function prettyLoc(locKey){
+    const k = String(locKey || "").toLowerCase();
+    if (k === "beacon") return "Beacon";
+    if (k === "tulia") return "Tulia";
+    if (k === "prohibition") return "Prohibition";
+    if (k === "cesoar" || k === "cesoir") return "Ce Soir";
+    return locKey || "";
+  }
+
+  function parseShiftStartMs(row){
+    const s = row?.date;
+    if (!s) return 0;
+    // common: "2026-01-09 17:00:00"
+    if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/.test(s)) {
+      const iso = s.replace(" ", "T") + "Z";
+      const t = Date.parse(iso);
+      return isFinite(t) ? t : 0;
+    }
+    // date-only
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const t = Date.parse(s + "T00:00:00Z");
+      return isFinite(t) ? t : 0;
+    }
+    const t = Date.parse(s);
+    return isFinite(t) ? t : 0;
+  }
+
+  function dateOnly(row){
+    const s = String(row?.date || "").trim();
+    if (!s) return "";
+    if (s.length >= 10) return s.slice(0,10);
+    return s;
+  }
+
+  function timeFromAny(v){
+    const s = String(v || "").trim();
+    if (!s) return "";
+    // if looks like "2026-01-09 17:00:00"
+    if (/^\d{4}-\d{2}-\d{2}\s+/.test(s)) {
+      const parts = s.split(/\s+/);
+      return (parts[1] || "").trim();
+    }
+    // if looks like ISO
+    if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+      return s.split("T")[1]?.replace("Z","") || s;
+    }
+    return s;
+  }
+
+  function shiftInOut(row){
+    const label = String(row?.label || "").trim();
+    if (label.includes(" - ")) {
+      const [a,b] = label.split(" - ");
+      return { inTime: (a||"").trim(), outTime: (b||"").trim() };
+    }
+    const inTime = timeFromAny(row?.in_time);
+    const outTime = timeFromAny(row?.out_time);
+    return { inTime, outTime };
+  }
+
+  function numOrZero(v){
+    const x = Number(v);
+    return isFinite(x) ? x : 0;
+  }
+
+  function totalPayForRow(r){
+    const explicit = Number(r?.total_pay);
+    if (isFinite(explicit)) return explicit;
+
+    const sum =
+      numOrZero(r?.regular_pay) +
+      numOrZero(r?.overtime_pay) +
+      numOrZero(r?.double_overtime_pay) +
+      numOrZero(r?.holiday_pay);
+
+    return sum;
+  }
+
+  function renderHWDetailRows(docA, docB){
+    const tbody = ui.hwDetailTbody;
+    if (!tbody) return;
+
+    const rowsA = Array.isArray(docA?.shift_rows) ? docA.shift_rows : [];
+    const rowsB = Array.isArray(docB?.shift_rows) ? docB.shift_rows : [];
+    const all = [...rowsA, ...rowsB];
+
+    tbody.innerHTML = "";
+
+    if (!all.length) {
+      if (ui.hwRowsStatus) ui.hwRowsStatus.textContent = "0";
+      if (ui.hwRowsHint) {
+        ui.hwRowsHint.innerHTML =
+          `No detailed rows found. Re-run the snapshot action with <span class="mono">detailed=true</span>, then click “Refresh from Firestore”.`;
+      }
+      return;
+    }
+
+    if (ui.hwRowsHint) ui.hwRowsHint.textContent = "";
+
+    // Sort: Last, First, then shift start ascending
+    all.sort((a,b)=>{
+      const la = normName(a?.last_name || a?.last || "");
+      const lb = normName(b?.last_name || b?.last || "");
+      if (la !== lb) return la.localeCompare(lb, undefined, { sensitivity:"base" });
+
+      const fa = normName(a?.first_name || a?.first || "");
+      const fb = normName(b?.first_name || b?.first || "");
+      if (fa !== fb) return fa.localeCompare(fb, undefined, { sensitivity:"base" });
+
+      const ta = parseShiftStartMs(a);
+      const tb = parseShiftStartMs(b);
+      if (ta !== tb) return ta - tb;
+
+      const al = String(a?.label || "");
+      const bl = String(b?.label || "");
+      return al.localeCompare(bl, undefined, { sensitivity:"base" });
+    });
+
+    if (ui.hwRowsStatus) ui.hwRowsStatus.textContent = String(all.length);
+
+    for (const r of all) {
+      const tr = document.createElement("tr");
+
+      const emp = (r.employee_id ?? r.employeeId ?? r.employee ?? "") || (r.user_id ?? r.userId ?? "");
+      const first = (r.first_name ?? r.first ?? "").trim();
+      const last  = (r.last_name ?? r.last ?? "").trim();
+
+      const loc = prettyLoc(r.locKey || LOC_KEY);
+      const { inTime, outTime } = shiftInOut(r);
+
+      const role = (r.role_id ?? r.roleId ?? r.role ?? "");
+      const wage = (r.wage != null) ? fmtNum(r.wage, 2) : fmtNum(r.wage_raw, 2);
+
+      const regH = fmtNum(numOrZero(r.regular_hours), 2);
+      const otH  = fmtNum(numOrZero(r.overtime_hours), 2);
+      const dotH = fmtNum(numOrZero(r.double_overtime_hours), 2);
+      const holH = fmtNum(numOrZero(r.holiday_hours), 2);
+
+      const regP = fmtNum(numOrZero(r.regular_pay), 2);
+      const otP  = fmtNum(numOrZero(r.overtime_pay), 2);
+      const dotP = fmtNum(numOrZero(r.double_overtime_pay), 2);
+      const holP = fmtNum(numOrZero(r.holiday_pay), 2);
+      const totP = fmtNum(totalPayForRow(r), 2);
+
+      const cells = [
+        emp,
+        dateOnly(r),
+        first,
+        last,
+        loc,
+        inTime,
+        outTime,
+        role === "" ? "" : String(role),
+        wage,
+        regH,
+        otH,
+        dotH,
+        holH,
+        regP,
+        otP,
+        dotP,
+        holP,
+        totP
+      ];
+
+      for (const c of cells) {
+        const td = document.createElement("td");
+        td.textContent = (c == null) ? "" : String(c);
+        tr.appendChild(td);
+      }
+
+      tbody.appendChild(tr);
+    }
+  }
 
   function keyForEmp(e){
     const id = e.empId || e.user_id || e.userId || e.id;
@@ -623,10 +857,8 @@
     const first = o.first || o.first_name || o.firstName || (sp?.first || "");
     const last  = o.last || o.last_name || o.lastName || (sp?.last || "");
 
-    // ✅ empId = 7shifts user_id (stable identity)
     const empId = o.user_id || o.userId || o.id || null;
 
-    // ✅ empNo = 7shifts employee_id (this is the “employee #” you want)
     const empNo =
       o.employee_id || o.employeeId ||
       o.employee_number || o.employeeNumber ||
@@ -1102,6 +1334,9 @@
       renderHWCard(aDoc, ui.hwWeekARange, ui.hwWeekABody, weekA);
       renderHWCard(bDoc, ui.hwWeekBRange, ui.hwWeekBBody, weekB);
 
+      // ✅ NEW: render combined shift rows (Week A + Week B)
+      renderHWDetailRows(aDoc, bDoc);
+
       const have = (aDoc?1:0) + (bDoc?1:0);
       setHWStatus(have ? `Loaded (${have}/2 found)` : "No data for these weeks yet");
     } catch (e) {
@@ -1111,6 +1346,10 @@
       ui.hwWeekBRange.textContent = "—";
       ui.hwWeekABody.innerHTML = `<div class="note"><b>Error:</b> ${e?.message || e}</div>`;
       ui.hwWeekBBody.innerHTML = `<div class="note">If you see “Missing or insufficient permissions”, add a Firestore rules match for <span class="mono">payrollHoursWages</span>.</div>`;
+
+      if (ui.hwRowsStatus) ui.hwRowsStatus.textContent = "—";
+      if (ui.hwDetailTbody) ui.hwDetailTbody.innerHTML = "";
+      if (ui.hwRowsHint) ui.hwRowsHint.textContent = "";
     }
   }
 
