@@ -1,4 +1,4 @@
-name: Payroll hours & wages snapshots (7shifts)
+name: "Payroll hours & wages snapshots (7shifts)"
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ on:
         required: false
         default: "2"
       locations:
-        description: "Comma-separated location keys (beacon,tulia,prohibition,cesoar)"
+        description: "Comma-separated location keys (beacon,tulia,prohibition,cesoir)"
         required: false
         default: "beacon"
       punches:
@@ -68,7 +68,7 @@ jobs:
           INPUT_WEEKS:   ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.weeks)   || '' }}
           INPUT_LOCS:    ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.locations) || '' }}
           INPUT_PUNCHES: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.punches) || '' }}
-          INPUT_DETAILED:${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.detailed) || '' }}
+          INPUT_DETAILED: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.detailed) || '' }}
         run: |
           WEEK_OF="$INPUT_WEEK_OF"
           if [ -z "$WEEK_OF" ]; then
