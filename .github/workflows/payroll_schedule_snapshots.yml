@@ -1,4 +1,4 @@
-name: Payroll schedule snapshots (7shifts)
+name: "Payroll schedule snapshots (7shifts)"
 
 on:
   workflow_dispatch:
@@ -13,16 +13,11 @@ on:
       locations:
         description: "Comma-separated location keys (beacon,tulia,prohibition,cesoir)"
         required: false
-        default: "beacon"
+        default: "beacon,tulia,prohibition,cesoir"
 
   schedule:
-    # GitHub cron is UTC and does NOT support time zones / DST.
-    # We run at BOTH:
-    # - 10:00 UTC (06:00 Toronto during DST / summer)
-    # - 11:00 UTC (06:00 Toronto during Standard Time / winter)
-    # Then we gate: only proceed if it's actually 06:00 in Toronto.
-    - cron: "0 10 * * *"
-    - cron: "0 11 * * *"
+    # Run at 10:00 and 11:00 UTC, then we guard so it only actually runs at 06:00 Toronto.
+    - cron: "0 10,11 * * *"
 
 jobs:
   write_payroll_schedule:
@@ -49,6 +44,15 @@ jobs:
             exit 1
           fi
 
+      - name: Skip unless 06:00 Toronto (schedule only)
+        if: github.event_name == 'schedule'
+        run: |
+          H=$(TZ=America/Toronto date +%H)
+          if [ "$H" != "06" ]; then
+            echo "Not 06:00 Toronto right now (Toronto hour=$H). Exiting."
+            exit 0
+          fi
+
       - name: Compute run vars (week_of / weeks / locations)
         id: vars
         env:
@@ -65,29 +69,13 @@ jobs:
           if [ -z "$WEEKS" ]; then WEEKS="2"; fi
 
           LOCS="$INPUT_LOCS"
-          if [ -z "$LOCS" ]; then LOCS="beacon"; fi
+          if [ -z "$LOCS" ]; then LOCS="beacon,tulia,prohibition,cesoir"; fi
 
           echo "week_of=$WEEK_OF" >> "$GITHUB_OUTPUT"
           echo "weeks=$WEEKS"     >> "$GITHUB_OUTPUT"
           echo "locations=$LOCS" >> "$GITHUB_OUTPUT"
 
           echo "Will run: week_of=$WEEK_OF weeks=$WEEKS locations=$LOCS"
-
-      - name: Gate scheduled runs to 06:00 Toronto only
-        run: |
-          # Manual runs should ALWAYS proceed.
-          if [ "${GITHUB_EVENT_NAME}" != "schedule" ]; then
-            echo "Manual dispatch (or non-schedule). Proceeding."
-            exit 0
-          fi
-
-          HOUR=$(TZ=America/Toronto date +%H)
-          if [ "$HOUR" != "06" ]; then
-            echo "Scheduled run but Toronto hour is $HOUR (not 06). Skipping."
-            exit 0
-          fi
-
-          echo "Toronto hour is 06. Proceeding."
 
       - name: Write payroll schedule snapshots
         env:
@@ -119,10 +107,6 @@ jobs:
           if [ ! -f "$SCRIPT" ]; then
             echo "ERROR: Could not find write_payroll_schedule_snapshot.cjs"
             echo "Looked for scripts/write_payroll_schedule_snapshot.cjs and write_payroll_schedule_snapshot.cjs"
-            echo "Repo root contents:"
-            ls -la
-            echo "scripts/ contents:"
-            ls -la scripts || true
             exit 1
           fi
 
