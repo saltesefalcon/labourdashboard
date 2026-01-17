@@ -22,6 +22,7 @@
     .btn:hover{filter:brightness(1.05)}
     .btn.primary{border-color:rgba(34,197,94,.4)}
     .btn.danger{border-color:rgba(239,68,68,.5)}
+    .btn:disabled{opacity:.55;cursor:not-allowed}
     .row{display:flex;gap:12px;flex-wrap:wrap}
     .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
     .card h2{margin:0 0 10px;font-size:1.05rem}
@@ -39,6 +40,7 @@
     .note{font-size:.9rem;color:var(--muted);line-height:1.35}
     .statusOk{color:var(--accent)}
     .statusBad{color:var(--warn)}
+
     /* --- Wage mismatch modal --- */
     .modalOverlay{
       position:fixed; inset:0;
@@ -70,6 +72,10 @@
       font-size:.85rem; color:var(--muted);
     }
     .badge b{ color:var(--ink); }
+
+    table { width:100%; border-collapse:collapse; }
+    th, td { border-bottom:1px solid var(--line); padding:8px; text-align:left; }
+    th { color:var(--muted); font-weight:600; }
   </style>
 
   <!-- Firebase (compat) -->
@@ -133,10 +139,9 @@
         </div>
 
         <div class="note">
-          This page is now reading/writing:
+          This page is reading/writing:
           <span class="mono">payrollSettings/app</span> (anchorMonday)
           and <span class="mono">payrollPeriods/{periodId}</span> (lock state).
-          Next we’ll mirror the <span class="mono">example.xlsx</span> layout here.
         </div>
       </div>
 
@@ -159,14 +164,14 @@
           <div class="card">
             <h2>FOH</h2>
             <div style="overflow:auto">
-              <table style="width:100%;border-collapse:collapse" id="fohTable">
+              <table id="fohTable">
                 <thead>
-                  <tr style="text-align:left">
-                    <th style="padding:8px;border-bottom:1px solid var(--line)">First</th>
-                    <th style="padding:8px;border-bottom:1px solid var(--line)">Last</th>
-                    <th style="padding:8px;border-bottom:1px solid var(--line)">Emp #</th>
-                    <th style="padding:8px;border-bottom:1px solid var(--line)">Wage</th>
-                    <th style="padding:8px;border-bottom:1px solid var(--line)"></th>
+                  <tr>
+                    <th>First</th>
+                    <th>Last</th>
+                    <th>Emp #</th>
+                    <th>Wage</th>
+                    <th style="width:170px"></th>
                   </tr>
                 </thead>
                 <tbody></tbody>
@@ -177,14 +182,14 @@
           <div class="card">
             <h2>BOH</h2>
             <div style="overflow:auto">
-              <table style="width:100%;border-collapse:collapse" id="bohTable">
+              <table id="bohTable">
                 <thead>
-                  <tr style="text-align:left">
-                    <th style="padding:8px;border-bottom:1px solid var(--line)">First</th>
-                    <th style="padding:8px;border-bottom:1px solid var(--line)">Last</th>
-                    <th style="padding:8px;border-bottom:1px solid var(--line)">Emp #</th>
-                    <th style="padding:8px;border-bottom:1px solid var(--line)">Wage</th>
-                    <th style="padding:8px;border-bottom:1px solid var(--line)"></th>
+                  <tr>
+                    <th>First</th>
+                    <th>Last</th>
+                    <th>Emp #</th>
+                    <th>Wage</th>
+                    <th style="width:170px"></th>
                   </tr>
                 </thead>
                 <tbody></tbody>
@@ -200,8 +205,30 @@
 
       <div id="tab-summary" class="hidden">
         <h2>Hours &amp; Wages Summary</h2>
-        <div class="note">
-          Next: we’ll render the Dayforce-style table to match your CSV, make it editable when unlocked, and printable.
+
+        <div class="note" style="margin-bottom:10px">
+          Reads from Firestore:
+          <span class="mono">companies/aidan/locations/beacon/payrollHoursWages/{weekStartMonday}</span>
+        </div>
+
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0 14px">
+          <button id="refreshHWBtn" class="btn primary">Refresh from Firestore</button>
+          <span class="pill"><b>HW status</b> <span id="hwStatus" class="muted">Not loaded</span></span>
+        </div>
+
+        <div class="grid2">
+          <div class="card">
+            <h2>Week A <span class="muted" id="hwWeekARange">—</span></h2>
+            <div id="hwWeekABody" class="note">—</div>
+          </div>
+          <div class="card">
+            <h2>Week B <span class="muted" id="hwWeekBRange">—</span></h2>
+            <div id="hwWeekBBody" class="note">—</div>
+          </div>
+        </div>
+
+        <div class="note" style="margin-top:10px">
+          If a week shows “No snapshot found”, run the GitHub Action and backfill that <span class="mono">week_of</span>.
         </div>
       </div>
 
@@ -233,14 +260,14 @@
       <div class="hr"></div>
 
       <div style="overflow:auto">
-        <table style="width:100%;border-collapse:collapse">
+        <table>
           <thead>
-            <tr style="text-align:left">
-              <th style="padding:8px;border-bottom:1px solid var(--line)">Employee</th>
-              <th style="padding:8px;border-bottom:1px solid var(--line)">Dept</th>
-              <th style="padding:8px;border-bottom:1px solid var(--line)">Saved wage</th>
-              <th style="padding:8px;border-bottom:1px solid var(--line)">7shifts wage</th>
-              <th style="padding:8px;border-bottom:1px solid var(--line)">Choose</th>
+            <tr>
+              <th>Employee</th>
+              <th>Dept</th>
+              <th>Saved wage</th>
+              <th>7shifts wage</th>
+              <th>Choose</th>
             </tr>
           </thead>
           <tbody id="wageMismatchTbody"></tbody>
@@ -275,12 +302,12 @@
     "4Paoa0SWHybPzwP7uNjOx2VgbiJ2",
     "9aQ5evQ3nbYt0kjw91ruil5Igq52"
   ];
+
   const ADMIN_UIDS = [
     "e0G8FBe3xlYExc3HvSGtIk5Osgw1",
     "BslFJsAMikSucxwbL8S7qPXcC6r2",
     "nW1IbxeaZJT0hAoORZhDtgOlAdd2",
     "zbpmXxrpweXQzf7Z7JMx8kUblQi1",
-    "nW1IbxeaZJT0hAoORZhDtgOlAdd2",
     "n1xq8sI8QWSfmQni7G5Qw5jS74b2",
     "CfNm6og5ydXhOAcKlSvJEABWsT23",
     "Yf1EPiMfQVNvgKVVMZD4h6zjpRX2",
@@ -289,6 +316,7 @@
   ];
 
   const LOC_KEY = "beacon";
+  const COMPANY_ID = "aidan";
 
   const els = {
     loginBtn: document.getElementById("loginBtn"),
@@ -310,12 +338,10 @@
   els.locPath3.textContent = LOC_KEY;
 
   function setStatus(text){ els.statusPill.textContent = text; }
-
   function showApp(isAllowed){
     els.accessDenied.classList.toggle("hidden", isAllowed);
     els.app.classList.toggle("hidden", !isAllowed);
   }
-
   function setAdmin(isAdmin){
     els.adminPill.textContent = isAdmin ? "Yes" : "No";
     els.adminPill.className = isAdmin ? "statusOk" : "statusBad";
@@ -339,7 +365,6 @@
   }
   wireTabs();
 
-  const COMPANY_ID = "aidan";
   let db = null;
 
   const ui = {
@@ -349,6 +374,13 @@
     lockedLabel: document.getElementById("lockedLabel"),
     lockBtn: document.getElementById("lockBtn"),
     unlockBtn: document.getElementById("unlockBtn"),
+
+    refreshHWBtn: document.getElementById("refreshHWBtn"),
+    hwStatus: document.getElementById("hwStatus"),
+    hwWeekARange: document.getElementById("hwWeekARange"),
+    hwWeekBRange: document.getElementById("hwWeekBRange"),
+    hwWeekABody: document.getElementById("hwWeekABody"),
+    hwWeekBBody: document.getElementById("hwWeekBBody"),
   };
 
   let session = {
@@ -367,12 +399,8 @@
     const [y,m,d] = iso.split("-").map(Number);
     return new Date(Date.UTC(y, m-1, d));
   }
-  function isoFromUTC(d){
-    return d.toISOString().slice(0,10);
-  }
-  function addDaysUTC(d, days){
-    return new Date(d.getTime() + days * MS_DAY);
-  }
+  function isoFromUTC(d){ return d.toISOString().slice(0,10); }
+  function addDaysUTC(d, days){ return new Date(d.getTime() + days * MS_DAY); }
   function todayUTC(){
     const now = new Date();
     return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -393,22 +421,25 @@
   function periodRef(periodId){
     return locRoot().collection("payrollPeriods").doc(periodId);
   }
-
   function masterRosterRef(){
     return locRoot().collection("payrollSettings").doc("roster");
   }
   function rosterRef(periodId){
     return locRoot().collection("payrollRosters").doc(periodId);
   }
-
-  // schedule snapshot collection
   function payrollScheduleRef(weekStartISO){
     return locRoot().collection("payrollSchedule").doc(weekStartISO);
+  }
+  function payrollHoursWagesRef(weekStartISO){
+    return locRoot().collection("payrollHoursWages").doc(weekStartISO);
   }
 
   function setRosterStatus(msg){
     const el = document.getElementById("rosterStatus");
     if (el) el.textContent = msg;
+  }
+  function setHWStatus(msg){
+    if (ui.hwStatus) ui.hwStatus.textContent = msg;
   }
 
   function money2(n){
@@ -416,24 +447,20 @@
     if (!isFinite(x)) return "";
     return x.toFixed(2);
   }
-
   function moneyLabel(n){
     const x = Number(n);
     if (!isFinite(x)) return "—";
     return `$${x.toFixed(2)}`;
   }
-
   function sameWage(a,b){
     const x = Number(a), y = Number(b);
     if (!isFinite(x) || !isFinite(y)) return false;
     return Math.round(x * 100) === Math.round(y * 100);
   }
+  function normName(s){ return String(s || "").trim().toLowerCase(); }
 
-  function normName(s){
-    return String(s || "").trim().toLowerCase();
-  }
   function keyForEmp(e){
-    const id = e.empId || e.employeeId || e.id;
+    const id = e.empId || e.user_id || e.userId || e.id;
     if (id) return `id:${String(id)}`;
     return `name:${normName(e.first)}|${normName(e.last)}`;
   }
@@ -482,8 +509,6 @@
 
       function cell(text){
         const td = document.createElement("td");
-        td.style.padding = "8px";
-        td.style.borderBottom = "1px solid var(--line)";
         td.textContent = text;
         return td;
       }
@@ -494,9 +519,6 @@
       tr.appendChild(cell(moneyLabel(m.incomingWage)));
 
       const tdChoice = document.createElement("td");
-      tdChoice.style.padding = "8px";
-      tdChoice.style.borderBottom = "1px solid var(--line)";
-
       const wrap = document.createElement("div");
       wrap.className = "radioWrap";
 
@@ -511,9 +533,9 @@
           Use 7shifts
         </label>
       `;
-
       tdChoice.appendChild(wrap);
       tr.appendChild(tdChoice);
+
       tbody.appendChild(tr);
     });
 
@@ -551,13 +573,13 @@
     inp.style.color = "var(--ink)";
     inp.style.borderRadius = "8px";
     inp.style.padding = "6px 8px";
+    inp.style.width = "100%";
+    inp.style.fontSize = "0.95rem";
   }
   function makeInput(value, placeholder=""){
     const inp = document.createElement("input");
     inp.value = value ?? "";
     inp.placeholder = placeholder;
-    inp.style.width = "100%";
-    inp.style.fontSize = "0.95rem";
     return inp;
   }
 
@@ -571,13 +593,13 @@
     if (syncBtn) syncBtn.disabled = !canEdit;
   }
 
-  // --- master roster ---
   async function loadMasterRoster(){
     const snap = await masterRosterRef().get();
     const d = snap.exists ? (snap.data() || {}) : {};
     const list = Array.isArray(d.employees) ? d.employees : [];
     return list.map(e => ({ ...e, active: e.active !== false }));
   }
+
   async function saveMasterRoster(list){
     await masterRosterRef().set({
       employees: list,
@@ -587,12 +609,12 @@
     }, { merge:true });
   }
 
-  // --- schedule doc extractor ---
   function splitName(full){
     const parts = String(full || "").trim().split(/\s+/).filter(Boolean);
     if (!parts.length) return {first:"", last:""};
     return { first: parts[0], last: parts.slice(1).join(" ") };
   }
+
   function normalizeFromObj(obj, deptHint){
     const o = obj || {};
     const full = o.name || o.full_name || o.fullName || "";
@@ -601,10 +623,16 @@
     const first = o.first || o.first_name || o.firstName || (sp?.first || "");
     const last  = o.last || o.last_name || o.lastName || (sp?.last || "");
 
-    const empId = o.employee_id || o.employeeId || o.user_id || o.userId || o.id || null;
-    const empNo = o.employee_number || o.employeeNumber || o.empNo || o.emp_no || "";
+    // ✅ empId = 7shifts user_id (stable identity)
+    const empId = o.user_id || o.userId || o.id || null;
 
-    const wage = (o.wage ?? o.hourly_rate ?? o.hourlyRate ?? o.rate ?? o.pay_rate ?? o.payRate ?? null);
+    // ✅ empNo = 7shifts employee_id (this is the “employee #” you want)
+    const empNo =
+      o.employee_id || o.employeeId ||
+      o.employee_number || o.employeeNumber ||
+      o.empNo || o.emp_no || "";
+
+    const wage = (o.wage ?? o.hourly_wage ?? o.hourly_rate ?? o.hourlyRate ?? o.rate ?? o.pay_rate ?? o.payRate ?? null);
 
     return {
       dept: deptHint || (o.dept || o.department || "FOH"),
@@ -624,23 +652,13 @@
     if (!Array.isArray(raw)) return [];
 
     const out = [];
-
     for (const item of raw) {
       if (!item) continue;
 
       if (typeof item === "string") {
         const { first, last } = splitName(item);
         if (first || last) {
-          out.push({
-            dept: "FOH",
-            empId: null,
-            empNo: "",
-            first,
-            last,
-            wage: null,
-            active: true,
-            _editing: false
-          });
+          out.push({ dept:"FOH", empId:null, empNo:"", first, last, wage:null, active:true, _editing:false });
         }
         continue;
       }
@@ -653,7 +671,6 @@
     return out.filter(e => e.first || e.last);
   }
 
-  // --- merge add-only ---
   function mergeAddOnly(baseList, incomingList){
     const map = new Map();
     baseList.forEach(e => map.set(keyForEmp(e), e));
@@ -676,16 +693,12 @@
       const incW = Number(inc.wage);
       const curHasGoodWage = isFinite(curW) && curW > 0;
       const incHasGoodWage = isFinite(incW) && incW > 0;
-
-      if (!curHasGoodWage && incHasGoodWage) {
-        cur.wage = incW;
-      }
+      if (!curHasGoodWage && incHasGoodWage) cur.wage = incW;
 
       if (!cur.empId && inc.empId) cur.empId = inc.empId;
 
       const curDept = String(cur.dept || "").toUpperCase();
       const incDept = String(inc.dept || "").toUpperCase();
-
       if (!curDept && incDept) cur.dept = incDept;
       if (curDept === "FOH" && incDept === "BOH") cur.dept = "BOH";
     }
@@ -693,7 +706,6 @@
     return { list: Array.from(map.values()), added };
   }
 
-  // --- render roster (per-row edit/done) ---
   function renderRoster(){
     const fohBody = document.querySelector("#fohTable tbody");
     const bohBody = document.querySelector("#bohTable tbody");
@@ -712,14 +724,6 @@
 
     function addRow(tbody, emp){
       const tr = document.createElement("tr");
-
-      function td(node){
-        const cell = document.createElement("td");
-        cell.style.padding = "8px";
-        cell.style.borderBottom = "1px solid var(--line)";
-        cell.appendChild(node);
-        return cell;
-      }
 
       const canEditThisRow = !!session.user && session.isAdmin && !session.locked;
       const isEditing = !!emp._editing;
@@ -740,11 +744,18 @@
       numInp.oninput   = () => { if (!shouldLock) emp.empNo = numInp.value.trim(); };
       wageInp.oninput  = () => { if (!shouldLock) emp.wage  = Number(wageInp.value); };
 
+      function td(node){
+        const cell = document.createElement("td");
+        cell.appendChild(node);
+        return cell;
+      }
+
       tr.appendChild(td(firstInp));
       tr.appendChild(td(lastInp));
       tr.appendChild(td(numInp));
       tr.appendChild(td(wageInp));
 
+      const actionsTd = document.createElement("td");
       const actionWrap = document.createElement("div");
       actionWrap.style.display = "flex";
       actionWrap.style.gap = "8px";
@@ -773,10 +784,8 @@
         const ok = confirm(`Are you sure you would like to remove this employee?\n\n${label}`);
         if (!ok) return;
 
-        // remove from current pay period roster (UI state)
         session.rosterEmployees = (session.rosterEmployees || []).filter(x => x !== emp);
 
-        // mark inactive in MASTER roster (so future periods won't include them)
         const master = await loadMasterRoster();
         const k = keyForEmp(emp);
 
@@ -798,22 +807,16 @@
 
       actionWrap.appendChild(editBtn);
       actionWrap.appendChild(rmBtn);
+      actionsTd.appendChild(actionWrap);
+      tr.appendChild(actionsTd);
 
-      const tdActions = document.createElement("td");
-      tdActions.style.padding = "8px";
-      tdActions.style.borderBottom = "1px solid var(--line)";
-      tdActions.appendChild(actionWrap);
-
-      tr.appendChild(tdActions);
       tbody.appendChild(tr);
     }
 
-    // ✅ actually render rows
-    foh.forEach(emp => addRow(fohBody, emp));
-    boh.forEach(emp => addRow(bohBody, emp));
+    foh.forEach(e => addRow(fohBody, e));
+    boh.forEach(e => addRow(bohBody, e));
   }
 
-  // ✅ Sync from payrollSchedule snapshots (add-only) + wage mismatch review
   async function syncRosterFrom7shifts(){
     if (!session.periodStartISO) return { added: 0 };
 
@@ -881,6 +884,7 @@
 
     if (mismatches.length) {
       setRosterStatus(`⚠️ Wage mismatches: ${mismatches.length} (review required)`);
+
       const res = await showWageMismatchModal(mismatches);
 
       if (res?.applied) {
@@ -927,6 +931,7 @@
       renderRoster();
 
       await syncRosterFrom7shifts();
+      setRosterStatus("New roster (from master + 7shifts)");
       return;
     }
 
@@ -935,6 +940,7 @@
     renderRoster();
 
     await syncRosterFrom7shifts();
+    setRosterStatus("Loaded");
   }
 
   async function saveRosterForCurrentPeriod(){
@@ -1027,6 +1033,87 @@
     }
   }
 
+  function weekRangeText(weekStartISO){
+    const a = utcDateFromISO(weekStartISO);
+    const b = addDaysUTC(a, 6);
+    return `${isoFromUTC(a)} → ${isoFromUTC(b)}`;
+  }
+
+  function renderHWCard(doc, rangeEl, bodyEl, fallbackWeekStart){
+    if (!rangeEl || !bodyEl) return;
+
+    if (!doc) {
+      rangeEl.textContent = weekRangeText(fallbackWeekStart);
+      bodyEl.innerHTML = `
+        <div class="note">
+          <b>No snapshot found</b> for <span class="mono">${fallbackWeekStart}</span>.<br/>
+          Run the GitHub Action and backfill that week.
+        </div>`;
+      return;
+    }
+
+    const start = doc.weekStart || fallbackWeekStart;
+    const end = doc.weekEnd || isoFromUTC(addDaysUTC(utcDateFromISO(start), 6));
+    rangeEl.textContent = `${start} → ${end}`;
+
+    const t = doc.total || {};
+    const lines = [
+      ["Total hours", t.total_hours],
+      ["Total pay", moneyLabel(t.total_pay)],
+      ["Regular hours", t.regular_hours],
+      ["Overtime hours", t.overtime_hours],
+      ["Holiday hours", t.holiday_hours],
+      ["Total tips", moneyLabel(t.total_tips)],
+      ["Tip in", moneyLabel(t.tip_in)],
+      ["Tip out", moneyLabel(t.tip_out)],
+    ];
+
+    bodyEl.innerHTML = `
+      <table>
+        <tbody>
+          ${lines.map(([k,v]) => `
+            <tr>
+              <td style="color:var(--muted)">${k}</td>
+              <td>${(v==null || v==="") ? "—" : v}</td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+      <div class="note" style="margin-top:8px">Fetched: <span class="mono">${doc.fetched_at || "—"}</span></div>
+    `;
+  }
+
+  async function loadHoursWagesForCurrentPeriod(){
+    if (!session.periodStartISO) return;
+
+    const weekA = session.periodStartISO;
+    const weekB = isoFromUTC(addDaysUTC(utcDateFromISO(session.periodStartISO), 7));
+
+    setHWStatus("Loading…");
+
+    try {
+      const [aSnap, bSnap] = await Promise.all([
+        payrollHoursWagesRef(weekA).get(),
+        payrollHoursWagesRef(weekB).get(),
+      ]);
+
+      const aDoc = aSnap.exists ? (aSnap.data() || null) : null;
+      const bDoc = bSnap.exists ? (bSnap.data() || null) : null;
+
+      renderHWCard(aDoc, ui.hwWeekARange, ui.hwWeekABody, weekA);
+      renderHWCard(bDoc, ui.hwWeekBRange, ui.hwWeekBBody, weekB);
+
+      const have = (aDoc?1:0) + (bDoc?1:0);
+      setHWStatus(have ? `Loaded (${have}/2 found)` : "No data for these weeks yet");
+    } catch (e) {
+      console.error(e);
+      setHWStatus("❌ Failed to read (check Firestore rules)");
+      ui.hwWeekARange.textContent = "—";
+      ui.hwWeekBRange.textContent = "—";
+      ui.hwWeekABody.innerHTML = `<div class="note"><b>Error:</b> ${e?.message || e}</div>`;
+      ui.hwWeekBBody.innerHTML = `<div class="note">If you see “Missing or insufficient permissions”, add a Firestore rules match for <span class="mono">payrollHoursWages</span>.</div>`;
+    }
+  }
+
   async function loadPeriod(periodStartISO){
     session.periodStartISO = periodStartISO;
     session.periodEndISO = isoFromUTC(addDaysUTC(utcDateFromISO(periodStartISO), 13));
@@ -1046,6 +1133,7 @@
 
       setLockedUI(false);
       await loadRosterForCurrentPeriod();
+      await loadHoursWagesForCurrentPeriod();
       setStatus("✅ Ready");
       return;
     }
@@ -1053,6 +1141,7 @@
     const d = snap.data() || {};
     setLockedUI(!!d.locked);
     await loadRosterForCurrentPeriod();
+    await loadHoursWagesForCurrentPeriod();
     setStatus("✅ Ready");
   }
 
@@ -1087,7 +1176,6 @@
   async function initPayroll(user, isAdmin){
     session.user = user;
     session.isAdmin = isAdmin;
-
     db = firebase.firestore();
 
     await loadOrCreateAnchor();
@@ -1102,6 +1190,7 @@
   document.getElementById("sync7Btn")?.addEventListener("click", syncRosterFrom7shifts);
   document.getElementById("addEmpBtn")?.addEventListener("click", addEmployeeBlank);
   document.getElementById("saveRosterBtn")?.addEventListener("click", saveRosterForCurrentPeriod);
+  ui.refreshHWBtn?.addEventListener("click", loadHoursWagesForCurrentPeriod);
 
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
