@@ -77,19 +77,7 @@
     }
     .badge b{ color:var(--ink); }
 
-    /* --- Roster settings side panel --- */
-    .rosterShell{
-      display:grid;
-      grid-template-columns: 1fr 370px;
-      gap:12px;
-      align-items:start;
-    }
-    @media (max-width: 980px){
-      .rosterShell{ grid-template-columns: 1fr; }
-    }
-    .rosterSettingsHeader{
-      display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:10px 0 12px;
-    }
+    /* --- Roster per-row settings drawer --- */
     .tinyInput{
       width:100%;
       background:transparent;
@@ -103,6 +91,42 @@
     .tinyCheck{
       transform: scale(1.1);
       accent-color: var(--accent);
+    }
+    .drawer{
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:12px;
+      background:rgba(255,255,255,.02);
+    }
+    .drawerGrid{
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap:10px;
+      align-items:end;
+    }
+    @media (max-width: 900px){
+      .drawerGrid{ grid-template-columns: 1fr; }
+    }
+    .drawerHead{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-bottom:10px;
+    }
+    .drawerTitle{
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+    }
+    .drawerTitle b{ color:var(--ink); }
+    .drawerTitle span{ color:var(--muted); font-size:.9rem; }
+    .helpLine{
+      color:var(--muted);
+      font-size:.9rem;
+      margin-top:10px;
+      line-height:1.35;
     }
   </style>
 
@@ -120,7 +144,7 @@
     <div class="topbar">
       <div class="title">
         <h1>Payroll — Beacon</h1>
-        <div class="sub">Companion app (separate from Labour Dashboard) — <span class="mono">V2.10</span></div>
+        <div class="sub">Companion app (separate from Labour Dashboard) — <span class="mono">V2.11</span></div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <button id="loginBtn" class="btn primary">Login</button>
@@ -234,94 +258,58 @@
           <button id="sync7Btn" class="btn primary">Sync from 7shifts</button>
           <button id="addEmpBtn" class="btn">+ Add employee</button>
           <button id="saveRosterBtn" class="btn primary">Save roster</button>
-          <button id="toggleRosterSettingsBtn" class="btn">Settings</button>
+
           <span class="pill"><b>Roster status</b> <span id="rosterStatus" class="muted">Not loaded</span></span>
+          <span class="pill"><b>Settings effective</b> <span id="empSettingsEffectivePill" class="muted">—</span></span>
         </div>
 
-        <div class="rosterShell">
-          <div>
-            <div class="grid2">
-              <div class="card">
-                <h2>FOH</h2>
-                <div style="overflow:auto">
-                  <table id="fohTable">
-                    <thead>
-                      <tr>
-                        <th>First</th>
-                        <th>Last</th>
-                        <th>Emp #</th>
-                        <th>Wage</th>
-                        <th style="width:170px"></th>
-                      </tr>
-                    </thead>
-                    <tbody></tbody>
-                  </table>
-                </div>
-              </div>
+        <div class="note" style="margin-bottom:12px">
+          Settings are edited per employee via the <b>Settings</b> button on their row:
+          OT threshold (hours before spill), Travel (adds 1 hour per day worked), Flat rate (per pay period).
+          Changes create a forward-only snapshot for the current pay period and will carry forward.
+        </div>
 
-              <div class="card">
-                <h2>BOH</h2>
-                <div style="overflow:auto">
-                  <table id="bohTable">
-                    <thead>
-                      <tr>
-                        <th>First</th>
-                        <th>Last</th>
-                        <th>Emp #</th>
-                        <th>Wage</th>
-                        <th style="width:170px"></th>
-                      </tr>
-                    </thead>
-                    <tbody></tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <div class="note" style="margin-top:10px">
-              Sorting: alphabetized by first name inside each department.
-            </div>
+        <!-- ✅ FOH then BOH stacked -->
+        <div class="card">
+          <h2>FOH</h2>
+          <div style="overflow:auto">
+            <table id="fohTable">
+              <thead>
+                <tr>
+                  <th>First</th>
+                  <th>Last</th>
+                  <th>Emp #</th>
+                  <th>Wage</th>
+                  <th style="width:260px"></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
           </div>
+        </div>
 
-          <!-- ✅ Settings side panel -->
-          <div id="rosterSettingsPanel" class="card hidden">
-            <h2>Roster Settings <span class="muted">(OT / Travel / Flat)</span></h2>
+        <div style="height:12px"></div>
 
-            <div class="smallMuted" id="empSettingsMeta">—</div>
-
-            <div class="rosterSettingsHeader">
-              <button id="saveEmpSettingsBtn" class="btn primary">Save settings</button>
-              <button id="revertEmpSettingsBtn" class="btn">Revert</button>
-              <span class="pill"><b>Status</b> <span id="empSettingsStatus" class="muted">Not loaded</span></span>
-            </div>
-
-            <div class="note" style="margin-bottom:10px">
-              OT threshold is total hours (2-week pay period) before spill.
-              Travel adds <b>1 hour per day worked</b>.
-              Flat rate is paid once per pay period.
-            </div>
-
-            <div style="overflow:auto; max-height:56vh">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Employee</th>
-                    <th>Emp #</th>
-                    <th>Wage</th>
-                    <th>OT (hrs)</th>
-                    <th>Travel</th>
-                    <th>Flat ($)</th>
-                  </tr>
-                </thead>
-                <tbody id="empSettingsTbody"></tbody>
-              </table>
-            </div>
-
-            <div class="note" style="margin-top:10px">
-              Saved to Firestore as <span class="mono">payrollSettings/empSettings_YYYY-MM-DD</span> and carried forward.
-              Editing never rewrites past pay periods.
-            </div>
+        <div class="card">
+          <h2>BOH</h2>
+          <div style="overflow:auto">
+            <table id="bohTable">
+              <thead>
+                <tr>
+                  <th>First</th>
+                  <th>Last</th>
+                  <th>Emp #</th>
+                  <th>Wage</th>
+                  <th style="width:260px"></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
           </div>
+        </div>
+
+        <div class="note" style="margin-top:10px">
+          Sorting: alphabetized by first name inside each department.
         </div>
       </div>
 
@@ -581,20 +569,14 @@
     hwCsvBtn: document.getElementById("hwCsvBtn"),
     hwXlsxBtn: document.getElementById("hwXlsxBtn"),
 
-    toggleRosterSettingsBtn: document.getElementById("toggleRosterSettingsBtn"),
-    rosterSettingsPanel: document.getElementById("rosterSettingsPanel"),
-    empSettingsTbody: document.getElementById("empSettingsTbody"),
-    empSettingsStatus: document.getElementById("empSettingsStatus"),
-    empSettingsMeta: document.getElementById("empSettingsMeta"),
-    saveEmpSettingsBtn: document.getElementById("saveEmpSettingsBtn"),
-    revertEmpSettingsBtn: document.getElementById("revertEmpSettingsBtn"),
-
     refreshAdditionsBtn: document.getElementById("refreshAdditionsBtn"),
     additionsRowsStatus: document.getElementById("additionsRowsStatus"),
     additionsTbody: document.getElementById("additionsTbody"),
     additionsHint: document.getElementById("additionsHint"),
     additionsCsvBtn: document.getElementById("additionsCsvBtn"),
     additionsXlsxBtn: document.getElementById("additionsXlsxBtn"),
+
+    empSettingsEffectivePill: document.getElementById("empSettingsEffectivePill"),
   };
 
   let session = {
@@ -615,7 +597,8 @@
     empSettingsEffectiveStart: null, // which effectiveStart was loaded
     empSettingsDirty: false,
 
-    additionsRows: [] // computed rows for main table + export
+    openSettingsKey: null,        // which employee drawer is open
+    additionsRows: []             // computed rows for main table + export
   };
 
   const MS_DAY = 86400000;
@@ -674,8 +657,10 @@
   function setHWStatus(msg){
     if (ui.hwStatus) ui.hwStatus.textContent = msg;
   }
-  function setEmpSettingsStatus(msg){
-    if (ui.empSettingsStatus) ui.empSettingsStatus.textContent = msg;
+
+  function updateEmpSettingsEffectivePill(){
+    if (!ui.empSettingsEffectivePill) return;
+    ui.empSettingsEffectivePill.textContent = session.empSettingsEffectiveStart ? session.empSettingsEffectiveStart : "none";
   }
 
   function money2(n){
@@ -1055,9 +1040,7 @@
         firstFiniteNum(r, ["regular_hours","regularHours","reg_hours","regHours"]) ??
         0;
 
-      if (!(regHours > 0)) {
-        regHours = computeHoursFromRow(r);
-      }
+      if (!(regHours > 0)) regHours = computeHoursFromRow(r);
 
       const otHours =
         firstFiniteNum(r, ["overtime_hours","overtimeHours","ot_hours","otHours"]) ??
@@ -1075,33 +1058,25 @@
         firstFiniteNum(r, ["regular_pay","regularPay"]) ??
         0;
 
-      if (!(regPay > 0) && wageNum != null && regHours > 0) {
-        regPay = computeRegularPay(wageNum, regHours);
-      }
+      if (!(regPay > 0) && wageNum != null && regHours > 0) regPay = computeRegularPay(wageNum, regHours);
 
       let otPay =
         firstFiniteNum(r, ["overtime_pay","overtimePay","ot_pay","otPay"]) ??
         0;
 
-      if (!(otPay > 0) && wageNum != null && otHours > 0) {
-        otPay = computeOtPay(wageNum, otHours, 1.5);
-      }
+      if (!(otPay > 0) && wageNum != null && otHours > 0) otPay = computeOtPay(wageNum, otHours, 1.5);
 
       let dotPay =
         firstFiniteNum(r, ["double_overtime_pay","doubleOvertimePay","double_ot_pay","doubleOtPay"]) ??
         0;
 
-      if (!(dotPay > 0) && wageNum != null && dotHours > 0) {
-        dotPay = computeOtPay(wageNum, dotHours, 2.0);
-      }
+      if (!(dotPay > 0) && wageNum != null && dotHours > 0) dotPay = computeOtPay(wageNum, dotHours, 2.0);
 
       let holPay =
         firstFiniteNum(r, ["holiday_pay","holidayPay"]) ??
         0;
 
-      if (!(holPay > 0) && wageNum != null && holHours > 0) {
-        holPay = computeOtPay(wageNum, holHours, 1.0);
-      }
+      if (!(holPay > 0) && wageNum != null && holHours > 0) holPay = computeOtPay(wageNum, holHours, 1.0);
 
       const computed = { regular_pay: regPay, ot_pay: otPay, double_ot_pay: dotPay, holiday_pay: holPay };
       const totPay = totalPayForRow(r, computed);
@@ -1178,23 +1153,32 @@
     return `name:${normName(first)}|${normName(last)}`;
   }
 
-  // ---------- Settings panel logic ----------
   function canEditSettings(){
     return !!session.user && session.isAdmin && !session.locked;
   }
 
   function cloneSettingsMap(m){
     const out = new Map();
-    for (const [k,v] of (m || new Map()).entries()) {
-      out.set(k, { ...v });
-    }
+    for (const [k,v] of (m || new Map()).entries()) out.set(k, { ...v });
     return out;
+  }
+
+  function ensureDraftForKey(k){
+    if (!session.empSettingsDraft.has(k)) {
+      session.empSettingsDraft.set(k, { key:k, otThreshold:null, travel:false, flatRate:null });
+    }
+    return session.empSettingsDraft.get(k);
+  }
+
+  function baseForKey(k){
+    const b = session.empSettingsBase.get(k);
+    if (!b) return { key:k, otThreshold:null, travel:false, flatRate:null };
+    return { ...b };
   }
 
   async function loadEmpSettingsForCurrentPeriod(){
     if (!session.periodStartISO) return;
 
-    setEmpSettingsStatus("Loading…");
     session.empSettingsDirty = false;
 
     try {
@@ -1238,125 +1222,14 @@
       session.empSettingsBase = base;
       session.empSettingsDraft = cloneSettingsMap(base);
 
-      // meta text
-      if (ui.empSettingsMeta) {
-        const eff = session.empSettingsEffectiveStart ? session.empSettingsEffectiveStart : "none";
-        const willCreate = (session.empSettingsEffectiveStart !== session.periodStartISO);
-        ui.empSettingsMeta.innerHTML =
-          `Loaded settings effective: <span class="mono">${eff}</span>. ` +
-          (willCreate
-            ? `Edits will create a new snapshot for <span class="mono">${session.periodStartISO}</span>.`
-            : `Edits will update the snapshot for <span class="mono">${session.periodStartISO}</span>.`);
-      }
-
-      renderEmpSettingsPanel();
-      setEmpSettingsStatus("Loaded");
+      updateEmpSettingsEffectivePill();
     } catch (e) {
       console.error(e);
-      setEmpSettingsStatus("❌ Failed (permissions?)");
+      session.empSettingsBase = new Map();
+      session.empSettingsDraft = new Map();
+      session.empSettingsEffectiveStart = null;
+      updateEmpSettingsEffectivePill();
     }
-  }
-
-  function renderEmpSettingsPanel(){
-    if (!ui.empSettingsTbody) return;
-    ui.empSettingsTbody.innerHTML = "";
-
-    const list = (session.rosterEmployees || []).slice()
-      .filter(e => e && (e.first || e.last))
-      .sort((a,b)=>{
-        const la = normName(a.last || "");
-        const lb = normName(b.last || "");
-        if (la !== lb) return la.localeCompare(lb, undefined, { sensitivity:"base" });
-        const fa = normName(a.first || "");
-        const fb = normName(b.first || "");
-        if (fa !== fb) return fa.localeCompare(fb, undefined, { sensitivity:"base" });
-        return 0;
-      });
-
-    const editable = canEditSettings();
-
-    for (const emp of list) {
-      const k = keyForEmp(emp);
-      if (!session.empSettingsDraft.has(k)) {
-        session.empSettingsDraft.set(k, { key:k, otThreshold:null, travel:false, flatRate:null });
-      }
-      const s = session.empSettingsDraft.get(k);
-
-      const tr = document.createElement("tr");
-
-      function tdText(t){
-        const td = document.createElement("td");
-        td.textContent = t;
-        return td;
-      }
-
-      const name = `${emp.first || ""} ${emp.last || ""}`.trim();
-      tr.appendChild(tdText(name));
-      tr.appendChild(tdText(String(emp.empNo || "")));
-      tr.appendChild(tdText(emp.wage != null && isFinite(Number(emp.wage)) ? `$${Number(emp.wage).toFixed(2)}` : ""));
-
-      // OT
-      const tdOT = document.createElement("td");
-      const inpOT = document.createElement("input");
-      inpOT.type = "number";
-      inpOT.step = "0.25";
-      inpOT.min = "0";
-      inpOT.className = "tinyInput";
-      inpOT.placeholder = "e.g. 44";
-      inpOT.value = (s.otThreshold == null || !isFinite(Number(s.otThreshold))) ? "" : String(s.otThreshold);
-      inpOT.disabled = !editable;
-      inpOT.oninput = () => {
-        const v = inpOT.value.trim();
-        s.otThreshold = v === "" ? null : Number(v);
-        session.empSettingsDirty = true;
-        setEmpSettingsStatus("Edited (not saved)");
-        computeAndRenderAdditions();
-      };
-      tdOT.appendChild(inpOT);
-      tr.appendChild(tdOT);
-
-      // Travel
-      const tdTrav = document.createElement("td");
-      const chk = document.createElement("input");
-      chk.type = "checkbox";
-      chk.className = "tinyCheck";
-      chk.checked = !!s.travel;
-      chk.disabled = !editable;
-      chk.onchange = () => {
-        s.travel = !!chk.checked;
-        session.empSettingsDirty = true;
-        setEmpSettingsStatus("Edited (not saved)");
-        computeAndRenderAdditions();
-      };
-      tdTrav.appendChild(chk);
-      tr.appendChild(tdTrav);
-
-      // Flat
-      const tdFlat = document.createElement("td");
-      const inpFlat = document.createElement("input");
-      inpFlat.type = "number";
-      inpFlat.step = "0.01";
-      inpFlat.min = "0";
-      inpFlat.className = "tinyInput";
-      inpFlat.placeholder = "e.g. 50";
-      inpFlat.value = (s.flatRate == null || !isFinite(Number(s.flatRate))) ? "" : String(s.flatRate);
-      inpFlat.disabled = !editable;
-      inpFlat.oninput = () => {
-        const v = inpFlat.value.trim();
-        s.flatRate = v === "" ? null : Number(v);
-        session.empSettingsDirty = true;
-        setEmpSettingsStatus("Edited (not saved)");
-        computeAndRenderAdditions();
-      };
-      tdFlat.appendChild(inpFlat);
-      tr.appendChild(tdFlat);
-
-      ui.empSettingsTbody.appendChild(tr);
-    }
-
-    // buttons state
-    if (ui.saveEmpSettingsBtn) ui.saveEmpSettingsBtn.disabled = !editable;
-    if (ui.revertEmpSettingsBtn) ui.revertEmpSettingsBtn.disabled = !editable;
   }
 
   async function saveEmpSettingsForCurrentPeriod(){
@@ -1366,17 +1239,13 @@
       return;
     }
 
-    setEmpSettingsStatus("Saving…");
-
     const rows = [];
-    const list = (session.rosterEmployees || []).slice()
-      .filter(e => e && (e.first || e.last));
+    const list = (session.rosterEmployees || []).slice().filter(e => e && (e.first || e.last));
 
     for (const emp of list) {
       const k = keyForEmp(emp);
-      const s = session.empSettingsDraft.get(k) || { key:k, otThreshold:null, travel:false, flatRate:null };
+      const s = ensureDraftForKey(k);
 
-      // Only store meaningful values (but keep row presence stable)
       rows.push({
         key: k,
         empId: emp.empId ? String(emp.empId) : null,
@@ -1402,52 +1271,27 @@
     try {
       await empSettingsDocRefForStart(session.periodStartISO).set(doc, { merge:true });
       session.empSettingsDirty = false;
-      setEmpSettingsStatus("Saved");
-      await loadEmpSettingsForCurrentPeriod(); // reload (now effective should be current)
+      await loadEmpSettingsForCurrentPeriod(); // reload base/draft (base now updated to this period)
+      setRosterStatus("Settings saved");
       computeAndRenderAdditions();
+      renderRoster(); // redraw to show saved state in drawer
     } catch (e) {
       console.error(e);
-      setEmpSettingsStatus("❌ Save failed");
       alert(e?.message || String(e));
     }
   }
 
-  function revertEmpSettingsEdits(){
+  function revertEmpSettingForKey(k){
     if (!canEditSettings()) return;
-    session.empSettingsDraft = cloneSettingsMap(session.empSettingsBase);
-    session.empSettingsDirty = false;
-    renderEmpSettingsPanel();
-    setEmpSettingsStatus("Reverted");
+    const b = baseForKey(k);
+    session.empSettingsDraft.set(k, { ...b });
+    session.empSettingsDirty = true;
+    setRosterStatus("Settings reverted (not saved)");
     computeAndRenderAdditions();
+    renderRoster();
   }
 
   // ---------- Main Additions compute/render ----------
-  function wageForKey(k){
-    const roster = (session.rosterEmployees || []);
-    for (const e of roster) {
-      if (keyForEmp(e) === k) {
-        const w = Number(e.wage);
-        return isFinite(w) ? w : null;
-      }
-    }
-    return null;
-  }
-  function empNoForKey(k){
-    const roster = (session.rosterEmployees || []);
-    for (const e of roster) {
-      if (keyForEmp(e) === k) return String(e.empNo || "");
-    }
-    return "";
-  }
-  function nameForKey(k, fallbackFirst="", fallbackLast=""){
-    const roster = (session.rosterEmployees || []);
-    for (const e of roster) {
-      if (keyForEmp(e) === k) return `${e.first || ""} ${e.last || ""}`.trim();
-    }
-    const nm = `${fallbackFirst || ""} ${fallbackLast || ""}`.trim();
-    return nm || k;
-  }
-
   function computeAndRenderAdditions(){
     const aDoc = session.hwDocA;
     const bDoc = session.hwDocB;
@@ -1470,12 +1314,10 @@
     }
     if (ui.additionsHint) ui.additionsHint.textContent = "";
 
-    const byKey = new Map(); // key -> {hours, days:Set, first,last}
+    const byKey = new Map(); // key -> {hours, days:Set}
     for (const r of all) {
       const k = keyForShiftRow(r);
-      if (!byKey.has(k)) {
-        byKey.set(k, { hours:0, days:new Set(), first:(r.first_name??r.first??"").trim(), last:(r.last_name??r.last??"").trim() });
-      }
+      if (!byKey.has(k)) byKey.set(k, { hours:0, days:new Set() });
       const rec = byKey.get(k);
       const h = computeHoursFromRow(r);
       rec.hours += Number(h || 0);
@@ -1483,7 +1325,6 @@
       if (d) rec.days.add(d);
     }
 
-    // For each employee in roster, compute additions using settings
     const rosterSorted = (session.rosterEmployees || []).slice()
       .filter(e => e && (e.first || e.last))
       .sort((a,b)=>{
@@ -1501,13 +1342,13 @@
     for (const emp of rosterSorted) {
       const k = keyForEmp(emp);
       const worked = byKey.get(k);
-      if (!worked) continue; // only show people who worked at least one shift (for now)
+      if (!worked) continue;
 
       const totalHours = Math.round(worked.hours * 100) / 100;
       const wage = Number(emp.wage);
       const wageOk = isFinite(wage) && wage > 0 ? wage : null;
 
-      const s = session.empSettingsDraft.get(k) || { otThreshold:null, travel:false, flatRate:null };
+      const s = ensureDraftForKey(k);
       const thr = (s.otThreshold != null && isFinite(Number(s.otThreshold)) && Number(s.otThreshold) >= 0) ? Number(s.otThreshold) : null;
 
       const spillHours = (thr == null) ? 0 : Math.max(0, Math.round((totalHours - thr) * 100) / 100);
@@ -1520,7 +1361,6 @@
       const travelPay = (wageOk ? Math.round(travelHours * wageOk * 100) / 100 : 0);
       const totalAdd = Math.round((otPay + travelPay + flat) * 100) / 100;
 
-      // include row if any additions OR they hit spill hours OR travel enabled OR flat
       const include = (spillHours > 0) || (travelHours > 0) || (flat > 0);
       if (!include) continue;
 
@@ -1542,16 +1382,10 @@
       });
     }
 
-    // sort by last, first
     outRows.sort((a,b)=>{
-      const [al,af] = String(a["Employee"]||"").trim().split(/\s+/).reverse();
-      const [bl,bf] = String(b["Employee"]||"").trim().split(/\s+/).reverse();
-      const la = normName(al||"");
-      const lb = normName(bl||"");
-      if (la !== lb) return la.localeCompare(lb, undefined, { sensitivity:"base" });
-      const fa = normName(af||"");
-      const fb = normName(bf||"");
-      return fa.localeCompare(fb, undefined, { sensitivity:"base" });
+      const aName = String(a["Employee"]||"").trim();
+      const bName = String(b["Employee"]||"").trim();
+      return aName.localeCompare(bName, undefined, { sensitivity:"base" });
     });
 
     if (ui.additionsRowsStatus) ui.additionsRowsStatus.textContent = String(outRows.length);
@@ -1575,7 +1409,7 @@
     setAdditionsExportButtonsEnabled();
   }
 
-  // ---------- Wage mismatch modal (unchanged logic) ----------
+  // ---------- Wage mismatch modal ----------
   async function showWageMismatchModal(mismatches){
     const modal = document.getElementById("wageMismatchModal");
     const tbody = document.getElementById("wageMismatchTbody");
@@ -1687,10 +1521,6 @@
     if (addBtn) addBtn.disabled = !canEdit;
     if (saveBtn) saveBtn.disabled = !canEdit;
     if (syncBtn) syncBtn.disabled = !canEdit;
-
-    // settings buttons too
-    if (ui.saveEmpSettingsBtn) ui.saveEmpSettingsBtn.disabled = !canEdit;
-    if (ui.revertEmpSettingsBtn) ui.revertEmpSettingsBtn.disabled = !canEdit;
   }
 
   async function loadMasterRoster(){
@@ -1755,15 +1585,11 @@
 
       if (typeof item === "string") {
         const { first, last } = splitName(item);
-        if (first || last) {
-          out.push({ dept:"FOH", empId:null, empNo:"", first, last, wage:null, active:true, _editing:false });
-        }
+        if (first || last) out.push({ dept:"FOH", empId:null, empNo:"", first, last, wage:null, active:true, _editing:false });
         continue;
       }
 
-      if (typeof item === "object") {
-        out.push(normalizeFromObj(item, item.dept || item.department || "FOH"));
-      }
+      if (typeof item === "object") out.push(normalizeFromObj(item, item.dept || item.department || "FOH"));
     }
 
     return out.filter(e => e.first || e.last);
@@ -1868,7 +1694,7 @@
         emp._editing = !emp._editing;
         setRosterStatus("Edited (not saved)");
         renderRoster();
-        renderEmpSettingsPanel();
+        computeAndRenderAdditions();
       };
 
       const rmBtn = document.createElement("button");
@@ -1902,16 +1728,172 @@
 
         setRosterStatus("Removed (save roster)");
         renderRoster();
-        renderEmpSettingsPanel();
         computeAndRenderAdditions();
+      };
+
+      const settingsBtn = document.createElement("button");
+      settingsBtn.className = "btn";
+      settingsBtn.textContent = "Settings";
+      settingsBtn.disabled = !session.user; // must be signed in to view drawer (keeps things consistent)
+      settingsBtn.onclick = () => {
+        const k = keyForEmp(emp);
+        session.openSettingsKey = (session.openSettingsKey === k) ? null : k;
+        renderRoster();
       };
 
       actionWrap.appendChild(editBtn);
       actionWrap.appendChild(rmBtn);
+      actionWrap.appendChild(settingsBtn);
       actionsTd.appendChild(actionWrap);
       tr.appendChild(actionsTd);
 
       tbody.appendChild(tr);
+
+      // ---- Settings drawer row (inline) ----
+      const k = keyForEmp(emp);
+      if (session.openSettingsKey === k) {
+        const drawerTr = document.createElement("tr");
+        const drawerTd = document.createElement("td");
+        drawerTd.colSpan = 5;
+
+        const drawer = document.createElement("div");
+        drawer.className = "drawer";
+
+        const title = document.createElement("div");
+        title.className = "drawerHead";
+
+        const left = document.createElement("div");
+        left.className = "drawerTitle";
+        const nm = `${emp.first || ""} ${emp.last || ""}`.trim();
+        left.innerHTML = `<b>${nm || "Employee settings"}</b><span>OT / Travel / Flat (saved forward-only for this pay period)</span>`;
+
+        const right = document.createElement("div");
+        right.style.display = "flex";
+        right.style.gap = "8px";
+        right.style.flexWrap = "wrap";
+        right.style.justifyContent = "flex-end";
+
+        const saveBtn = document.createElement("button");
+        saveBtn.className = "btn primary";
+        saveBtn.textContent = "Save settings";
+        saveBtn.disabled = !canEditSettings();
+        saveBtn.onclick = async () => {
+          await saveEmpSettingsForCurrentPeriod();
+        };
+
+        const revertBtn = document.createElement("button");
+        revertBtn.className = "btn";
+        revertBtn.textContent = "Revert";
+        revertBtn.disabled = !canEditSettings();
+        revertBtn.onclick = () => revertEmpSettingForKey(k);
+
+        const closeBtn = document.createElement("button");
+        closeBtn.className = "btn";
+        closeBtn.textContent = "Close";
+        closeBtn.onclick = () => { session.openSettingsKey = null; renderRoster(); };
+
+        right.appendChild(saveBtn);
+        right.appendChild(revertBtn);
+        right.appendChild(closeBtn);
+
+        title.appendChild(left);
+        title.appendChild(right);
+
+        const grid = document.createElement("div");
+        grid.className = "drawerGrid";
+
+        const s = ensureDraftForKey(k);
+        const editable = canEditSettings();
+
+        // OT threshold
+        const otWrap = document.createElement("div");
+        otWrap.innerHTML = `<div class="muted" style="font-size:.85rem;margin-bottom:6px">OT threshold (hours)</div>`;
+        const ot = document.createElement("input");
+        ot.type = "number";
+        ot.step = "0.25";
+        ot.min = "0";
+        ot.className = "tinyInput";
+        ot.placeholder = "e.g. 44";
+        ot.value = (s.otThreshold == null || !isFinite(Number(s.otThreshold))) ? "" : String(s.otThreshold);
+        ot.disabled = !editable;
+        ot.oninput = () => {
+          const v = ot.value.trim();
+          s.otThreshold = v === "" ? null : Number(v);
+          session.empSettingsDirty = true;
+          setRosterStatus("Settings edited (not saved)");
+          computeAndRenderAdditions();
+        };
+        otWrap.appendChild(ot);
+
+        // Travel
+        const travWrap = document.createElement("div");
+        travWrap.innerHTML = `<div class="muted" style="font-size:.85rem;margin-bottom:6px">Travel</div>`;
+        const travRow = document.createElement("div");
+        travRow.style.display = "flex";
+        travRow.style.alignItems = "center";
+        travRow.style.gap = "10px";
+        const trav = document.createElement("input");
+        trav.type = "checkbox";
+        trav.className = "tinyCheck";
+        trav.checked = !!s.travel;
+        trav.disabled = !editable;
+        trav.onchange = () => {
+          s.travel = !!trav.checked;
+          session.empSettingsDirty = true;
+          setRosterStatus("Settings edited (not saved)");
+          computeAndRenderAdditions();
+        };
+        const travLbl = document.createElement("div");
+        travLbl.className = "muted";
+        travLbl.style.fontSize = ".95rem";
+        travLbl.textContent = "Adds 1 hour per day worked";
+        travRow.appendChild(trav);
+        travRow.appendChild(travLbl);
+        travWrap.appendChild(travRow);
+
+        // Flat rate
+        const flatWrap = document.createElement("div");
+        flatWrap.innerHTML = `<div class="muted" style="font-size:.85rem;margin-bottom:6px">Flat rate ($)</div>`;
+        const flat = document.createElement("input");
+        flat.type = "number";
+        flat.step = "0.01";
+        flat.min = "0";
+        flat.className = "tinyInput";
+        flat.placeholder = "e.g. 50";
+        flat.value = (s.flatRate == null || !isFinite(Number(s.flatRate))) ? "" : String(s.flatRate);
+        flat.disabled = !editable;
+        flat.oninput = () => {
+          const v = flat.value.trim();
+          s.flatRate = v === "" ? null : Number(v);
+          session.empSettingsDirty = true;
+          setRosterStatus("Settings edited (not saved)");
+          computeAndRenderAdditions();
+        };
+        flatWrap.appendChild(flat);
+
+        grid.appendChild(otWrap);
+        grid.appendChild(travWrap);
+        grid.appendChild(flatWrap);
+
+        const help = document.createElement("div");
+        help.className = "helpLine";
+        const eff = session.empSettingsEffectiveStart ? session.empSettingsEffectiveStart : "none";
+        const willCreate = (session.empSettingsEffectiveStart !== session.periodStartISO);
+        help.innerHTML =
+          `Loaded settings effective: <span class="mono">${eff}</span>. ` +
+          (willCreate
+            ? `Saving will create <span class="mono">payrollSettings/${empSettingsDocIdForStart(session.periodStartISO)}</span> (forward-only).`
+            : `Saving updates <span class="mono">payrollSettings/${empSettingsDocIdForStart(session.periodStartISO)}</span>.`) +
+          (!editable ? `<br/><span class="statusBad">Admin + unlocked period required to edit.</span>` : "");
+
+        drawer.appendChild(title);
+        drawer.appendChild(grid);
+        drawer.appendChild(help);
+
+        drawerTd.appendChild(drawer);
+        drawerTr.appendChild(drawerTd);
+        tbody.appendChild(drawerTr);
+      }
     }
 
     foh.forEach(e => addRow(fohBody, e));
@@ -2020,7 +2002,6 @@
 
     session.rosterEmployees = (mergedPeriod.list || []).map(e => ({ ...e, _editing: false }));
     renderRoster();
-    renderEmpSettingsPanel();
     computeAndRenderAdditions();
 
     if (mergedPeriod.added > 0) {
@@ -2086,7 +2067,6 @@
     }, { merge:true });
 
     setRosterStatus("Saved");
-    renderEmpSettingsPanel();
   }
 
   function addEmployeeBlank(){
@@ -2113,7 +2093,7 @@
 
     setRosterStatus("Added (not saved)");
     renderRoster();
-    renderEmpSettingsPanel();
+    computeAndRenderAdditions();
   }
 
   function setLockedUI(locked){
@@ -2122,7 +2102,6 @@
     ui.lockedLabel.className = locked ? "statusOk" : "statusBad";
     setRosterButtonsEnabled();
     renderRoster();
-    renderEmpSettingsPanel();
 
     ui.lockBtn.classList.toggle("hidden", !session.isAdmin || locked);
     ui.unlockBtn.classList.toggle("hidden", !session.isAdmin || !locked);
@@ -2341,19 +2320,6 @@
   setAdditionsExportButtonsEnabled();
 
   ui.refreshAdditionsBtn?.addEventListener("click", computeAndRenderAdditions);
-
-  ui.toggleRosterSettingsBtn?.addEventListener("click", async () => {
-    ui.rosterSettingsPanel?.classList.toggle("hidden");
-    // ensure loaded + rendered
-    if (!session.empSettingsDraft || session.empSettingsDraft.size === 0) {
-      await loadEmpSettingsForCurrentPeriod();
-    } else {
-      renderEmpSettingsPanel();
-    }
-  });
-
-  ui.saveEmpSettingsBtn?.addEventListener("click", saveEmpSettingsForCurrentPeriod);
-  ui.revertEmpSettingsBtn?.addEventListener("click", revertEmpSettingsEdits);
 
   // ---------- Auth ----------
   firebase.initializeApp(firebaseConfig);
