@@ -82,6 +82,9 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+  <!-- SheetJS (for XLSX export) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 
 <body>
@@ -231,7 +234,7 @@
           If a week shows “No snapshot found”, run the GitHub Action and backfill that <span class="mono">week_of</span>.
         </div>
 
-        <!-- ✅ NEW: Detailed shift rows table -->
+        <!-- ✅ Detailed shift rows table -->
         <div class="card" style="margin-top:12px">
           <h2>Detailed shift rows <span class="muted">(one row per shift)</span></h2>
 
@@ -243,6 +246,9 @@
 
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0 12px">
             <span class="pill"><b>Rows</b> <span id="hwRowsStatus" class="muted">—</span></span>
+
+            <button id="hwCsvBtn" class="btn">Download CSV</button>
+            <button id="hwXlsxBtn" class="btn">Download XLSX</button>
           </div>
 
           <div style="overflow:auto">
@@ -363,6 +369,32 @@
   const LOC_KEY = "beacon";
   const COMPANY_ID = "aidan";
 
+  // ✅ Beacon Role ID -> Name
+  const ROLE_NAMES_BEACON = {
+    "1189518": "Server Assistant",
+    "1189029": "Host",
+    "1183183": "Server",
+    "1183182": "Bartender",
+    "1211411": "Dishwasher",
+    "1211410": "Cook"
+  };
+
+  function roleNameFromId(roleId, locKey, fallbackRoleName){
+    const id = String(roleId ?? "").trim();
+    const lk = String(locKey || "").toLowerCase();
+
+    // prefer explicit role name if provided by snapshot writer
+    const fallback = String(fallbackRoleName || "").trim();
+    if (fallback) return fallback;
+
+    if (lk === "beacon") {
+      if (ROLE_NAMES_BEACON[id]) return ROLE_NAMES_BEACON[id];
+    }
+
+    // last-resort fallback: show id if we truly can't map it
+    return id || "";
+  }
+
   const els = {
     loginBtn: document.getElementById("loginBtn"),
     logoutBtn: document.getElementById("logoutBtn"),
@@ -427,10 +459,11 @@
     hwWeekABody: document.getElementById("hwWeekABody"),
     hwWeekBBody: document.getElementById("hwWeekBBody"),
 
-    // ✅ NEW
     hwRowsStatus: document.getElementById("hwRowsStatus"),
     hwDetailTbody: document.getElementById("hwDetailTbody"),
     hwRowsHint: document.getElementById("hwRowsHint"),
+    hwCsvBtn: document.getElementById("hwCsvBtn"),
+    hwXlsxBtn: document.getElementById("hwXlsxBtn"),
   };
 
   let session = {
@@ -440,7 +473,8 @@
     periodStartISO: null,
     periodEndISO: null,
     locked: false,
-    rosterEmployees: []
+    rosterEmployees: [],
+    hwDetailRows: [] // ✅ used for export
   };
 
   const MS_DAY = 86400000;
@@ -509,7 +543,7 @@
   }
   function normName(s){ return String(s || "").trim().toLowerCase(); }
 
-  // ✅ for table: trim trailing zeros (18.20 -> 18.2, 19.00 -> 19)
+  // trim trailing zeros (18.20 -> 18.2, 19.00 -> 19)
   function fmtNum(n, decimals=2){
     const x = Number(n);
     if (!isFinite(x)) return "";
@@ -527,7 +561,7 @@
     return locKey || "";
   }
 
-  // ✅ NEW: safely read numbers across multiple possible key names
+  // safely read numbers across multiple possible key names
   function firstFiniteNum(obj, keys){
     for (const k of keys) {
       const v = obj?.[k];
@@ -541,13 +575,12 @@
     return isFinite(x) ? x : 0;
   }
 
-  // ✅ NEW: parse "6:11PM" / "11:44AM" / "17:00" / "17:00:00"
+  // parse "6:11PM" / "11:44AM" / "17:00" / "17:00:00"
   function parseTimeToMinutesAny(t){
     const s0 = String(t || "").trim();
     if (!s0) return null;
     const s = s0.toUpperCase().replace(/\s+/g,"");
 
-    // 12-hour: H:MMAM or HAM
     const m12 = s.match(/^(\d{1,2})(?::(\d{2}))?(AM|PM)$/);
     if (m12) {
       let hh = Number(m12[1]);
@@ -558,7 +591,6 @@
       return hh * 60 + mm;
     }
 
-    // 24-hour: HH:MM(:SS)?
     const m24 = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
     if (m24) {
       const hh = Number(m24[1]);
@@ -580,12 +612,10 @@
   function timeFromAny(v){
     const s = String(v || "").trim();
     if (!s) return "";
-    // if looks like "2026-01-09 17:00:00"
     if (/^\d{4}-\d{2}-\d{2}\s+/.test(s)) {
       const parts = s.split(/\s+/);
       return (parts[1] || "").trim();
     }
-    // if looks like ISO
     if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
       return s.split("T")[1]?.replace("Z","") || s;
     }
@@ -603,7 +633,7 @@
     return { inTime, outTime };
   }
 
-  // ✅ NEW: shift start ms uses date + parsed inTime (fixes sorting within same day)
+  // shift start ms uses date + parsed inTime (fixes sorting within same day)
   function shiftStartMs(row){
     const d = dateOnly(row);
     if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return 0;
@@ -611,7 +641,6 @@
     const base = Date.parse(d + "T00:00:00Z");
     if (!isFinite(base)) return 0;
 
-    // prefer explicit minutes if writer provided them
     const startMinExplicit = firstFiniteNum(row, ["start_min", "startMin"]);
     if (startMinExplicit != null) return base + startMinExplicit * 60000;
 
@@ -621,7 +650,7 @@
     return base + mins * 60000;
   }
 
-  // ✅ NEW: compute hours from in/out (handles crossing midnight + unpaid breaks)
+  // compute hours from in/out (handles crossing midnight + unpaid breaks)
   function computeHoursFromRow(row){
     const startMinExplicit = firstFiniteNum(row, ["start_min", "startMin"]);
     const endMinExplicit   = firstFiniteNum(row, ["end_min", "endMin"]);
@@ -648,7 +677,6 @@
     return Math.round((mins / 60) * 100) / 100;
   }
 
-  // ✅ NEW: compute pay (fallback) using wage + hours; OT multipliers are defaults
   function computeRegularPay(wage, regHours){
     const w = Number(wage);
     const h = Number(regHours);
@@ -666,38 +694,108 @@
     return Math.round(w * h * m * 100) / 100;
   }
 
-  // ✅ UPDATED: now supports total_pay OR sums across multiple key variants
   function totalPayForRow(r, computed){
-    const explicit =
-      firstFiniteNum(r, ["total_pay", "totalPay"]) ??
-      null;
-
+    const explicit = firstFiniteNum(r, ["total_pay", "totalPay"]);
     if (explicit != null && explicit !== 0) return explicit;
 
-    const regPay =
-      firstFiniteNum(r, ["regular_pay", "regularPay"]) ??
-      computed?.regular_pay ??
-      0;
-
-    const otPay =
-      firstFiniteNum(r, ["overtime_pay", "overtimePay", "ot_pay", "otPay"]) ??
-      computed?.ot_pay ??
-      0;
-
-    const dotPay =
-      firstFiniteNum(r, ["double_overtime_pay", "doubleOvertimePay", "double_ot_pay", "doubleOtPay"]) ??
-      computed?.double_ot_pay ??
-      0;
-
-    const holPay =
-      firstFiniteNum(r, ["holiday_pay", "holidayPay"]) ??
-      computed?.holiday_pay ??
-      0;
+    const regPay = firstFiniteNum(r, ["regular_pay", "regularPay"]) ?? computed?.regular_pay ?? 0;
+    const otPay  = firstFiniteNum(r, ["overtime_pay", "overtimePay", "ot_pay", "otPay"]) ?? computed?.ot_pay ?? 0;
+    const dotPay = firstFiniteNum(r, ["double_overtime_pay", "doubleOvertimePay", "double_ot_pay", "doubleOtPay"]) ?? computed?.double_ot_pay ?? 0;
+    const holPay = firstFiniteNum(r, ["holiday_pay", "holidayPay"]) ?? computed?.holiday_pay ?? 0;
 
     return regPay + otPay + dotPay + holPay;
   }
 
-  // ✅ UPDATED: render rows with improved sort + fallback calculations
+  function setHWExportButtonsEnabled(){
+    const have = Array.isArray(session.hwDetailRows) && session.hwDetailRows.length > 0;
+    if (ui.hwCsvBtn) ui.hwCsvBtn.disabled = !have;
+    if (ui.hwXlsxBtn) ui.hwXlsxBtn.disabled = !have;
+  }
+
+  function hwExportBaseName(){
+    const start = session.periodStartISO || "";
+    const end   = session.periodEndISO || "";
+    return `Hours & Wages Summary_${start}_${end}`;
+  }
+
+  function hwExportFilename(ext){
+    let base = hwExportBaseName();
+
+    const rows = Array.isArray(session.hwDetailRows) ? session.hwDetailRows : [];
+    const locs = new Set(rows.map(r => String(r.Location || "").trim()).filter(Boolean));
+    if (ext === "xlsx" && locs.size > 1) base += "_all-locations";
+
+    return `${base}.${ext}`;
+  }
+
+  function downloadBlob(filename, blob){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=> URL.revokeObjectURL(url), 1500);
+  }
+
+  function csvEscape(v){
+    const s = (v == null) ? "" : String(v);
+    if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
+    return s;
+  }
+
+  function downloadHWDetailCSV(){
+    const rows = Array.isArray(session.hwDetailRows) ? session.hwDetailRows : [];
+    if (!rows.length) return alert("No detailed rows to export yet.");
+
+    const headers = [
+      "Employee","Date","First","Last","Location","In Time","Out Time","Role","Wage",
+      "Regular hours","OT hours","Double OT hours","Holiday hours",
+      "Regular pay","OT pay","Double OT pay","Holiday pay","Total pay"
+    ];
+
+    const lines = [];
+    lines.push(headers.map(csvEscape).join(","));
+
+    for (const r of rows) {
+      lines.push(headers.map(h => csvEscape(r[h])).join(","));
+    }
+
+    const csv = lines.join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    downloadBlob(hwExportFilename("csv"), blob);
+  }
+
+  function downloadHWDetailXLSX(){
+    const rows = Array.isArray(session.hwDetailRows) ? session.hwDetailRows : [];
+    if (!rows.length) return alert("No detailed rows to export yet.");
+
+    if (!window.XLSX) {
+      alert("XLSX library not loaded. Check your internet connection (SheetJS CDN).");
+      return;
+    }
+
+    const headers = [
+      "Employee","Date","First","Last","Location","In Time","Out Time","Role","Wage",
+      "Regular hours","OT hours","Double OT hours","Holiday hours",
+      "Regular pay","OT pay","Double OT pay","Holiday pay","Total pay"
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
+
+    // Set header order (json_to_sheet sometimes infers)
+    XLSX.utils.sheet_add_aoa(ws, [headers], { origin: "A1" });
+
+    XLSX.utils.book_append_sheet(wb, ws, "Detailed Rows");
+
+    const out = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([out], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    downloadBlob(hwExportFilename("xlsx"), blob);
+  }
+
+  // render rows with improved sort + fallback calculations + role names
   function renderHWDetailRows(docA, docB){
     const tbody = ui.hwDetailTbody;
     if (!tbody) return;
@@ -707,6 +805,7 @@
     const all = [...rowsA, ...rowsB];
 
     tbody.innerHTML = "";
+    session.hwDetailRows = [];
 
     if (!all.length) {
       if (ui.hwRowsStatus) ui.hwRowsStatus.textContent = "0";
@@ -714,12 +813,13 @@
         ui.hwRowsHint.innerHTML =
           `No detailed rows found. Re-run the snapshot action with <span class="mono">detailed=true</span>, then click “Refresh from Firestore”.`;
       }
+      setHWExportButtonsEnabled();
       return;
     }
 
     if (ui.hwRowsHint) ui.hwRowsHint.textContent = "";
 
-    // ✅ Sort: Last, First, then shift start (date + in-time) ascending
+    // Sort: Last, First, then shift start (date + in-time) ascending
     all.sort((a,b)=>{
       const la = normName(a?.last_name || a?.last || "");
       const lb = normName(b?.last_name || b?.last || "");
@@ -751,7 +851,8 @@
       const loc = prettyLoc(locKey);
       const { inTime, outTime } = shiftInOut(r);
 
-      const role = (r.role_id ?? r.roleId ?? r.role ?? "");
+      const roleIdRaw = (r.role_id ?? r.roleId ?? r.role ?? "");
+      const roleName = roleNameFromId(roleIdRaw, locKey, (r.role_name ?? r.roleName ?? ""));
 
       const wageNum =
         firstFiniteNum(r, ["wage","hourly_wage","hourly_rate","hourlyRate","rate","pay_rate","payRate"]) ??
@@ -824,7 +925,7 @@
         loc,
         inTime,
         outTime,
-        role === "" ? "" : String(role),
+        roleName,
         wage,
 
         fmtNum(regHours, 2),
@@ -846,7 +947,31 @@
       }
 
       tbody.appendChild(tr);
+
+      // ✅ Store normalized row for export (match table headers)
+      session.hwDetailRows.push({
+        "Employee": String(emp ?? ""),
+        "Date": String(dateOnly(r) ?? ""),
+        "First": String(first ?? ""),
+        "Last": String(last ?? ""),
+        "Location": String(loc ?? ""),
+        "In Time": String(inTime ?? ""),
+        "Out Time": String(outTime ?? ""),
+        "Role": String(roleName ?? ""),
+        "Wage": wage === "" ? "" : Number(wage),
+        "Regular hours": Number(fmtNum(regHours, 2) || 0),
+        "OT hours": Number(fmtNum(otHours, 2) || 0),
+        "Double OT hours": Number(fmtNum(dotHours, 2) || 0),
+        "Holiday hours": Number(fmtNum(holHours, 2) || 0),
+        "Regular pay": Number(fmtNum(regPay, 2) || 0),
+        "OT pay": Number(fmtNum(otPay, 2) || 0),
+        "Double OT pay": Number(fmtNum(dotPay, 2) || 0),
+        "Holiday pay": Number(fmtNum(holPay, 2) || 0),
+        "Total pay": Number(fmtNum(totPay, 2) || 0)
+      });
     }
+
+    setHWExportButtonsEnabled();
   }
 
   function keyForEmp(e){
@@ -1490,7 +1615,6 @@
       renderHWCard(aDoc, ui.hwWeekARange, ui.hwWeekABody, weekA);
       renderHWCard(bDoc, ui.hwWeekBRange, ui.hwWeekBBody, weekB);
 
-      // ✅ render combined shift rows (Week A + Week B)
       renderHWDetailRows(aDoc, bDoc);
 
       const have = (aDoc?1:0) + (bDoc?1:0);
@@ -1506,6 +1630,8 @@
       if (ui.hwRowsStatus) ui.hwRowsStatus.textContent = "—";
       if (ui.hwDetailTbody) ui.hwDetailTbody.innerHTML = "";
       if (ui.hwRowsHint) ui.hwRowsHint.textContent = "";
+      session.hwDetailRows = [];
+      setHWExportButtonsEnabled();
     }
   }
 
@@ -1587,6 +1713,11 @@
   document.getElementById("saveRosterBtn")?.addEventListener("click", saveRosterForCurrentPeriod);
   ui.refreshHWBtn?.addEventListener("click", loadHoursWagesForCurrentPeriod);
 
+  // ✅ Export buttons
+  ui.hwCsvBtn?.addEventListener("click", downloadHWDetailCSV);
+  ui.hwXlsxBtn?.addEventListener("click", downloadHWDetailXLSX);
+  setHWExportButtonsEnabled();
+
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
 
@@ -1641,4 +1772,3 @@
 </script>
 </body>
 </html>
-
