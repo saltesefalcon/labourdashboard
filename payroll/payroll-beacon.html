@@ -40,6 +40,11 @@
     .note{font-size:.9rem;color:var(--muted);line-height:1.35}
     .statusOk{color:var(--accent)}
     .statusBad{color:var(--warn)}
+    .smallMuted{ color:var(--muted); font-size:.9rem; line-height:1.35; }
+
+    table { width:100%; border-collapse:collapse; }
+    th, td { border-bottom:1px solid var(--line); padding:8px; text-align:left; white-space:nowrap; }
+    th { color:var(--muted); font-weight:600; }
 
     /* --- Wage mismatch modal --- */
     .modalOverlay{
@@ -64,7 +69,6 @@
     }
     .modalHeader h3{ margin:0; font-size:1.05rem; }
     .modalActions{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; margin-top:12px; }
-    .smallMuted{ color:var(--muted); font-size:.9rem; line-height:1.35; }
     .radioWrap{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
     .badge{
       display:inline-flex; align-items:center; gap:6px;
@@ -73,9 +77,33 @@
     }
     .badge b{ color:var(--ink); }
 
-    table { width:100%; border-collapse:collapse; }
-    th, td { border-bottom:1px solid var(--line); padding:8px; text-align:left; white-space:nowrap; }
-    th { color:var(--muted); font-weight:600; }
+    /* --- Roster settings side panel --- */
+    .rosterShell{
+      display:grid;
+      grid-template-columns: 1fr 370px;
+      gap:12px;
+      align-items:start;
+    }
+    @media (max-width: 980px){
+      .rosterShell{ grid-template-columns: 1fr; }
+    }
+    .rosterSettingsHeader{
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:10px 0 12px;
+    }
+    .tinyInput{
+      width:100%;
+      background:transparent;
+      color:var(--ink);
+      border:1px solid var(--line);
+      border-radius:8px;
+      padding:6px 8px;
+      font-size:.95rem;
+    }
+    .tinyInput:disabled{opacity:.55}
+    .tinyCheck{
+      transform: scale(1.1);
+      accent-color: var(--accent);
+    }
   </style>
 
   <!-- Firebase (compat) -->
@@ -92,7 +120,7 @@
     <div class="topbar">
       <div class="title">
         <h1>Payroll — Beacon</h1>
-        <div class="sub">Companion app (separate from Labour Dashboard)</div>
+        <div class="sub">Companion app (separate from Labour Dashboard) — <span class="mono">V2.10</span></div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <button id="loginBtn" class="btn primary">Login</button>
@@ -146,6 +174,52 @@
           <span class="mono">payrollSettings/app</span> (anchorMonday)
           and <span class="mono">payrollPeriods/{periodId}</span> (lock state).
         </div>
+
+        <div class="hr"></div>
+
+        <!-- ✅ Computed additions / e-transfer table -->
+        <div class="card">
+          <h2>E-Transfer / Additions <span class="muted">(computed)</span></h2>
+          <div class="note" style="margin-bottom:10px">
+            Uses:
+            (1) shift rows from Week A + Week B snapshots,
+            (2) roster wages,
+            (3) roster settings (OT threshold / Travel / Flat rate).
+            OT spill pay is estimated as <span class="mono">spillHours × wage × 1.5</span>.
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0 12px">
+            <button id="refreshAdditionsBtn" class="btn primary">Recompute</button>
+            <span class="pill"><b>Rows</b> <span id="additionsRowsStatus" class="muted">—</span></span>
+
+            <button id="additionsCsvBtn" class="btn">Download CSV</button>
+            <button id="additionsXlsxBtn" class="btn">Download XLSX</button>
+          </div>
+
+          <div style="overflow:auto">
+            <table id="additionsTable">
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Emp #</th>
+                  <th>Wage</th>
+                  <th>Total hours (2w)</th>
+                  <th>OT threshold</th>
+                  <th>OT spill hours</th>
+                  <th>OT spill pay (est)</th>
+                  <th>Travel days</th>
+                  <th>Travel hours</th>
+                  <th>Travel pay</th>
+                  <th>Flat rate</th>
+                  <th>Total additions</th>
+                </tr>
+              </thead>
+              <tbody id="additionsTbody"></tbody>
+            </table>
+          </div>
+
+          <div id="additionsHint" class="note" style="margin-top:10px"></div>
+        </div>
       </div>
 
       <div id="tab-roster" class="hidden">
@@ -160,49 +234,94 @@
           <button id="sync7Btn" class="btn primary">Sync from 7shifts</button>
           <button id="addEmpBtn" class="btn">+ Add employee</button>
           <button id="saveRosterBtn" class="btn primary">Save roster</button>
+          <button id="toggleRosterSettingsBtn" class="btn">Settings</button>
           <span class="pill"><b>Roster status</b> <span id="rosterStatus" class="muted">Not loaded</span></span>
         </div>
 
-        <div class="grid2">
-          <div class="card">
-            <h2>FOH</h2>
-            <div style="overflow:auto">
-              <table id="fohTable">
-                <thead>
-                  <tr>
-                    <th>First</th>
-                    <th>Last</th>
-                    <th>Emp #</th>
-                    <th>Wage</th>
-                    <th style="width:170px"></th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
+        <div class="rosterShell">
+          <div>
+            <div class="grid2">
+              <div class="card">
+                <h2>FOH</h2>
+                <div style="overflow:auto">
+                  <table id="fohTable">
+                    <thead>
+                      <tr>
+                        <th>First</th>
+                        <th>Last</th>
+                        <th>Emp #</th>
+                        <th>Wage</th>
+                        <th style="width:170px"></th>
+                      </tr>
+                    </thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="card">
+                <h2>BOH</h2>
+                <div style="overflow:auto">
+                  <table id="bohTable">
+                    <thead>
+                      <tr>
+                        <th>First</th>
+                        <th>Last</th>
+                        <th>Emp #</th>
+                        <th>Wage</th>
+                        <th style="width:170px"></th>
+                      </tr>
+                    </thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div class="note" style="margin-top:10px">
+              Sorting: alphabetized by first name inside each department.
             </div>
           </div>
 
-          <div class="card">
-            <h2>BOH</h2>
-            <div style="overflow:auto">
-              <table id="bohTable">
+          <!-- ✅ Settings side panel -->
+          <div id="rosterSettingsPanel" class="card hidden">
+            <h2>Roster Settings <span class="muted">(OT / Travel / Flat)</span></h2>
+
+            <div class="smallMuted" id="empSettingsMeta">—</div>
+
+            <div class="rosterSettingsHeader">
+              <button id="saveEmpSettingsBtn" class="btn primary">Save settings</button>
+              <button id="revertEmpSettingsBtn" class="btn">Revert</button>
+              <span class="pill"><b>Status</b> <span id="empSettingsStatus" class="muted">Not loaded</span></span>
+            </div>
+
+            <div class="note" style="margin-bottom:10px">
+              OT threshold is total hours (2-week pay period) before spill.
+              Travel adds <b>1 hour per day worked</b>.
+              Flat rate is paid once per pay period.
+            </div>
+
+            <div style="overflow:auto; max-height:56vh">
+              <table>
                 <thead>
                   <tr>
-                    <th>First</th>
-                    <th>Last</th>
+                    <th>Employee</th>
                     <th>Emp #</th>
                     <th>Wage</th>
-                    <th style="width:170px"></th>
+                    <th>OT (hrs)</th>
+                    <th>Travel</th>
+                    <th>Flat ($)</th>
                   </tr>
                 </thead>
-                <tbody></tbody>
+                <tbody id="empSettingsTbody"></tbody>
               </table>
             </div>
-          </div>
-        </div>
 
-        <div class="note" style="margin-top:10px">
-          Sorting: alphabetized by first name inside each department.
+            <div class="note" style="margin-top:10px">
+              Saved to Firestore as <span class="mono">payrollSettings/empSettings_YYYY-MM-DD</span> and carried forward.
+              Editing never rewrites past pay periods.
+            </div>
+          </div>
         </div>
       </div>
 
@@ -383,15 +502,12 @@
     const id = String(roleId ?? "").trim();
     const lk = String(locKey || "").toLowerCase();
 
-    // prefer explicit role name if provided by snapshot writer
     const fallback = String(fallbackRoleName || "").trim();
     if (fallback) return fallback;
 
     if (lk === "beacon") {
       if (ROLE_NAMES_BEACON[id]) return ROLE_NAMES_BEACON[id];
     }
-
-    // last-resort fallback: show id if we truly can't map it
     return id || "";
   }
 
@@ -464,6 +580,21 @@
     hwRowsHint: document.getElementById("hwRowsHint"),
     hwCsvBtn: document.getElementById("hwCsvBtn"),
     hwXlsxBtn: document.getElementById("hwXlsxBtn"),
+
+    toggleRosterSettingsBtn: document.getElementById("toggleRosterSettingsBtn"),
+    rosterSettingsPanel: document.getElementById("rosterSettingsPanel"),
+    empSettingsTbody: document.getElementById("empSettingsTbody"),
+    empSettingsStatus: document.getElementById("empSettingsStatus"),
+    empSettingsMeta: document.getElementById("empSettingsMeta"),
+    saveEmpSettingsBtn: document.getElementById("saveEmpSettingsBtn"),
+    revertEmpSettingsBtn: document.getElementById("revertEmpSettingsBtn"),
+
+    refreshAdditionsBtn: document.getElementById("refreshAdditionsBtn"),
+    additionsRowsStatus: document.getElementById("additionsRowsStatus"),
+    additionsTbody: document.getElementById("additionsTbody"),
+    additionsHint: document.getElementById("additionsHint"),
+    additionsCsvBtn: document.getElementById("additionsCsvBtn"),
+    additionsXlsxBtn: document.getElementById("additionsXlsxBtn"),
   };
 
   let session = {
@@ -474,7 +605,17 @@
     periodEndISO: null,
     locked: false,
     rosterEmployees: [],
-    hwDetailRows: [] // ✅ used for export
+    hwDetailRows: [],
+
+    hwDocA: null,
+    hwDocB: null,
+
+    empSettingsBase: new Map(),   // latest effective settings <= period
+    empSettingsDraft: new Map(),  // editable copy (for current UI)
+    empSettingsEffectiveStart: null, // which effectiveStart was loaded
+    empSettingsDirty: false,
+
+    additionsRows: [] // computed rows for main table + export
   };
 
   const MS_DAY = 86400000;
@@ -518,12 +659,23 @@
     return locRoot().collection("payrollHoursWages").doc(weekStartISO);
   }
 
+  // ✅ Forward-only employee settings docs
+  function empSettingsDocIdForStart(iso){
+    return `empSettings_${iso}`;
+  }
+  function empSettingsDocRefForStart(iso){
+    return locRoot().collection("payrollSettings").doc(empSettingsDocIdForStart(iso));
+  }
+
   function setRosterStatus(msg){
     const el = document.getElementById("rosterStatus");
     if (el) el.textContent = msg;
   }
   function setHWStatus(msg){
     if (ui.hwStatus) ui.hwStatus.textContent = msg;
+  }
+  function setEmpSettingsStatus(msg){
+    if (ui.empSettingsStatus) ui.empSettingsStatus.textContent = msg;
   }
 
   function money2(n){
@@ -543,7 +695,6 @@
   }
   function normName(s){ return String(s || "").trim().toLowerCase(); }
 
-  // trim trailing zeros (18.20 -> 18.2, 19.00 -> 19)
   function fmtNum(n, decimals=2){
     const x = Number(n);
     if (!isFinite(x)) return "";
@@ -561,7 +712,6 @@
     return locKey || "";
   }
 
-  // safely read numbers across multiple possible key names
   function firstFiniteNum(obj, keys){
     for (const k of keys) {
       const v = obj?.[k];
@@ -570,12 +720,7 @@
     }
     return null;
   }
-  function numOrZero(v){
-    const x = Number(v);
-    return isFinite(x) ? x : 0;
-  }
 
-  // parse "6:11PM" / "11:44AM" / "17:00" / "17:00:00"
   function parseTimeToMinutesAny(t){
     const s0 = String(t || "").trim();
     if (!s0) return null;
@@ -633,7 +778,6 @@
     return { inTime, outTime };
   }
 
-  // shift start ms uses date + parsed inTime (fixes sorting within same day)
   function shiftStartMs(row){
     const d = dateOnly(row);
     if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return 0;
@@ -650,7 +794,6 @@
     return base + mins * 60000;
   }
 
-  // compute hours from in/out (handles crossing midnight + unpaid breaks)
   function computeHoursFromRow(row){
     const startMinExplicit = firstFiniteNum(row, ["start_min", "startMin"]);
     const endMinExplicit   = firstFiniteNum(row, ["end_min", "endMin"]);
@@ -784,10 +927,7 @@
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
-
-    // Set header order (json_to_sheet sometimes infers)
     XLSX.utils.sheet_add_aoa(ws, [headers], { origin: "A1" });
-
     XLSX.utils.book_append_sheet(wb, ws, "Detailed Rows");
 
     const out = XLSX.write(wb, { bookType: "xlsx", type: "array" });
@@ -795,7 +935,61 @@
     downloadBlob(hwExportFilename("xlsx"), blob);
   }
 
-  // render rows with improved sort + fallback calculations + role names
+  // ---------- Additions (Main) export ----------
+  function additionsExportBaseName(){
+    const start = session.periodStartISO || "";
+    const end   = session.periodEndISO || "";
+    return `Payroll_Additions_${start}_${end}`;
+  }
+  function additionsFilename(ext){
+    return `${additionsExportBaseName()}.${ext}`;
+  }
+  function setAdditionsExportButtonsEnabled(){
+    const have = Array.isArray(session.additionsRows) && session.additionsRows.length > 0;
+    if (ui.additionsCsvBtn) ui.additionsCsvBtn.disabled = !have;
+    if (ui.additionsXlsxBtn) ui.additionsXlsxBtn.disabled = !have;
+  }
+  function downloadAdditionsCSV(){
+    const rows = Array.isArray(session.additionsRows) ? session.additionsRows : [];
+    if (!rows.length) return alert("No additions rows yet.");
+
+    const headers = [
+      "Employee","Emp #","Wage","Total hours (2w)","OT threshold","OT spill hours","OT spill pay (est)",
+      "Travel days","Travel hours","Travel pay","Flat rate","Total additions"
+    ];
+
+    const lines = [];
+    lines.push(headers.map(csvEscape).join(","));
+    for (const r of rows) lines.push(headers.map(h => csvEscape(r[h])).join(","));
+
+    const blob = new Blob([lines.join("\r\n")], { type:"text/csv;charset=utf-8" });
+    downloadBlob(additionsFilename("csv"), blob);
+  }
+  function downloadAdditionsXLSX(){
+    const rows = Array.isArray(session.additionsRows) ? session.additionsRows : [];
+    if (!rows.length) return alert("No additions rows yet.");
+
+    if (!window.XLSX) {
+      alert("XLSX library not loaded. Check your internet connection (SheetJS CDN).");
+      return;
+    }
+
+    const headers = [
+      "Employee","Emp #","Wage","Total hours (2w)","OT threshold","OT spill hours","OT spill pay (est)",
+      "Travel days","Travel hours","Travel pay","Flat rate","Total additions"
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
+    XLSX.utils.sheet_add_aoa(ws, [headers], { origin: "A1" });
+    XLSX.utils.book_append_sheet(wb, ws, "Additions");
+
+    const out = XLSX.write(wb, { bookType:"xlsx", type:"array" });
+    const blob = new Blob([out], { type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    downloadBlob(additionsFilename("xlsx"), blob);
+  }
+
+  // ---------- Shift rows rendering ----------
   function renderHWDetailRows(docA, docB){
     const tbody = ui.hwDetailTbody;
     if (!tbody) return;
@@ -819,7 +1013,6 @@
 
     if (ui.hwRowsHint) ui.hwRowsHint.textContent = "";
 
-    // Sort: Last, First, then shift start (date + in-time) ascending
     all.sort((a,b)=>{
       const la = normName(a?.last_name || a?.last || "");
       const lb = normName(b?.last_name || b?.last || "");
@@ -858,7 +1051,6 @@
         firstFiniteNum(r, ["wage","hourly_wage","hourly_rate","hourlyRate","rate","pay_rate","payRate"]) ??
         null;
 
-      // HOURS (accept multiple key names, else compute)
       let regHours =
         firstFiniteNum(r, ["regular_hours","regularHours","reg_hours","regHours"]) ??
         0;
@@ -879,7 +1071,6 @@
         firstFiniteNum(r, ["holiday_hours","holidayHours"]) ??
         0;
 
-      // PAY (accept multiple key names, else compute)
       let regPay =
         firstFiniteNum(r, ["regular_pay","regularPay"]) ??
         0;
@@ -948,7 +1139,6 @@
 
       tbody.appendChild(tr);
 
-      // ✅ Store normalized row for export (match table headers)
       session.hwDetailRows.push({
         "Employee": String(emp ?? ""),
         "Date": String(dateOnly(r) ?? ""),
@@ -974,27 +1164,418 @@
     setHWExportButtonsEnabled();
   }
 
+  // ---------- Employee key ----------
   function keyForEmp(e){
     const id = e.empId || e.user_id || e.userId || e.id;
     if (id) return `id:${String(id)}`;
     return `name:${normName(e.first)}|${normName(e.last)}`;
   }
-
-  function setWageByKey(list, key, wage){
-    if (!Array.isArray(list)) return false;
-    let changed = false;
-    for (const e of list) {
-      if (keyForEmp(e) === key) {
-        const cur = Number(e.wage);
-        if (!isFinite(cur) || Math.round(cur*100) !== Math.round(Number(wage)*100)) {
-          e.wage = Number(wage);
-          changed = true;
-        }
-      }
-    }
-    return changed;
+  function keyForShiftRow(r){
+    const uid = r?.user_id ?? r?.userId ?? null;
+    if (uid != null && String(uid).trim() !== "") return `id:${String(uid)}`;
+    const first = (r?.first_name ?? r?.first ?? "").trim();
+    const last = (r?.last_name ?? r?.last ?? "").trim();
+    return `name:${normName(first)}|${normName(last)}`;
   }
 
+  // ---------- Settings panel logic ----------
+  function canEditSettings(){
+    return !!session.user && session.isAdmin && !session.locked;
+  }
+
+  function cloneSettingsMap(m){
+    const out = new Map();
+    for (const [k,v] of (m || new Map()).entries()) {
+      out.set(k, { ...v });
+    }
+    return out;
+  }
+
+  async function loadEmpSettingsForCurrentPeriod(){
+    if (!session.periodStartISO) return;
+
+    setEmpSettingsStatus("Loading…");
+    session.empSettingsDirty = false;
+
+    try {
+      const snap = await locRoot().collection("payrollSettings").get();
+      const docs = [];
+      snap.forEach(doc => {
+        const d = doc.data() || {};
+        if (d.kind === "empSettings" && typeof d.effectiveStart === "string") {
+          docs.push({ id: doc.id, ...d });
+        }
+      });
+
+      // pick latest effectiveStart <= current periodStart
+      const cur = session.periodStartISO;
+      let best = null;
+      for (const d of docs) {
+        const es = String(d.effectiveStart || "");
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(es)) continue;
+        if (es <= cur) {
+          if (!best || es > best.effectiveStart) best = d;
+        }
+      }
+
+      const base = new Map();
+      if (best && Array.isArray(best.rows)) {
+        for (const row of best.rows) {
+          const k = String(row?.key || "").trim();
+          if (!k) continue;
+          base.set(k, {
+            key: k,
+            otThreshold: (row.otThreshold == null || row.otThreshold === "") ? null : Number(row.otThreshold),
+            travel: !!row.travel,
+            flatRate: (row.flatRate == null || row.flatRate === "") ? null : Number(row.flatRate)
+          });
+        }
+        session.empSettingsEffectiveStart = best.effectiveStart;
+      } else {
+        session.empSettingsEffectiveStart = null;
+      }
+
+      session.empSettingsBase = base;
+      session.empSettingsDraft = cloneSettingsMap(base);
+
+      // meta text
+      if (ui.empSettingsMeta) {
+        const eff = session.empSettingsEffectiveStart ? session.empSettingsEffectiveStart : "none";
+        const willCreate = (session.empSettingsEffectiveStart !== session.periodStartISO);
+        ui.empSettingsMeta.innerHTML =
+          `Loaded settings effective: <span class="mono">${eff}</span>. ` +
+          (willCreate
+            ? `Edits will create a new snapshot for <span class="mono">${session.periodStartISO}</span>.`
+            : `Edits will update the snapshot for <span class="mono">${session.periodStartISO}</span>.`);
+      }
+
+      renderEmpSettingsPanel();
+      setEmpSettingsStatus("Loaded");
+    } catch (e) {
+      console.error(e);
+      setEmpSettingsStatus("❌ Failed (permissions?)");
+    }
+  }
+
+  function renderEmpSettingsPanel(){
+    if (!ui.empSettingsTbody) return;
+    ui.empSettingsTbody.innerHTML = "";
+
+    const list = (session.rosterEmployees || []).slice()
+      .filter(e => e && (e.first || e.last))
+      .sort((a,b)=>{
+        const la = normName(a.last || "");
+        const lb = normName(b.last || "");
+        if (la !== lb) return la.localeCompare(lb, undefined, { sensitivity:"base" });
+        const fa = normName(a.first || "");
+        const fb = normName(b.first || "");
+        if (fa !== fb) return fa.localeCompare(fb, undefined, { sensitivity:"base" });
+        return 0;
+      });
+
+    const editable = canEditSettings();
+
+    for (const emp of list) {
+      const k = keyForEmp(emp);
+      if (!session.empSettingsDraft.has(k)) {
+        session.empSettingsDraft.set(k, { key:k, otThreshold:null, travel:false, flatRate:null });
+      }
+      const s = session.empSettingsDraft.get(k);
+
+      const tr = document.createElement("tr");
+
+      function tdText(t){
+        const td = document.createElement("td");
+        td.textContent = t;
+        return td;
+      }
+
+      const name = `${emp.first || ""} ${emp.last || ""}`.trim();
+      tr.appendChild(tdText(name));
+      tr.appendChild(tdText(String(emp.empNo || "")));
+      tr.appendChild(tdText(emp.wage != null && isFinite(Number(emp.wage)) ? `$${Number(emp.wage).toFixed(2)}` : ""));
+
+      // OT
+      const tdOT = document.createElement("td");
+      const inpOT = document.createElement("input");
+      inpOT.type = "number";
+      inpOT.step = "0.25";
+      inpOT.min = "0";
+      inpOT.className = "tinyInput";
+      inpOT.placeholder = "e.g. 44";
+      inpOT.value = (s.otThreshold == null || !isFinite(Number(s.otThreshold))) ? "" : String(s.otThreshold);
+      inpOT.disabled = !editable;
+      inpOT.oninput = () => {
+        const v = inpOT.value.trim();
+        s.otThreshold = v === "" ? null : Number(v);
+        session.empSettingsDirty = true;
+        setEmpSettingsStatus("Edited (not saved)");
+        computeAndRenderAdditions();
+      };
+      tdOT.appendChild(inpOT);
+      tr.appendChild(tdOT);
+
+      // Travel
+      const tdTrav = document.createElement("td");
+      const chk = document.createElement("input");
+      chk.type = "checkbox";
+      chk.className = "tinyCheck";
+      chk.checked = !!s.travel;
+      chk.disabled = !editable;
+      chk.onchange = () => {
+        s.travel = !!chk.checked;
+        session.empSettingsDirty = true;
+        setEmpSettingsStatus("Edited (not saved)");
+        computeAndRenderAdditions();
+      };
+      tdTrav.appendChild(chk);
+      tr.appendChild(tdTrav);
+
+      // Flat
+      const tdFlat = document.createElement("td");
+      const inpFlat = document.createElement("input");
+      inpFlat.type = "number";
+      inpFlat.step = "0.01";
+      inpFlat.min = "0";
+      inpFlat.className = "tinyInput";
+      inpFlat.placeholder = "e.g. 50";
+      inpFlat.value = (s.flatRate == null || !isFinite(Number(s.flatRate))) ? "" : String(s.flatRate);
+      inpFlat.disabled = !editable;
+      inpFlat.oninput = () => {
+        const v = inpFlat.value.trim();
+        s.flatRate = v === "" ? null : Number(v);
+        session.empSettingsDirty = true;
+        setEmpSettingsStatus("Edited (not saved)");
+        computeAndRenderAdditions();
+      };
+      tdFlat.appendChild(inpFlat);
+      tr.appendChild(tdFlat);
+
+      ui.empSettingsTbody.appendChild(tr);
+    }
+
+    // buttons state
+    if (ui.saveEmpSettingsBtn) ui.saveEmpSettingsBtn.disabled = !editable;
+    if (ui.revertEmpSettingsBtn) ui.revertEmpSettingsBtn.disabled = !editable;
+  }
+
+  async function saveEmpSettingsForCurrentPeriod(){
+    if (!session.periodStartISO) return;
+    if (!canEditSettings()) {
+      alert("You must be an admin, and the period must be unlocked, to edit settings.");
+      return;
+    }
+
+    setEmpSettingsStatus("Saving…");
+
+    const rows = [];
+    const list = (session.rosterEmployees || []).slice()
+      .filter(e => e && (e.first || e.last));
+
+    for (const emp of list) {
+      const k = keyForEmp(emp);
+      const s = session.empSettingsDraft.get(k) || { key:k, otThreshold:null, travel:false, flatRate:null };
+
+      // Only store meaningful values (but keep row presence stable)
+      rows.push({
+        key: k,
+        empId: emp.empId ? String(emp.empId) : null,
+        empNo: String(emp.empNo || ""),
+        first: String(emp.first || ""),
+        last: String(emp.last || ""),
+        otThreshold: (s.otThreshold == null || !isFinite(Number(s.otThreshold))) ? null : Number(s.otThreshold),
+        travel: !!s.travel,
+        flatRate: (s.flatRate == null || !isFinite(Number(s.flatRate))) ? null : Number(s.flatRate)
+      });
+    }
+
+    const doc = {
+      kind: "empSettings",
+      location: LOC_KEY,
+      effectiveStart: session.periodStartISO,
+      rows,
+      updated_at: new Date().toISOString(),
+      updated_by_uid: session.user.uid,
+      updated_by_email: session.user.email
+    };
+
+    try {
+      await empSettingsDocRefForStart(session.periodStartISO).set(doc, { merge:true });
+      session.empSettingsDirty = false;
+      setEmpSettingsStatus("Saved");
+      await loadEmpSettingsForCurrentPeriod(); // reload (now effective should be current)
+      computeAndRenderAdditions();
+    } catch (e) {
+      console.error(e);
+      setEmpSettingsStatus("❌ Save failed");
+      alert(e?.message || String(e));
+    }
+  }
+
+  function revertEmpSettingsEdits(){
+    if (!canEditSettings()) return;
+    session.empSettingsDraft = cloneSettingsMap(session.empSettingsBase);
+    session.empSettingsDirty = false;
+    renderEmpSettingsPanel();
+    setEmpSettingsStatus("Reverted");
+    computeAndRenderAdditions();
+  }
+
+  // ---------- Main Additions compute/render ----------
+  function wageForKey(k){
+    const roster = (session.rosterEmployees || []);
+    for (const e of roster) {
+      if (keyForEmp(e) === k) {
+        const w = Number(e.wage);
+        return isFinite(w) ? w : null;
+      }
+    }
+    return null;
+  }
+  function empNoForKey(k){
+    const roster = (session.rosterEmployees || []);
+    for (const e of roster) {
+      if (keyForEmp(e) === k) return String(e.empNo || "");
+    }
+    return "";
+  }
+  function nameForKey(k, fallbackFirst="", fallbackLast=""){
+    const roster = (session.rosterEmployees || []);
+    for (const e of roster) {
+      if (keyForEmp(e) === k) return `${e.first || ""} ${e.last || ""}`.trim();
+    }
+    const nm = `${fallbackFirst || ""} ${fallbackLast || ""}`.trim();
+    return nm || k;
+  }
+
+  function computeAndRenderAdditions(){
+    const aDoc = session.hwDocA;
+    const bDoc = session.hwDocB;
+
+    const rowsA = Array.isArray(aDoc?.shift_rows) ? aDoc.shift_rows : [];
+    const rowsB = Array.isArray(bDoc?.shift_rows) ? bDoc.shift_rows : [];
+    const all = [...rowsA, ...rowsB];
+
+    if (!ui.additionsTbody) return;
+
+    ui.additionsTbody.innerHTML = "";
+    session.additionsRows = [];
+
+    if (!all.length) {
+      if (ui.additionsRowsStatus) ui.additionsRowsStatus.textContent = "0";
+      if (ui.additionsHint) ui.additionsHint.innerHTML =
+        `No shift rows loaded for this pay period yet. Go to “Hours &amp; Wages Summary” and click “Refresh from Firestore” after writing snapshots with <span class="mono">detailed=true</span>.`;
+      setAdditionsExportButtonsEnabled();
+      return;
+    }
+    if (ui.additionsHint) ui.additionsHint.textContent = "";
+
+    const byKey = new Map(); // key -> {hours, days:Set, first,last}
+    for (const r of all) {
+      const k = keyForShiftRow(r);
+      if (!byKey.has(k)) {
+        byKey.set(k, { hours:0, days:new Set(), first:(r.first_name??r.first??"").trim(), last:(r.last_name??r.last??"").trim() });
+      }
+      const rec = byKey.get(k);
+      const h = computeHoursFromRow(r);
+      rec.hours += Number(h || 0);
+      const d = dateOnly(r);
+      if (d) rec.days.add(d);
+    }
+
+    // For each employee in roster, compute additions using settings
+    const rosterSorted = (session.rosterEmployees || []).slice()
+      .filter(e => e && (e.first || e.last))
+      .sort((a,b)=>{
+        const la = normName(a.last || "");
+        const lb = normName(b.last || "");
+        if (la !== lb) return la.localeCompare(lb, undefined, { sensitivity:"base" });
+        const fa = normName(a.first || "");
+        const fb = normName(b.first || "");
+        if (fa !== fb) return fa.localeCompare(fb, undefined, { sensitivity:"base" });
+        return 0;
+      });
+
+    const outRows = [];
+
+    for (const emp of rosterSorted) {
+      const k = keyForEmp(emp);
+      const worked = byKey.get(k);
+      if (!worked) continue; // only show people who worked at least one shift (for now)
+
+      const totalHours = Math.round(worked.hours * 100) / 100;
+      const wage = Number(emp.wage);
+      const wageOk = isFinite(wage) && wage > 0 ? wage : null;
+
+      const s = session.empSettingsDraft.get(k) || { otThreshold:null, travel:false, flatRate:null };
+      const thr = (s.otThreshold != null && isFinite(Number(s.otThreshold)) && Number(s.otThreshold) >= 0) ? Number(s.otThreshold) : null;
+
+      const spillHours = (thr == null) ? 0 : Math.max(0, Math.round((totalHours - thr) * 100) / 100);
+      const travelDays = worked.days.size;
+      const travelHours = s.travel ? travelDays : 0;
+
+      const flat = (s.flatRate != null && isFinite(Number(s.flatRate)) && Number(s.flatRate) > 0) ? Number(s.flatRate) : 0;
+
+      const otPay = (wageOk ? Math.round(spillHours * wageOk * 1.5 * 100) / 100 : 0);
+      const travelPay = (wageOk ? Math.round(travelHours * wageOk * 100) / 100 : 0);
+      const totalAdd = Math.round((otPay + travelPay + flat) * 100) / 100;
+
+      // include row if any additions OR they hit spill hours OR travel enabled OR flat
+      const include = (spillHours > 0) || (travelHours > 0) || (flat > 0);
+      if (!include) continue;
+
+      const name = `${emp.first || ""} ${emp.last || ""}`.trim();
+
+      outRows.push({
+        "Employee": name,
+        "Emp #": String(emp.empNo || ""),
+        "Wage": wageOk == null ? "" : Number(wageOk.toFixed(2)),
+        "Total hours (2w)": Number(totalHours.toFixed(2)),
+        "OT threshold": thr == null ? "" : Number(thr),
+        "OT spill hours": Number(spillHours.toFixed(2)),
+        "OT spill pay (est)": Number(otPay.toFixed(2)),
+        "Travel days": Number(travelDays),
+        "Travel hours": Number(travelHours.toFixed(2)),
+        "Travel pay": Number(travelPay.toFixed(2)),
+        "Flat rate": Number(flat.toFixed(2)),
+        "Total additions": Number(totalAdd.toFixed(2))
+      });
+    }
+
+    // sort by last, first
+    outRows.sort((a,b)=>{
+      const [al,af] = String(a["Employee"]||"").trim().split(/\s+/).reverse();
+      const [bl,bf] = String(b["Employee"]||"").trim().split(/\s+/).reverse();
+      const la = normName(al||"");
+      const lb = normName(bl||"");
+      if (la !== lb) return la.localeCompare(lb, undefined, { sensitivity:"base" });
+      const fa = normName(af||"");
+      const fb = normName(bf||"");
+      return fa.localeCompare(fb, undefined, { sensitivity:"base" });
+    });
+
+    if (ui.additionsRowsStatus) ui.additionsRowsStatus.textContent = String(outRows.length);
+
+    for (const r of outRows) {
+      const tr = document.createElement("tr");
+      const cols = [
+        "Employee","Emp #","Wage","Total hours (2w)","OT threshold","OT spill hours","OT spill pay (est)",
+        "Travel days","Travel hours","Travel pay","Flat rate","Total additions"
+      ];
+      for (const c of cols) {
+        const td = document.createElement("td");
+        const v = r[c];
+        td.textContent = (v == null) ? "" : String(v);
+        tr.appendChild(td);
+      }
+      ui.additionsTbody.appendChild(tr);
+    }
+
+    session.additionsRows = outRows;
+    setAdditionsExportButtonsEnabled();
+  }
+
+  // ---------- Wage mismatch modal (unchanged logic) ----------
   async function showWageMismatchModal(mismatches){
     const modal = document.getElementById("wageMismatchModal");
     const tbody = document.getElementById("wageMismatchTbody");
@@ -1106,6 +1687,10 @@
     if (addBtn) addBtn.disabled = !canEdit;
     if (saveBtn) saveBtn.disabled = !canEdit;
     if (syncBtn) syncBtn.disabled = !canEdit;
+
+    // settings buttons too
+    if (ui.saveEmpSettingsBtn) ui.saveEmpSettingsBtn.disabled = !canEdit;
+    if (ui.revertEmpSettingsBtn) ui.revertEmpSettingsBtn.disabled = !canEdit;
   }
 
   async function loadMasterRoster(){
@@ -1283,6 +1868,7 @@
         emp._editing = !emp._editing;
         setRosterStatus("Edited (not saved)");
         renderRoster();
+        renderEmpSettingsPanel();
       };
 
       const rmBtn = document.createElement("button");
@@ -1316,6 +1902,8 @@
 
         setRosterStatus("Removed (save roster)");
         renderRoster();
+        renderEmpSettingsPanel();
+        computeAndRenderAdditions();
       };
 
       actionWrap.appendChild(editBtn);
@@ -1328,6 +1916,21 @@
 
     foh.forEach(e => addRow(fohBody, e));
     boh.forEach(e => addRow(bohBody, e));
+  }
+
+  function setWageByKey(list, key, wage){
+    if (!Array.isArray(list)) return false;
+    let changed = false;
+    for (const e of list) {
+      if (keyForEmp(e) === key) {
+        const cur = Number(e.wage);
+        if (!isFinite(cur) || Math.round(cur*100) !== Math.round(Number(wage)*100)) {
+          e.wage = Number(wage);
+          changed = true;
+        }
+      }
+    }
+    return changed;
   }
 
   async function syncRosterFrom7shifts(){
@@ -1417,6 +2020,8 @@
 
     session.rosterEmployees = (mergedPeriod.list || []).map(e => ({ ...e, _editing: false }));
     renderRoster();
+    renderEmpSettingsPanel();
+    computeAndRenderAdditions();
 
     if (mergedPeriod.added > 0) {
       setRosterStatus(`Synced: +${mergedPeriod.added} new (save roster)`);
@@ -1481,6 +2086,7 @@
     }, { merge:true });
 
     setRosterStatus("Saved");
+    renderEmpSettingsPanel();
   }
 
   function addEmployeeBlank(){
@@ -1507,6 +2113,7 @@
 
     setRosterStatus("Added (not saved)");
     renderRoster();
+    renderEmpSettingsPanel();
   }
 
   function setLockedUI(locked){
@@ -1515,6 +2122,7 @@
     ui.lockedLabel.className = locked ? "statusOk" : "statusBad";
     setRosterButtonsEnabled();
     renderRoster();
+    renderEmpSettingsPanel();
 
     ui.lockBtn.classList.toggle("hidden", !session.isAdmin || locked);
     ui.unlockBtn.classList.toggle("hidden", !session.isAdmin || !locked);
@@ -1612,10 +2220,14 @@
       const aDoc = aSnap.exists ? (aSnap.data() || null) : null;
       const bDoc = bSnap.exists ? (bSnap.data() || null) : null;
 
+      session.hwDocA = aDoc;
+      session.hwDocB = bDoc;
+
       renderHWCard(aDoc, ui.hwWeekARange, ui.hwWeekABody, weekA);
       renderHWCard(bDoc, ui.hwWeekBRange, ui.hwWeekBBody, weekB);
 
       renderHWDetailRows(aDoc, bDoc);
+      computeAndRenderAdditions();
 
       const have = (aDoc?1:0) + (bDoc?1:0);
       setHWStatus(have ? `Loaded (${have}/2 found)` : "No data for these weeks yet");
@@ -1632,6 +2244,10 @@
       if (ui.hwRowsHint) ui.hwRowsHint.textContent = "";
       session.hwDetailRows = [];
       setHWExportButtonsEnabled();
+
+      session.hwDocA = null;
+      session.hwDocB = null;
+      computeAndRenderAdditions();
     }
   }
 
@@ -1654,6 +2270,7 @@
 
       setLockedUI(false);
       await loadRosterForCurrentPeriod();
+      await loadEmpSettingsForCurrentPeriod();
       await loadHoursWagesForCurrentPeriod();
       setStatus("✅ Ready");
       return;
@@ -1662,6 +2279,7 @@
     const d = snap.data() || {};
     setLockedUI(!!d.locked);
     await loadRosterForCurrentPeriod();
+    await loadEmpSettingsForCurrentPeriod();
     await loadHoursWagesForCurrentPeriod();
     setStatus("✅ Ready");
   }
@@ -1708,16 +2326,36 @@
     await loadPeriod(startISO);
   }
 
+  // ---------- UI wiring ----------
   document.getElementById("sync7Btn")?.addEventListener("click", syncRosterFrom7shifts);
   document.getElementById("addEmpBtn")?.addEventListener("click", addEmployeeBlank);
   document.getElementById("saveRosterBtn")?.addEventListener("click", saveRosterForCurrentPeriod);
   ui.refreshHWBtn?.addEventListener("click", loadHoursWagesForCurrentPeriod);
 
-  // ✅ Export buttons
   ui.hwCsvBtn?.addEventListener("click", downloadHWDetailCSV);
   ui.hwXlsxBtn?.addEventListener("click", downloadHWDetailXLSX);
   setHWExportButtonsEnabled();
 
+  ui.additionsCsvBtn?.addEventListener("click", downloadAdditionsCSV);
+  ui.additionsXlsxBtn?.addEventListener("click", downloadAdditionsXLSX);
+  setAdditionsExportButtonsEnabled();
+
+  ui.refreshAdditionsBtn?.addEventListener("click", computeAndRenderAdditions);
+
+  ui.toggleRosterSettingsBtn?.addEventListener("click", async () => {
+    ui.rosterSettingsPanel?.classList.toggle("hidden");
+    // ensure loaded + rendered
+    if (!session.empSettingsDraft || session.empSettingsDraft.size === 0) {
+      await loadEmpSettingsForCurrentPeriod();
+    } else {
+      renderEmpSettingsPanel();
+    }
+  });
+
+  ui.saveEmpSettingsBtn?.addEventListener("click", saveEmpSettingsForCurrentPeriod);
+  ui.revertEmpSettingsBtn?.addEventListener("click", revertEmpSettingsEdits);
+
+  // ---------- Auth ----------
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
 
