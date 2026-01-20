@@ -128,7 +128,24 @@
       margin-top:10px;
       line-height:1.35;
     }
-  </style>
+  
+  .mutedCol { color: var(--muted); }
+  td.mutedCell { color: var(--muted); }
+  tr.otOver { outline: 1px solid rgba(255,0,0,0.35); }
+  tr.rowAlert td{ color: #ff8a8a; }
+  tr.rowAlert td.mutedCol{ color: #ff8a8a; }
+
+  tr.otOver td { color: #fecaca; }
+  tr.disclaimerRow td { color: var(--muted); font-size: .85rem; padding-top:6px; padding-bottom:6px; }
+  tr.disclaimerRow td span.bad { color: #fca5a5; font-weight: 600; }
+
+
+/* Spill / audit rows */
+.rowDanger td{ background: rgba(239,68,68,0.12); }
+.rowAudit td{ background: rgba(255,255,255,0.04); font-style: italic; color: var(--muted); }
+.rowNote td{ background: rgba(255,255,255,0.03); color: var(--muted); font-size: 0.9rem; }
+.btn.btn-sm{ padding:6px 10px; font-size:0.85rem; }
+</style>
 
   <!-- Firebase (compat) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -224,18 +241,17 @@
             <table id="additionsTable">
               <thead>
                 <tr>
+                  <th>Action</th>
                   <th>Employee</th>
-                  <th>Emp #</th>
+                  <th>Dayforce ID</th>
+                  <th>Notes</th>
                   <th>Wage</th>
-                  <th>Total hours (2w)</th>
-                  <th>OT threshold</th>
-                  <th>OT spill hours</th>
-                  <th>OT spill pay (est)</th>
-                  <th>Travel days</th>
-                  <th>Travel hours</th>
-                  <th>Travel pay</th>
-                  <th>Flat rate</th>
-                  <th>Total additions</th>
+                  <th>E-trans (Total-Dayforce)</th>
+                  <th>Travel</th>
+                  <th>Hours</th>
+                  <th>Amount</th>
+                  <th>E-transfer</th>
+                  <th>Sent</th>
                 </tr>
               </thead>
               <tbody id="additionsTbody"></tbody>
@@ -281,7 +297,12 @@
                   <th>Emp #</th>
                   <th>Wage</th>
                   <th style="width:260px"></th>
-                </tr>
+                  <th class="mutedCol">OT threshold</th>
+                  <th class="mutedCol">Travel</th>
+                  <th class="mutedCol">Flat rate</th>
+                  <th class="mutedCol">E-transfer only</th>
+    
+</tr>
               </thead>
               <tbody></tbody>
             </table>
@@ -301,7 +322,12 @@
                   <th>Emp #</th>
                   <th>Wage</th>
                   <th style="width:260px"></th>
-                </tr>
+                  <th class="mutedCol">OT threshold</th>
+                  <th class="mutedCol">Travel</th>
+                  <th class="mutedCol">Flat rate</th>
+                  <th class="mutedCol">E-transfer only</th>
+    
+</tr>
               </thead>
               <tbody></tbody>
             </table>
@@ -321,10 +347,16 @@
           <span class="mono">companies/aidan/locations/beacon/payrollHoursWages/{weekStartMonday}</span>
         </div>
 
+        
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0 14px">
           <button id="refreshHWBtn" class="btn primary">Refresh from Firestore</button>
           <span class="pill"><b>HW status</b> <span id="hwStatus" class="muted">Not loaded</span></span>
+
+          <button id="hwPrevPeriodBtn" class="btn">← Prev pay period</button>
+          <span class="pill"><b>Pay Period</b> <span id="hwPeriodLabel" class="muted">—</span></span>
+          <button id="hwNextPeriodBtn" class="btn">Next pay period →</button>
         </div>
+
 
         <div class="grid2">
           <div class="card">
@@ -563,6 +595,10 @@
     hwWeekABody: document.getElementById("hwWeekABody"),
     hwWeekBBody: document.getElementById("hwWeekBBody"),
 
+    hwPrevPeriodBtn: document.getElementById("hwPrevPeriodBtn"),
+    hwNextPeriodBtn: document.getElementById("hwNextPeriodBtn"),
+    hwPeriodLabel: document.getElementById("hwPeriodLabel"),
+
     hwRowsStatus: document.getElementById("hwRowsStatus"),
     hwDetailTbody: document.getElementById("hwDetailTbody"),
     hwRowsHint: document.getElementById("hwRowsHint"),
@@ -592,13 +628,16 @@
     hwDocA: null,
     hwDocB: null,
 
+    hwCache: {}, // periodStartISO -> {docA, docB, loadedAtISO}
+
     empSettingsBase: new Map(),   // latest effective settings <= period
     empSettingsDraft: new Map(),  // editable copy (for current UI)
     empSettingsEffectiveStart: null, // which effectiveStart was loaded
     empSettingsDirty: false,
 
     openSettingsKey: null,        // which employee drawer is open
-    additionsRows: []             // computed rows for main table + export
+    additionsRows: [] ,            // computed rows for main table + export
+    hwCache: {}
   };
 
   const MS_DAY = 86400000;
@@ -805,6 +844,42 @@
     return Math.round((mins / 60) * 100) / 100;
   }
 
+  // Resolve worked hours for a shift row.
+  // IMPORTANT: In many 7shifts snapshots, bucket fields exist but are 0.
+  // We only trust buckets if their sum > 0; otherwise we compute from in/out time.
+  function resolveWorkedHours(row){
+    const reg = Number(firstFiniteNum(row, ["regular_hours","regularHours","reg_hours","regHours"]) || 0);
+    const ot  = Number(firstFiniteNum(row, ["overtime_hours","overtimeHours","ot_hours","otHours"]) || 0);
+    const dot = Number(firstFiniteNum(row, ["double_overtime_hours","doubleOvertimeHours","double_ot_hours","doubleOtHours"]) || 0);
+    const hol = Number(firstFiniteNum(row, ["holiday_hours","holidayHours"]) || 0);
+
+    const bucketSum = reg + ot + dot + hol;
+    // Trust buckets only if they actually contain time
+    if (bucketSum > 0) return Math.round(bucketSum * 100) / 100;
+
+    // Common "total hours" fields
+    const totalH = firstFiniteNum(row, ["hours","total_hours","totalHours","worked_hours","workedHours"]);
+    if (totalH != null && totalH > 0) return Math.round(Number(totalH) * 100) / 100;
+
+    // Common "minutes worked" fields
+    const totalM = firstFiniteNum(row, ["minutes_worked","minutesWorked","worked_minutes","workedMinutes"]);
+    if (totalM != null && totalM > 0) return Math.round((Number(totalM) / 60) * 100) / 100;
+
+    return computeHoursFromRow(row);
+  }
+
+  function shiftStartSortableKey(row){
+    const d = dateOnly(row) || "0000-00-00";
+    let inMin = firstFiniteNum(row, ["start_min","startMin"]);
+    if (!(inMin > 0)) {
+      const { inTime } = shiftInOut(row);
+      inMin = parseTimeToMinutesAny(inTime);
+    }
+    if (inMin == null) inMin = 0;
+    const mm = String(Math.round(inMin)).padStart(4, "0");
+    return `${d}T${mm}`;
+  }
+
   function computeRegularPay(wage, regHours){
     const w = Number(wage);
     const h = Number(regHours);
@@ -877,20 +952,12 @@
     const rows = Array.isArray(session.hwDetailRows) ? session.hwDetailRows : [];
     if (!rows.length) return alert("No detailed rows to export yet.");
 
-    const headers = [
-      "Employee","Date","First","Last","Location","In Time","Out Time","Role","Wage",
-      "Regular hours","OT hours","Double OT hours","Holiday hours",
-      "Regular pay","OT pay","Double OT pay","Holiday pay","Total pay"
-    ];
+    const headers = ["Employee","Date","First","Last","Location","In Time","Out Time","Role","Wage","Regular hours","OT hours","Double OT hours","Holiday hours","Regular pay","OT pay","Double OT pay","Holiday pay","Total pay"];
 
-    const lines = [];
-    lines.push(headers.map(csvEscape).join(","));
+    const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
+    XLSX.utils.sheet_add_aoa(ws, [headers], { origin: "A1" });
+    const csv = XLSX.utils.sheet_to_csv(ws);
 
-    for (const r of rows) {
-      lines.push(headers.map(h => csvEscape(r[h])).join(","));
-    }
-
-    const csv = lines.join("\r\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     downloadBlob(hwExportFilename("csv"), blob);
   }
@@ -899,16 +966,7 @@
     const rows = Array.isArray(session.hwDetailRows) ? session.hwDetailRows : [];
     if (!rows.length) return alert("No detailed rows to export yet.");
 
-    if (!window.XLSX) {
-      alert("XLSX library not loaded. Check your internet connection (SheetJS CDN).");
-      return;
-    }
-
-    const headers = [
-      "Employee","Date","First","Last","Location","In Time","Out Time","Role","Wage",
-      "Regular hours","OT hours","Double OT hours","Holiday hours",
-      "Regular pay","OT pay","Double OT pay","Holiday pay","Total pay"
-    ];
+    const headers = ["Employee","Date","First","Last","Location","In Time","Out Time","Role","Wage","Regular hours","OT hours","Double OT hours","Holiday hours","Regular pay","OT pay","Double OT pay","Holiday pay","Total pay"];
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
@@ -920,11 +978,11 @@
     downloadBlob(hwExportFilename("xlsx"), blob);
   }
 
-  // ---------- Additions (Main) export ----------
+// ---------- Additions (Main) export ----------
   function additionsExportBaseName(){
     const start = session.periodStartISO || "";
     const end   = session.periodEndISO || "";
-    return `Payroll_Additions_${start}_${end}`;
+    return `Payroll_Etransfer_${start}_${end}`;
   }
   function additionsFilename(ext){
     return `${additionsExportBaseName()}.${ext}`;
@@ -938,10 +996,7 @@
     const rows = Array.isArray(session.additionsRows) ? session.additionsRows : [];
     if (!rows.length) return alert("No additions rows yet.");
 
-    const headers = [
-      "Employee","Emp #","Wage","Total hours (2w)","OT threshold","OT spill hours","OT spill pay (est)",
-      "Travel days","Travel hours","Travel pay","Flat rate","Total additions"
-    ];
+    const headers = ["Employee","Dayforce ID","Notes","Wage","E-trans (Total-Dayforce)","Travel","Hours","Amount","E-transfer","Sent"];
 
     const lines = [];
     lines.push(headers.map(csvEscape).join(","));
@@ -967,7 +1022,7 @@
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
     XLSX.utils.sheet_add_aoa(ws, [headers], { origin: "A1" });
-    XLSX.utils.book_append_sheet(wb, ws, "Additions");
+    XLSX.utils.book_append_sheet(wb, ws, "E-Transfer");
 
     const out = XLSX.write(wb, { bookType:"xlsx", type:"array" });
     const blob = new Blob([out], { type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -986,166 +1041,262 @@
     tbody.innerHTML = "";
     session.hwDetailRows = [];
 
+    // Spill/travel caches used by Main (E-Transfer)
+    session.spillByKey = new Map();
+    session.travelDaysByKey = new Map();
+
     if (!all.length) {
       if (ui.hwRowsStatus) ui.hwRowsStatus.textContent = "0";
-      if (ui.hwRowsHint) {
-        ui.hwRowsHint.innerHTML =
-          `No detailed rows found. Re-run the snapshot action with <span class="mono">detailed=true</span>, then click “Refresh from Firestore”.`;
-      }
       setHWExportButtonsEnabled();
+      // still compute main sheet (will show nothing)
+      computeAndRenderAdditions();
       return;
     }
 
-    if (ui.hwRowsHint) ui.hwRowsHint.textContent = "";
-
-    all.sort((a,b)=>{
-      const la = normName(a?.last_name || a?.last || "");
-      const lb = normName(b?.last_name || b?.last || "");
-      if (la !== lb) return la.localeCompare(lb, undefined, { sensitivity:"base" });
-
-      const fa = normName(a?.first_name || a?.first || "");
-      const fb = normName(b?.first_name || b?.first || "");
-      if (fa !== fb) return fa.localeCompare(fb, undefined, { sensitivity:"base" });
-
-      const ta = shiftStartMs(a);
-      const tb = shiftStartMs(b);
-      if (ta !== tb) return ta - tb;
-
-      const al = String(a?.label || "");
-      const bl = String(b?.label || "");
-      return al.localeCompare(bl, undefined, { sensitivity:"base" });
-    });
-
-    if (ui.hwRowsStatus) ui.hwRowsStatus.textContent = String(all.length);
-
+    // Build shift objects
+    const shifts = [];
     for (const r of all) {
-      const tr = document.createElement("tr");
-
-      const emp = (r.employee_id ?? r.employeeId ?? r.employee ?? "") || (r.user_id ?? r.userId ?? "");
+      const emp = (r.employee ?? r.Employee ?? r.employee_name ?? r.employeeName ?? r.user ?? r.user_name ?? r.userName ?? r.name ?? "");
       const first = (r.first_name ?? r.first ?? "").trim();
       const last  = (r.last_name ?? r.last ?? "").trim();
 
-      const locKey = (r.location ?? r.locKey ?? LOC_KEY);
-      const loc = prettyLoc(locKey);
+      const locKey = String(r.location_key ?? r.locationKey ?? r.location ?? LOC_KEY).toLowerCase();
+      const loc = locKey.toUpperCase();
+
       const { inTime, outTime } = shiftInOut(r);
 
       const roleIdRaw = (r.role_id ?? r.roleId ?? r.role ?? "");
       const roleName = roleNameFromId(roleIdRaw, locKey, (r.role_name ?? r.roleName ?? ""));
 
-      const wageNum =
+      let wageNum =
         firstFiniteNum(r, ["wage","hourly_wage","hourly_rate","hourlyRate","rate","pay_rate","payRate"]) ??
         null;
 
-      let regHours =
-        firstFiniteNum(r, ["regular_hours","regularHours","reg_hours","regHours"]) ??
-        0;
+      // If the detailed snapshot didn't include wage for this row, fall back to roster wage for this employee.
+      if (wageNum == null) {
+        const k = keyForShiftRow(r);
+        const emp = session.rosterByKey?.get(k) || null;
+        const rw = emp ? firstFiniteNum(emp, ["wage","hourlyRate","rate"]) : null;
+        if (rw != null) wageNum = rw;
+      }
 
-      if (!(regHours > 0)) regHours = computeHoursFromRow(r);
+      const baseHours = resolveWorkedHours(r); // robust
+      const dOnly = dateOnly(r) || "";
+      const startKey = shiftStartSortableKey(r);
 
-      const otHours =
-        firstFiniteNum(r, ["overtime_hours","overtimeHours","ot_hours","otHours"]) ??
-        0;
+      const k = keyForShiftRow(r);
 
-      const dotHours =
-        firstFiniteNum(r, ["double_overtime_hours","doubleOvertimeHours","double_ot_hours","doubleOtHours"]) ??
-        0;
-
-      const holHours =
-        firstFiniteNum(r, ["holiday_hours","holidayHours"]) ??
-        0;
-
-      let regPay =
-        firstFiniteNum(r, ["regular_pay","regularPay"]) ??
-        0;
-
-      if (!(regPay > 0) && wageNum != null && regHours > 0) regPay = computeRegularPay(wageNum, regHours);
-
-      let otPay =
-        firstFiniteNum(r, ["overtime_pay","overtimePay","ot_pay","otPay"]) ??
-        0;
-
-      if (!(otPay > 0) && wageNum != null && otHours > 0) otPay = computeOtPay(wageNum, otHours, 1.5);
-
-      let dotPay =
-        firstFiniteNum(r, ["double_overtime_pay","doubleOvertimePay","double_ot_pay","doubleOtPay"]) ??
-        0;
-
-      if (!(dotPay > 0) && wageNum != null && dotHours > 0) dotPay = computeOtPay(wageNum, dotHours, 2.0);
-
-      let holPay =
-        firstFiniteNum(r, ["holiday_pay","holidayPay"]) ??
-        0;
-
-      if (!(holPay > 0) && wageNum != null && holHours > 0) holPay = computeOtPay(wageNum, holHours, 1.0);
-
-      const computed = { regular_pay: regPay, ot_pay: otPay, double_ot_pay: dotPay, holiday_pay: holPay };
-      const totPay = totalPayForRow(r, computed);
-
-      const wage = (wageNum != null) ? fmtNum(wageNum, 2) : "";
-
-      const cells = [
-        emp,
-        dateOnly(r),
+      shifts.push({
+        raw: r,
+        key: k,
+        dayforceId: (k.startsWith('id:') ? k.slice(3) : ''),
+        empDisplay: String(emp ?? ""),
         first,
         last,
         loc,
+        locKey,
         inTime,
         outTime,
         roleName,
-        wage,
+        wageNum,
+        date: dOnly,
+        startKey,
+        baseHours: Number(baseHours || 0),
+        adjHours: Number(baseHours || 0),
+        moved: 0
+      });
 
-        fmtNum(regHours, 2),
-        fmtNum(otHours, 2),
-        fmtNum(dotHours, 2),
-        fmtNum(holHours, 2),
+      // Travel days are based on days worked (any hours)
+      if (dOnly) {
+        if (!session.travelDaysByKey.has(k)) session.travelDaysByKey.set(k, new Set());
+        session.travelDaysByKey.get(k).add(dOnly);
+      }
+    }
 
-        fmtNum(regPay, 2),
-        fmtNum(otPay, 2),
-        fmtNum(dotPay, 2),
-        fmtNum(holPay, 2),
-        fmtNum(totPay, 2)
+    // Apply spill per employee (remove from last shift backwards until regular hours == threshold)
+    const byKey = new Map();
+    for (const s of shifts) {
+      if (!byKey.has(s.key)) byKey.set(s.key, []);
+      byKey.get(s.key).push(s);
+    }
+
+    const overThresholdKeys = new Set();
+
+    for (const [k, list] of byKey.entries()) {
+      // chronological sort for totals
+      list.sort((a,b) => a.startKey.localeCompare(b.startKey));
+      const total = list.reduce((sum,x)=>sum + (x.baseHours||0), 0);
+
+      const settings = ensureDraftForKey(k);
+      const thr = (settings?.otThreshold == null || settings?.otThreshold === "") ? 88 : Number(settings.otThreshold);
+
+      if (total > thr) overThresholdKeys.add(k);
+
+      let spill = Math.max(0, total - thr);
+
+      // remove from last shift backwards
+      for (let i = list.length - 1; i >= 0 && spill > 0; i--) {
+        const s = list[i];
+        const take = Math.min(s.adjHours, spill);
+        if (take > 0) {
+          s.adjHours = Number((s.adjHours - take).toFixed(4));
+          s.moved = Number((s.moved + take).toFixed(4));
+          spill = Number((spill - take).toFixed(4));
+          session.spillByKey.set(k, Number(((session.spillByKey.get(k) || 0) + take).toFixed(4)));
+        }
+      }
+    }
+
+    // Convert travel day sets -> counts
+    for (const [k, setOrNum] of Array.from(session.travelDaysByKey.entries())) {
+      if (setOrNum instanceof Set) session.travelDaysByKey.set(k, setOrNum.size);
+    }
+
+    // Render order: Last, First then start time
+    shifts.sort((a,b) => {
+      const la = normName(a.last), lb = normName(b.last);
+      if (la !== lb) return la < lb ? -1 : 1;
+      const fa = normName(a.first), fb = normName(b.first);
+      if (fa !== fb) return fa < fb ? -1 : 1;
+      return a.startKey.localeCompare(b.startKey);
+    });
+
+    // Render rows
+    const exportRows = [];
+    let uiRowCount = 0;
+
+    for (const s of shifts) {
+      const wage = (s.wageNum == null ? "" : Number(s.wageNum));
+      const regHours = Number((s.adjHours || 0).toFixed(2));
+
+      const regPay = (wage === "" ? "" : Number((regHours * Number(wage)).toFixed(2)));
+      const otHours = 0;
+      const dotHours = 0;
+      const holHours = 0;
+
+      const otPay = 0;
+      const dotPay = 0;
+      const holPay = 0;
+
+      const totalPay = (regPay === "" ? "" : Number((Number(regPay || 0) + Number(dotPay || 0) + Number(holPay || 0)).toFixed(2)));
+
+      const tr = document.createElement("tr");
+      if (overThresholdKeys.has(s.key)) tr.classList.add("rowDanger");
+
+      const cols = [
+        s.empDisplay,
+        s.date,
+        s.first,
+        s.last,
+        s.loc,
+        s.inTime,
+        s.outTime,
+        s.roleName,
+        wage === "" ? "" : wage,
+        regHours.toFixed(2),
+        otHours.toFixed(2),
+        dotHours.toFixed(2),
+        holHours.toFixed(2),
+        (regPay === "" ? "" : Number(regPay).toFixed(2)),
+        Number(otPay).toFixed(2),
+        Number(dotPay).toFixed(2),
+        Number(holPay).toFixed(2),
+        (totalPay === "" ? "" : Number(totalPay).toFixed(2))
       ];
 
-      for (const c of cells) {
+      for (const v of cols) {
         const td = document.createElement("td");
-        td.textContent = (c == null) ? "" : String(c);
+        td.textContent = (v == null) ? "" : String(v);
         tr.appendChild(td);
       }
 
       tbody.appendChild(tr);
+      uiRowCount++;
 
-      session.hwDetailRows.push({
-        "Employee": String(emp ?? ""),
-        "Date": String(dateOnly(r) ?? ""),
-        "First": String(first ?? ""),
-        "Last": String(last ?? ""),
-        "Location": String(loc ?? ""),
-        "In Time": String(inTime ?? ""),
-        "Out Time": String(outTime ?? ""),
-        "Role": String(roleName ?? ""),
+      // Export row (shift row only, no spill info)
+      exportRows.push({
+        "Employee": String(s.empDisplay ?? ""),
+        "Dayforce ID": String(s.dayforceId ?? ""),
+        "Date": String(s.date ?? ""),
+        "First": String(s.first ?? ""),
+        "Last": String(s.last ?? ""),
+        "Location": String(s.loc ?? ""),
+        "In Time": String(s.inTime ?? ""),
+        "Out Time": String(s.outTime ?? ""),
+        "Role": String(s.roleName ?? ""),
         "Wage": wage === "" ? "" : Number(wage),
-        "Regular hours": Number(fmtNum(regHours, 2) || 0),
-        "OT hours": Number(fmtNum(otHours, 2) || 0),
-        "Double OT hours": Number(fmtNum(dotHours, 2) || 0),
-        "Holiday hours": Number(fmtNum(holHours, 2) || 0),
-        "Regular pay": Number(fmtNum(regPay, 2) || 0),
-        "OT pay": Number(fmtNum(otPay, 2) || 0),
-        "Double OT pay": Number(fmtNum(dotPay, 2) || 0),
-        "Holiday pay": Number(fmtNum(holPay, 2) || 0),
-        "Total pay": Number(fmtNum(totPay, 2) || 0)
+        "Regular hours": Number(regHours.toFixed(2)),
+        "OT hours": 0,
+        "Double OT hours": 0,
+        "Holiday hours": 0,
+        "Regular pay": regPay === "" ? "" : Number(Number(regPay).toFixed(2)),
+        "OT pay": 0,
+        "Double OT pay": 0,
+        "Holiday pay": 0,
+        "Total pay": totalPay === "" ? "" : Number(Number(totalPay).toFixed(2))
       });
+
+      // If spill was removed from this shift, insert audit-only rows (NOT exported)
+      if (s.moved > 0) {
+        const moved = Number(s.moved.toFixed(2));
+
+        const auditTr = document.createElement("tr");
+        auditTr.classList.add("rowAudit");
+        if (overThresholdKeys.has(s.key)) auditTr.classList.add("rowDanger");
+
+        const auditCols = [
+          "", "", "", "", "",
+          "", "", "Spill → E-Transfer",
+          "", "", moved.toFixed(2), "0.00", "0.00",
+          "0.00", "0.00", "0.00", "0.00", "0.00"
+        ];
+        // Align with table columns (19 total)
+        // Employee, Date, First, Last, Location, In, Out, Role, Wage, RegH, OTH, DOTH, HolH, RegPay, OTPay, DOTPay, HolPay, TotalPay
+        const auditCells = [
+          "", s.date, s.first, s.last, s.loc,
+          s.inTime, s.outTime, "Spill → E-Transfer",
+          "", "0.00",
+          moved.toFixed(2), "0.00", "0.00",
+          "0.00","0.00","0.00","0.00","0.00"
+        ];
+
+        for (const v of auditCells) {
+          const td = document.createElement("td");
+          td.textContent = (v == null) ? "" : String(v);
+          auditTr.appendChild(td);
+        }
+        tbody.appendChild(auditTr);
+        uiRowCount++;
+
+        const noteTr = document.createElement("tr");
+        noteTr.classList.add("rowNote");
+        if (overThresholdKeys.has(s.key)) noteTr.classList.add("rowDanger");
+        const td = document.createElement("td");
+        td.colSpan = 18;
+        td.innerHTML = `<span class="mono">${moved.toFixed(2)}</span> hour(s) moved to Pay Period (Main) → E-Transfer sheet (not included in exports).`;
+        noteTr.appendChild(td);
+        tbody.appendChild(noteTr);
+        uiRowCount++;
+      }
     }
 
+    session.hwDetailRows = exportRows;
+    if (ui.hwRowsStatus) ui.hwRowsStatus.textContent = String(exportRows.length);
     setHWExportButtonsEnabled();
-  }
 
-  // ---------- Employee key ----------
+    // Recompute Main E-Transfer sheet from spill + travel/flat
+    computeAndRenderAdditions();
+  }
   function keyForEmp(e){
-    const id = e.empId || e.user_id || e.userId || e.id;
-    if (id) return `id:${String(id)}`;
+    // Prefer stable numeric/ID fields that align with 7shifts payload (employee_id) / Dayforce ID.
+    const id = e.employee_id || e.empNo || e.empNum || e.empNumber || e.emp_no || e.number || e.empId || e.user_id || e.userId || e.id;
+    if (id != null && String(id).trim() !== "") return `id:${String(id)}`;
     return `name:${normName(e.first)}|${normName(e.last)}`;
   }
   function keyForShiftRow(r){
+    // Prefer employee_id from snapshot payload (Dayforce ID), then fall back to user_id, then name.
+    const eid = r?.employee_id ?? r?.employeeId ?? r?.emp_id ?? null;
+    if (eid != null && String(eid).trim() !== "") return `id:${String(eid)}`;
     const uid = r?.user_id ?? r?.userId ?? null;
     if (uid != null && String(uid).trim() !== "") return `id:${String(uid)}`;
     const first = (r?.first_name ?? r?.first ?? "").trim();
@@ -1165,7 +1316,7 @@
 
   function ensureDraftForKey(k){
     if (!session.empSettingsDraft.has(k)) {
-      session.empSettingsDraft.set(k, { key:k, otThreshold:null, travel:false, flatRate:null });
+      session.empSettingsDraft.set(k, { key:k, otThreshold:null, travel:false, flatRate:null, eTransferOnly:false });
     }
     return session.empSettingsDraft.get(k);
   }
@@ -1293,6 +1444,7 @@
 
   // ---------- Main Additions compute/render ----------
   function computeAndRenderAdditions(){
+    // Build the E-Transfer sheet (Main) from spill hours + travel + flat rate.
     const aDoc = session.hwDocA;
     const bDoc = session.hwDocB;
 
@@ -1301,7 +1453,6 @@
     const all = [...rowsA, ...rowsB];
 
     if (!ui.additionsTbody) return;
-
     ui.additionsTbody.innerHTML = "";
     session.additionsRows = [];
 
@@ -1314,99 +1465,257 @@
     }
     if (ui.additionsHint) ui.additionsHint.textContent = "";
 
-    const byKey = new Map(); // key -> {hours, days:Set}
-    for (const r of all) {
-      const k = keyForShiftRow(r);
-      if (!byKey.has(k)) byKey.set(k, { hours:0, days:new Set() });
-      const rec = byKey.get(k);
-      const h = computeHoursFromRow(r);
-      rec.hours += Number(h || 0);
-      const d = dateOnly(r);
-      if (d) rec.days.add(d);
-    }
+    // Spill hours are computed during detailed rendering and stored on session.
+    const spillByKey = session.spillByKey instanceof Map ? session.spillByKey : new Map();
+    const travelDaysByKey = session.travelDaysByKey instanceof Map ? session.travelDaysByKey : new Map();
 
-    const rosterSorted = (session.rosterEmployees || []).slice()
-      .filter(e => e && (e.first || e.last))
-      .sort((a,b)=>{
-        const la = normName(a.last || "");
-        const lb = normName(b.last || "");
-        if (la !== lb) return la.localeCompare(lb, undefined, { sensitivity:"base" });
-        const fa = normName(a.first || "");
-        const fb = normName(b.first || "");
-        if (fa !== fb) return fa.localeCompare(fb, undefined, { sensitivity:"base" });
-        return 0;
-      });
+    // Load any per-period manual edits/overrides (stored on the payrollPeriods/{periodId} doc)
+    const edits = (session.periodDocData && session.periodDocData.etransferEdits) ? session.periodDocData.etransferEdits : {};
 
     const outRows = [];
 
-    for (const emp of rosterSorted) {
-      const k = keyForEmp(emp);
-      const worked = byKey.get(k);
-      if (!worked) continue;
+    // Build a roster lookup for wage + emp#
+    const roster = Array.isArray(session.rosterEmployees) ? session.rosterEmployees : [];
+    const rosterByKey = new Map(roster.map(e => [keyForEmp(e), e]));
 
-      const totalHours = Math.round(worked.hours * 100) / 100;
-      const wage = Number(emp.wage);
-      const wageOk = isFinite(wage) && wage > 0 ? wage : null;
+    function roundToHalf(x){
+      const n = Number(x || 0);
+      return Math.round(n * 2) / 2;
+    }
+
+    // Create rows for anyone with spill hours OR travel OR flat rate
+    const keys = new Set([
+      ...Array.from(spillByKey.keys()),
+      ...Array.from(travelDaysByKey.keys()),
+      ...Array.from(session.empSettingsDraft?.keys?.() || [])
+    ]);
+
+    const cols = ["Employee","Dayforce ID","Notes","Wage","E-trans (Total-Dayforce)","Travel","Hours","Amount","E-transfer","Sent"];
+
+    for (const k of keys) {
+      const emp = rosterByKey.get(k);
+      const first = (emp?.first ?? emp?.firstName ?? "").trim();
+      const last  = (emp?.last ?? emp?.lastName ?? "").trim();
+      const employeeName = (first || last) ? `${first} ${last}`.trim() : (emp?.name ?? k);
+
+      const empNum = emp?.empNum ?? emp?.empNumber ?? emp?.emp_no ?? emp?.number ?? "";
+      const wage = Number(emp?.wage ?? emp?.hourlyWage ?? emp?.rate ?? 0) || 0;
 
       const s = ensureDraftForKey(k);
-      const thr = (s.otThreshold != null && isFinite(Number(s.otThreshold)) && Number(s.otThreshold) >= 0) ? Number(s.otThreshold) : null;
+      const thr = (s?.otThreshold == null || s?.otThreshold === "") ? 88 : Number(s.otThreshold);
+      const spillHours = Number(spillByKey.get(k) || 0);
+      const travelDays = Number(travelDaysByKey.get(k) || 0);
+      const travelHours = (s?.travel ? travelDays * 1 : 0);
+      const flat = Number(s?.flatRate || 0) || 0;
 
-      const spillHours = (thr == null) ? 0 : Math.max(0, Math.round((totalHours - thr) * 100) / 100);
-      const travelDays = worked.days.size;
-      const travelHours = s.travel ? travelDays : 0;
-
-      const flat = (s.flatRate != null && isFinite(Number(s.flatRate)) && Number(s.flatRate) > 0) ? Number(s.flatRate) : 0;
-
-      const otPay = (wageOk ? Math.round(spillHours * wageOk * 1.5 * 100) / 100 : 0);
-      const travelPay = (wageOk ? Math.round(travelHours * wageOk * 100) / 100 : 0);
-      const totalAdd = Math.round((otPay + travelPay + flat) * 100) / 100;
-
+      // Include only if there's something payable on e-transfer (spill hours, travel, or flat)
       const include = (spillHours > 0) || (travelHours > 0) || (flat > 0);
       if (!include) continue;
 
-      const name = `${emp.first || ""} ${emp.last || ""}`.trim();
+      // Apply manual edits if any
+      const e = edits[k] || {};
+      const useNotes = (e.notes != null ? String(e.notes) : (spillHours > 0 ? `OT (${thr}+)` : (travelHours>0 ? "Travel" : "Flat")));
+      const useWage = (e.wage != null && e.wage !== "" ? Number(e.wage) : wage);
+      const useSpill = (e.eTransHours != null && e.eTransHours !== "" ? Number(e.eTransHours) : spillHours);
+      const useTravel = (e.travelHours != null && e.travelHours !== "" ? Number(e.travelHours) : travelHours);
+      const useSent = (e.sent != null ? !!e.sent : false);
 
-      outRows.push({
-        "Employee": name,
-        "Emp #": String(emp.empNo || ""),
-        "Wage": wageOk == null ? "" : Number(wageOk.toFixed(2)),
-        "Total hours (2w)": Number(totalHours.toFixed(2)),
-        "OT threshold": thr == null ? "" : Number(thr),
-        "OT spill hours": Number(spillHours.toFixed(2)),
-        "OT spill pay (est)": Number(otPay.toFixed(2)),
-        "Travel days": Number(travelDays),
-        "Travel hours": Number(travelHours.toFixed(2)),
-        "Travel pay": Number(travelPay.toFixed(2)),
-        "Flat rate": Number(flat.toFixed(2)),
-        "Total additions": Number(totalAdd.toFixed(2))
-      });
+      const hours = Number((useSpill + useTravel).toFixed(2));
+      const amount = Number((useWage * hours + flat).toFixed(2));
+      const eTransfer = roundToHalf(amount);
+
+      const rowObj = {
+        "Employee": employeeName,
+        "Dayforce ID": empNum === "" ? "" : Number(empNum),
+        "Notes": useNotes,
+        "Wage": useWage ? Number(useWage) : "",
+        "E-trans (Total-Dayforce)": Number(useSpill.toFixed(2)),
+        "Travel": Number(useTravel.toFixed(2)),
+        "Hours": Number(hours.toFixed(2)),
+        "Amount": Number(amount.toFixed(2)),
+        "E-transfer": Number(eTransfer.toFixed(2)),
+        "Sent": useSent
+      };
+
+      outRows.push({ key:k, row:rowObj });
     }
 
-    outRows.sort((a,b)=>{
-      const aName = String(a["Employee"]||"").trim();
-      const bName = String(b["Employee"]||"").trim();
-      return aName.localeCompare(bName, undefined, { sensitivity:"base" });
-    });
-
+    // Render
     if (ui.additionsRowsStatus) ui.additionsRowsStatus.textContent = String(outRows.length);
 
-    for (const r of outRows) {
+    for (const entry of outRows) {
+      const k = entry.key;
+      const r = entry.row;
+
       const tr = document.createElement("tr");
-      const cols = [
-        "Employee","Emp #","Wage","Total hours (2w)","OT threshold","OT spill hours","OT spill pay (est)",
-        "Travel days","Travel hours","Travel pay","Flat rate","Total additions"
-      ];
+
+      // Action button (not included in exports)
+      const tdAct = document.createElement("td");
+      const btn = document.createElement("button");
+      btn.className = "btn btn-sm";
+      btn.textContent = "Edit";
+      btn.onclick = async () => {
+        await editEtransferRow(k, r);
+      };
+      tdAct.appendChild(btn);
+      tr.appendChild(tdAct);
+
       for (const c of cols) {
         const td = document.createElement("td");
         const v = r[c];
-        td.textContent = (v == null) ? "" : String(v);
+
+        if (c === "Sent") {
+          const cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.className = "tinyCheck";
+          cb.checked = (v === true) || (String(v).toLowerCase() === "true") || (String(v).toLowerCase() === "yes") || (String(v).trim() === "1");
+          cb.disabled = !session.isAdmin;
+          cb.onchange = async () => {
+            await saveEtransferEdits(k, { sent: !!cb.checked });
+            computeAndRenderAdditions();
+          };
+          td.appendChild(cb);
+        } else {
+          td.textContent = (v == null) ? "" : String(v);
+        }
+
         tr.appendChild(td);
       }
       ui.additionsTbody.appendChild(tr);
+
+      session.additionsRows.push(r);
     }
 
-    session.additionsRows = outRows;
     setAdditionsExportButtonsEnabled();
+  }
+
+  async function editEtransferRow(empKey, row){
+    const cur = (session.periodDocData && session.periodDocData.etransferEdits && session.periodDocData.etransferEdits[empKey]) ? session.periodDocData.etransferEdits[empKey] : {};
+
+    const initial = {
+      notes: (cur.notes ?? row["Notes"] ?? ""),
+      eTransHours: String(cur.eTransHours ?? row["E-trans (Total-Dayforce)"] ?? "0"),
+      travelHours: String(cur.travelHours ?? row["Travel"] ?? "0"),
+      wage: String(cur.wage ?? row["Wage"] ?? ""),
+      sent: !!(cur.sent ?? (row["Sent"] === true))
+    };
+
+    // Modal overlay (single editor, not multiple prompts)
+    const overlay = document.createElement("div");
+    overlay.style.position = "fixed";
+    overlay.style.inset = "0";
+    overlay.style.background = "rgba(0,0,0,0.55)";
+    overlay.style.zIndex = "9999";
+    overlay.style.display = "flex";
+    overlay.style.alignItems = "center";
+    overlay.style.justifyContent = "center";
+    overlay.onclick = (e) => { if (e.target === overlay) close(); };
+
+    const card = document.createElement("div");
+    card.style.width = "min(640px, calc(100vw - 24px))";
+    card.style.background = "rgba(17,24,39,0.98)";
+    card.style.border = "1px solid rgba(255,255,255,0.10)";
+    card.style.borderRadius = "14px";
+    card.style.boxShadow = "0 20px 60px rgba(0,0,0,0.45)";
+    card.style.padding = "14px";
+
+    const title = document.createElement("div");
+    title.style.fontWeight = "800";
+    title.style.fontSize = "1.05rem";
+    title.style.marginBottom = "10px";
+    title.textContent = "Edit E-transfer row";
+    card.appendChild(title);
+
+    function field(label, el){
+      const wrap = document.createElement("div");
+      wrap.style.marginBottom = "10px";
+      const l = document.createElement("div");
+      l.className = "muted";
+      l.style.fontSize = ".85rem";
+      l.style.marginBottom = "6px";
+      l.textContent = label;
+      wrap.appendChild(l);
+      wrap.appendChild(el);
+      return wrap;
+    }
+
+    const notes = document.createElement("input");
+    notes.className = "input";
+    notes.value = initial.notes;
+
+    const eTransHours = document.createElement("input");
+    eTransHours.className = "input";
+    eTransHours.type = "number";
+    eTransHours.step = "0.01";
+    eTransHours.value = initial.eTransHours;
+
+    const travelHours = document.createElement("input");
+    travelHours.className = "input";
+    travelHours.type = "number";
+    travelHours.step = "0.01";
+    travelHours.value = initial.travelHours;
+
+    const wage = document.createElement("input");
+    wage.className = "input";
+    wage.type = "number";
+    wage.step = "0.01";
+    wage.value = initial.wage;
+
+    const sentWrap = document.createElement("label");
+    sentWrap.style.display = "flex";
+    sentWrap.style.alignItems = "center";
+    sentWrap.style.gap = "10px";
+    const sent = document.createElement("input");
+    sent.type = "checkbox";
+    sent.className = "tinyCheck";
+    sent.checked = initial.sent;
+    const sentTxt = document.createElement("div");
+    sentTxt.textContent = "Sent";
+    sentTxt.className = "muted";
+    sentWrap.appendChild(sent);
+    sentWrap.appendChild(sentTxt);
+
+    card.appendChild(field("Notes", notes));
+    card.appendChild(field("E-trans hours (spill hours)", eTransHours));
+    card.appendChild(field("Travel hours", travelHours));
+    card.appendChild(field("Wage", wage));
+    card.appendChild(field("Sent", sentWrap));
+
+    const btnRow = document.createElement("div");
+    btnRow.style.display = "flex";
+    btnRow.style.justifyContent = "flex-end";
+    btnRow.style.gap = "10px";
+    btnRow.style.marginTop = "8px";
+
+    const cancel = document.createElement("button");
+    cancel.className = "btn";
+    cancel.textContent = "Cancel";
+    cancel.onclick = () => close();
+
+    const save = document.createElement("button");
+    save.className = "btn primary";
+    save.textContent = "Save";
+    save.onclick = async () => {
+      const patch = {
+        notes: notes.value,
+        eTransHours: Number(eTransHours.value || 0),
+        travelHours: Number(travelHours.value || 0),
+        wage: (wage.value === "" ? "" : Number(wage.value)),
+        sent: !!sent.checked
+      };
+      await saveEtransferEdits(empKey, patch);
+      close();
+      computeAndRenderAdditions();
+    };
+
+    btnRow.appendChild(cancel);
+    btnRow.appendChild(save);
+    card.appendChild(btnRow);
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    function close(){ overlay.remove(); }
   }
 
   // ---------- Wage mismatch modal ----------
@@ -1747,10 +2056,33 @@
       actionsTd.appendChild(actionWrap);
       tr.appendChild(actionsTd);
 
+      // Settings summary columns (read-only)
+      const k = keyForEmp(emp);
+      const s = ensureDraftForKey(k);
+      const thrVal = (s?.otThreshold == null || s?.otThreshold === "") ? 88 : Number(s.otThreshold);
+      const travelVal = !!s?.travel;
+      const flatVal = Number(s?.flatRate || 0) || 0;
+      const etOnlyVal = !!s?.eTransferOnly;
+
+      function tdText(text, cls){
+        const cell = document.createElement("td");
+        if (cls) cell.className = cls;
+        cell.textContent = text;
+        return cell;
+      }
+
+      tr.appendChild(tdText(String(thrVal), "mutedCol"));
+      tr.appendChild(tdText(travelVal ? "Yes" : "No", "mutedCol"));
+      tr.appendChild(tdText(`$${money2(flatVal)}`, "mutedCol"));
+      tr.appendChild(tdText(etOnlyVal ? "Yes" : "No", "mutedCol"));
+
+      // Highlight employees whose settings differ from defaults
+      const isChanged = (thrVal !== 88) || travelVal || (flatVal > 0) || etOnlyVal;
+      if (isChanged) tr.classList.add("rowAlert");
       tbody.appendChild(tr);
 
       // ---- Settings drawer row (inline) ----
-      const k = keyForEmp(emp);
+      // (k already defined above for this employee)
       if (session.openSettingsKey === k) {
         const drawerTr = document.createElement("tr");
         const drawerTd = document.createElement("td");
@@ -1874,6 +2206,34 @@
         grid.appendChild(otWrap);
         grid.appendChild(travWrap);
         grid.appendChild(flatWrap);
+
+        // E-transfer only (remove all hours from HW sheet, show on Main)
+        const etoWrap = document.createElement("div");
+        etoWrap.innerHTML = `<div class="muted" style="font-size:.85rem;margin-bottom:6px">E-transfer only</div>`;
+        const etoRow = document.createElement("div");
+        etoRow.style.display = "flex";
+        etoRow.style.alignItems = "center";
+        etoRow.style.gap = "10px";
+        const eto = document.createElement("input");
+        eto.type = "checkbox";
+        eto.className = "tinyCheck";
+        eto.checked = !!s.eTransferOnly;
+        eto.disabled = !editable;
+        eto.onchange = () => {
+          s.eTransferOnly = !!eto.checked;
+          session.empSettingsDirty = true;
+          setRosterStatus("Settings edited (not saved)");
+          computeAndRenderAdditions();
+          renderHW(); // re-render to apply removal markers
+        };
+        const etoLbl = document.createElement("div");
+        etoLbl.className = "muted";
+        etoLbl.style.fontSize = ".9rem";
+        etoLbl.textContent = "Move all hours to Main sheet";
+        etoRow.appendChild(eto);
+        etoRow.appendChild(etoLbl);
+        etoWrap.appendChild(etoRow);
+        grid.appendChild(etoWrap);
 
         const help = document.createElement("div");
         help.className = "helpLine";
@@ -2029,8 +2389,7 @@
       session.rosterEmployees = master.filter(e => e.active !== false).map(e => ({ ...e, _editing:false }));
       renderRoster();
 
-      await syncRosterFrom7shifts();
-      setRosterStatus("New roster (from master + 7shifts)");
+      setRosterStatus("New roster (from master)");
       return;
     }
 
@@ -2038,7 +2397,6 @@
     session.rosterEmployees = Array.isArray(d.employees) ? d.employees.map(e => ({ ...e, _editing:false })) : [];
     renderRoster();
 
-    await syncRosterFrom7shifts();
     setRosterStatus("Loaded");
   }
 
@@ -2109,7 +2467,9 @@
 
   function setPeriodLabel(){
     if(!session.periodStartISO || !session.periodEndISO) return;
-    ui.periodLabel.textContent = `${session.periodStartISO} → ${session.periodEndISO}`;
+    const txt = `${session.periodStartISO} → ${session.periodEndISO}`;
+    if (ui.periodLabel) ui.periodLabel.textContent = txt;
+    if (ui.hwPeriodLabel) ui.hwPeriodLabel.textContent = txt;
   }
 
   async function loadOrCreateAnchor(){
@@ -2182,8 +2542,23 @@
     `;
   }
 
-  async function loadHoursWagesForCurrentPeriod(){
+  async function loadHoursWagesForCurrentPeriod(force=false){
     if (!session.periodStartISO) return;
+    const cacheKey = session.periodStartISO;
+    if (!force && session.hwCache && session.hwCache[cacheKey]) {
+      const cached = session.hwCache[cacheKey];
+      session.hwDocA = cached.docA || null;
+      session.hwDocB = cached.docB || null;
+      if (ui.hwStatus) ui.hwStatus.textContent = "Cached";
+      const a = session.periodStartISO;
+      const weekA = a;
+      const weekB = (function(){ const d = utcDateFromISO(a); return isoFromUTC(addDaysUTC(d, 7)); })();
+      renderHWCard(session.hwDocA, ui.hwWeekARange, ui.hwWeekABody, weekA);
+      renderHWCard(session.hwDocB, ui.hwWeekBRange, ui.hwWeekBBody, weekB);
+      renderHWDetailRows(session.hwDocA, session.hwDocB);
+      setPeriodLabel();
+      return;
+    }
 
     const weekA = session.periodStartISO;
     const weekB = isoFromUTC(addDaysUTC(utcDateFromISO(session.periodStartISO), 7));
@@ -2207,6 +2582,8 @@
 
       renderHWDetailRows(aDoc, bDoc);
       computeAndRenderAdditions();
+
+      session.hwCache[session.periodStartISO] = { docA: aDoc, docB: bDoc, loadedAtISO: new Date().toISOString() };
 
       const have = (aDoc?1:0) + (bDoc?1:0);
       setHWStatus(have ? `Loaded (${have}/2 found)` : "No data for these weeks yet");
@@ -2239,6 +2616,8 @@
 
     const snap = await periodRef(periodStartISO).get();
 
+    session.periodDocData = snap.exists ? (snap.data() || {}) : {};
+
     if (!snap.exists) {
       await periodRef(periodStartISO).set({
         periodStart: session.periodStartISO,
@@ -2246,6 +2625,8 @@
         locked: false,
         created_at: new Date().toISOString(),
       }, { merge:true });
+
+      session.periodDocData = { periodStart: session.periodStartISO, periodEnd: session.periodEndISO, locked:false, etransferEdits:{} };
 
       setLockedUI(false);
       await loadRosterForCurrentPeriod();
@@ -2288,6 +2669,9 @@
     if (ui.nextPeriodBtn) ui.nextPeriodBtn.onclick = () => gotoRelativePeriod(1);
     if (ui.lockBtn) ui.lockBtn.onclick = () => setLock(true);
     if (ui.unlockBtn) ui.unlockBtn.onclick = () => setLock(false);
+    if (ui.hwPrevPeriodBtn) ui.hwPrevPeriodBtn.onclick = () => gotoRelativePeriod(-1);
+    if (ui.hwNextPeriodBtn) ui.hwNextPeriodBtn.onclick = () => gotoRelativePeriod(1);
+
   }
   wirePayrollButtons();
 
@@ -2309,7 +2693,7 @@
   document.getElementById("sync7Btn")?.addEventListener("click", syncRosterFrom7shifts);
   document.getElementById("addEmpBtn")?.addEventListener("click", addEmployeeBlank);
   document.getElementById("saveRosterBtn")?.addEventListener("click", saveRosterForCurrentPeriod);
-  ui.refreshHWBtn?.addEventListener("click", loadHoursWagesForCurrentPeriod);
+  ui.refreshHWBtn?.addEventListener("click", () => loadHoursWagesForCurrentPeriod(true));
 
   ui.hwCsvBtn?.addEventListener("click", downloadHWDetailCSV);
   ui.hwXlsxBtn?.addEventListener("click", downloadHWDetailXLSX);
