@@ -162,16 +162,36 @@ function safeUserInfo(u) {
 
 function pickWageFromAnything(obj) {
   const o = obj || {};
+  // Common 7shifts shapes across endpoints:
+  // - schedule shifts often use hourly_wage
+  // - reports may use wage, hourly_rate, pay_rate, etc.
   const candidates = [
-    o.wage, o.hourly_wage, o.hourly_rate, o.rate, o.pay_rate, o.wage_rate,
-    o.hourlyRate, o.payRate
+    o.wage,
+    o.hourly_wage,
+    o.hourlyWage,
+    o.hourly,
+    o.hourly_rate,
+    o.hourlyRate,
+    o.hr_rate,
+    o.hrRate,
+    o.pay_rate,
+    o.payRate,
+    o.rate,
+    // cents variants
+    (typeof o.hourly_wage_cents === "number" ? o.hourly_wage_cents / 100 : null),
+    (typeof o.pay_rate_cents === "number" ? o.pay_rate_cents / 100 : null),
+    // some endpoints embed a "role" or "user" object with wage info
+    o.role && (o.role.wage ?? o.role.hourly_wage ?? o.role.hourly_rate ?? o.role.pay_rate),
+    o.user && (o.user.wage ?? o.user.hourly_wage ?? o.user.hourly_rate ?? o.user.pay_rate),
   ];
+
   for (const c of candidates) {
     const n = numOrNull(c);
     if (n != null && n > 0) return n;
   }
   return null;
 }
+
 
 // --- time parsing helpers (fallback compute) ---
 function parseTime12ToMinutes(t) {
