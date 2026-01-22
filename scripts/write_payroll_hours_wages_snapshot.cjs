@@ -162,40 +162,16 @@ function safeUserInfo(u) {
 
 function pickWageFromAnything(obj) {
   const o = obj || {};
-  // Common 7shifts shapes across endpoints:
-  // - schedule shifts often use hourly_wage
-  // - reports may use wage, hourly_rate, pay_rate, etc.
   const candidates = [
-    o.wage,
-    o.hourly_wage,
-    o.hourlyWage,
-    o.hourly,
-    o.hourly_rate,
-    o.hourlyRate,
-    o.hr_rate,
-    o.hrRate,
-    o.pay_rate,
-    o.payRate,
-    o.rate,
-    // cents variants
-    (typeof o.hourly_wage_cents === "number" ? o.hourly_wage_cents / 100 : null),
-    (typeof o.pay_rate_cents === "number" ? o.pay_rate_cents / 100 : null),
-    (typeof o.user?.pay_rate_cents === "number" ? o.user.pay_rate_cents / 100 : null),
-    (typeof o.user_information?.pay_rate_cents === "number" ? o.user_information.pay_rate_cents / 100 : null),
-    (typeof o.user_information?.hourly_wage_cents === "number" ? o.user_information.hourly_wage_cents / 100 : null),
-    // some endpoints embed a "role" or "user" object with wage info
-    o.role && (o.role.wage ?? o.role.hourly_wage ?? o.role.hourly_rate ?? o.role.pay_rate),
-    o.user && (o.user.wage ?? o.user.hourly_wage ?? o.user.hourly_rate ?? o.user.pay_rate),
-    o.user_information && (o.user_information.wage ?? o.user_information.hourly_wage ?? o.user_information.hourly_rate ?? o.user_information.pay_rate),
+    o.wage, o.hourly_wage, o.hourly_rate, o.rate, o.pay_rate, o.wage_rate,
+    o.hourlyRate, o.payRate
   ];
-
   for (const c of candidates) {
     const n = numOrNull(c);
     if (n != null && n > 0) return n;
   }
   return null;
 }
-
 
 // --- time parsing helpers (fallback compute) ---
 function parseTime12ToMinutes(t) {
@@ -277,16 +253,118 @@ function pickShiftNumbers(shift) {
   };
 }
 
+
+function normalizeShiftRowFromApiRow(row, locKey) {
+  const r = row || {};
+  // common user info nesting
+  const ui = r.user || r.user_information || r.userInfo || r.employee || {};
+  const employee_id = r.employee_id ?? ui.employee_id ?? ui.employeeId ?? ui.id ?? null;
+  const user_id = r.user_id ?? ui.user_id ?? ui.userId ?? null;
+
+  const first_name = r.first_name ?? ui.first_name ?? ui.firstName ?? "";
+  const last_name  = r.last_name  ?? ui.last_name  ?? ui.lastName  ?? "";
+
+  const label = r.label || r.time_label || r.shift_label || r.shiftLabel || "";
+  const { inLabel, outLabel } = splitLabelTimes(label);
+
+  const dateRaw = r.date || r.start_date || r.shift_date || r.start || r.start_at || r.start_time || "";
+  const date = String(dateRaw).slice(0, 10);
+
+  const startMin =
+    numOrNull(r.start_min ?? r.startMin) ??
+    parseTime24ToMinutes(r.start_time || r.startTime) ??
+    parseTime24ToMinutes(String(dateRaw).slice(11, 19)) ??
+    parseTime12ToMinutes(inLabel);
+
+  const endMin =
+    numOrNull(r.end_min ?? r.endMin) ??
+    parseTime24ToMinutes(r.end_time || r.endTime) ??
+    parseTime12ToMinutes(outLabel);
+
+  const crossesMidnight = (startMin != null && endMin != null) ? (endMin < startMin) : false;
+  const unpaidBreakMins = sumUnpaidBreakMins(r.breaks);
+
+  const wage =
+    numOrNull(r.wage) ??
+    numOrNull(r.hourly_wage) ??
+    numOrNull(r.hourly_rate) ??
+    pickWageFromAnything(ui) ??
+    null;
+
+  let regular_hours = numOrNull(r.regular_hours ?? r.regularHours ?? r.hours ?? r.total_hours ?? r.totalHours);
+  let ot_hours = numOrNull(r.overtime_hours ?? r.overtimeHours ?? r.ot_hours ?? r.otHours) ?? 0;
+  let double_ot_hours = numOrNull(r.double_overtime_hours ?? r.doubleOvertimeHours ?? r.double_ot_hours ?? r.doubleOtHours) ?? 0;
+  let holiday_hours = numOrNull(r.holiday_hours ?? r.holidayHours) ?? 0;
+
+  if (regular_hours == null || regular_hours <= 0) {
+    const computed = computeHours(startMin, endMin, crossesMidnight, unpaidBreakMins);
+    if (computed != null) regular_hours = computed;
+  }
+  if (regular_hours == null) regular_hours = 0;
+
+  let regular_pay = numOrNull(r.regular_pay ?? r.regularPay);
+  let ot_pay = numOrNull(r.overtime_pay ?? r.overtimePay ?? r.ot_pay ?? r.otPay) ?? 0;
+  let double_ot_pay = numOrNull(r.double_overtime_pay ?? r.doubleOvertimePay ?? r.double_ot_pay ?? r.doubleOtPay) ?? 0;
+  let holiday_pay = numOrNull(r.holiday_pay ?? r.holidayPay) ?? 0;
+  let total_pay = numOrNull(r.total_pay ?? r.totalPay);
+
+  if ((regular_pay == null || regular_pay <= 0) && wage != null && regular_hours > 0) {
+    regular_pay = round2(regular_hours * wage);
+  }
+  if (regular_pay == null) regular_pay = 0;
+
+  if (total_pay == null || total_pay <= 0) {
+    total_pay = round2((regular_pay || 0) + (double_ot_pay || 0) + (holiday_pay || 0));
+  }
+
+  const roleName = r.role_name || r.role || r.position_name || r.position || "";
+  const roleId = r.role_id ?? r.position_id ?? r.roleId ?? r.positionId ?? null;
+
+  return {
+    employee_id,
+    user_id,
+    first_name,
+    last_name,
+    location: locKey,
+
+    date: date || "",
+    in_time: inLabel || "",
+    out_time: outLabel || "",
+    label: label || "",
+    breaks: Array.isArray(r.breaks) ? r.breaks : [],
+
+    start_min: startMin,
+    end_min: endMin,
+    crosses_midnight: !!crossesMidnight,
+    unpaid_break_mins: unpaidBreakMins,
+
+    role: roleName || (roleId != null ? String(roleId) : ""),
+    role_id: roleId,
+
+    wage,
+
+    regular_hours,
+    ot_hours,
+    double_ot_hours,
+    holiday_hours,
+
+    regular_pay,
+    ot_pay,
+    double_ot_pay,
+    holiday_pay,
+    total_pay,
+
+    computed: {
+      used_compute_hours: (numOrNull(r.regular_hours ?? r.regularHours) == null || numOrNull(r.regular_hours ?? r.regularHours) <= 0),
+      used_compute_pay: (numOrNull(r.regular_pay ?? r.regularPay) == null || numOrNull(r.regular_pay ?? r.regularPay) <= 0),
+    },
+  };
+}
+
+
 function extractShiftRowsForUser(u, locKey) {
   const ui = safeUserInfo(u);
-  const userWage = (
-    pickWageFromAnything(u)
-    || pickWageFromAnything(u?.user)
-    || pickWageFromAnything(u?.user_information)
-    || pickWageFromAnything(u?.userInfo)
-    || pickWageFromAnything(u?.total)
-    || null
-  );
+  const userWage = pickWageFromAnything(u) || pickWageFromAnything(u.total) || null;
 
   const weeks = Array.isArray(u.weeks) ? u.weeks : [];
   const rows = [];
@@ -455,6 +533,7 @@ async function main() {
       const raw = await fetchJson(url, token);
 
       const report = raw?.data ?? raw ?? {};
+      const payload = report;
       const total = pickTotals(report.total || {});
       const settings = report.settings || report.filters || null;
 
@@ -483,10 +562,14 @@ async function main() {
       // Detailed shift rows (new)
       let shift_rows = [];
       if (detailed) {
-        for (const u of users) shift_rows.push(...extractShiftRowsForUser(u, locKey));
-      }
-
-      const doc = {
+        // Prefer server-provided shift_rows when present (includes wage reliably across weeks)
+        const apiRows = payload?.shift_rows || payload?.shiftRows || payload?.shift_rows_data || null;
+        if (Array.isArray(apiRows) && apiRows.length) {
+          shift_rows = apiRows.map(r => normalizeShiftRowFromApiRow(r, locKey));
+        } else {
+          for (const u of users) shift_rows.push(...extractShiftRowsForUser(u, locKey));
+        }
+      }const doc = {
         location: locKey,
         weekStart: w,
         weekEnd: wEndISO,
