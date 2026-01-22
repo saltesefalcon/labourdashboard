@@ -180,9 +180,13 @@ function pickWageFromAnything(obj) {
     // cents variants
     (typeof o.hourly_wage_cents === "number" ? o.hourly_wage_cents / 100 : null),
     (typeof o.pay_rate_cents === "number" ? o.pay_rate_cents / 100 : null),
+    (typeof o.user?.pay_rate_cents === "number" ? o.user.pay_rate_cents / 100 : null),
+    (typeof o.user_information?.pay_rate_cents === "number" ? o.user_information.pay_rate_cents / 100 : null),
+    (typeof o.user_information?.hourly_wage_cents === "number" ? o.user_information.hourly_wage_cents / 100 : null),
     // some endpoints embed a "role" or "user" object with wage info
     o.role && (o.role.wage ?? o.role.hourly_wage ?? o.role.hourly_rate ?? o.role.pay_rate),
     o.user && (o.user.wage ?? o.user.hourly_wage ?? o.user.hourly_rate ?? o.user.pay_rate),
+    o.user_information && (o.user_information.wage ?? o.user_information.hourly_wage ?? o.user_information.hourly_rate ?? o.user_information.pay_rate),
   ];
 
   for (const c of candidates) {
@@ -275,7 +279,14 @@ function pickShiftNumbers(shift) {
 
 function extractShiftRowsForUser(u, locKey) {
   const ui = safeUserInfo(u);
-  const userWage = pickWageFromAnything(u) || pickWageFromAnything(u.total) || null;
+  const userWage = (
+    pickWageFromAnything(u)
+    || pickWageFromAnything(u?.user)
+    || pickWageFromAnything(u?.user_information)
+    || pickWageFromAnything(u?.userInfo)
+    || pickWageFromAnything(u?.total)
+    || null
+  );
 
   const weeks = Array.isArray(u.weeks) ? u.weeks : [];
   const rows = [];
