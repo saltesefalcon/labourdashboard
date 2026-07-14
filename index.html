@@ -48,17 +48,118 @@
   .pct-warn{color:#f59e0b}
   .pct-bad{color:#ef4444}
 
-  /* Settings: managers list */
-  .mgr-row{display:grid;grid-template-columns:1fr 140px 36px;gap:8px;align-items:center;margin-bottom:8px}
-  .mgr-row input[type="text"]{width:100%}
-  .mgr-row input[type="number"]{width:100%}
+  /* Settings modal */
+  .settings-modal-card{
+    width:min(780px,94vw);
+    max-height:88vh;
+    overflow:auto;
+    padding:0;
+    background:var(--panel);
+    border:1px solid var(--line);
+  }
+  .settings-modal-head{
+    position:sticky;
+    top:0;
+    z-index:3;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:16px 18px 12px;
+    background:rgba(17,24,39,.97);
+    border-bottom:1px solid var(--line);
+    backdrop-filter:blur(8px);
+  }
+  .settings-modal-title{font-size:1rem;font-weight:700}
+  .settings-modal-body{padding:16px 18px 4px}
+  .settings-section{
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:14px;
+    margin-bottom:14px;
+    background:rgba(255,255,255,.015);
+  }
+  .settings-section-head{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-bottom:12px;
+  }
+  .settings-section-title{font-weight:700}
+  .settings-section-note{margin-top:3px;font-size:.82rem;color:var(--muted);line-height:1.35}
+  .salary-summary{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .manager-grid-head,
+  .manager-period-row{
+    display:grid;
+    grid-template-columns:minmax(170px,1fr) 120px 140px 140px 38px;
+    gap:8px;
+    align-items:center;
+  }
+  .manager-grid-head{
+    padding:0 2px 6px;
+    color:var(--muted);
+    font-size:.76rem;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+  }
+  .manager-period-row{margin-bottom:8px}
+  .manager-period-row input{width:100%;min-width:0}
+  .manager-period-row input[type="number"]{width:100%}
+  .manager-remove{
+    width:38px;
+    padding:8px 0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .settings-field{
+    display:block;
+    border:1px solid rgba(255,255,255,.06);
+    border-radius:10px;
+    padding:10px;
+    background:#0d1525;
+  }
+  .settings-field-title{display:block;font-size:.84rem;font-weight:600;margin-bottom:6px}
+  .settings-field-hint{display:block;color:var(--muted);font-size:.75rem;margin-top:5px;line-height:1.25}
+  .settings-field input[type="number"]{width:100%}
+  .settings-actions{
+    position:sticky;
+    bottom:0;
+    z-index:3;
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:12px 18px 16px;
+    background:rgba(17,24,39,.97);
+    border-top:1px solid var(--line);
+    backdrop-filter:blur(8px);
+  }
+  .settings-actions .primary{min-width:180px}
+  @media (max-width:760px){
+    .manager-grid-head{display:none}
+    .manager-period-row{
+      grid-template-columns:1fr 1fr 38px;
+    }
+    .manager-period-row input:first-child{grid-column:1 / 3}
+    .manager-period-row input:nth-child(2){grid-column:1 / 2}
+    .manager-period-row input:nth-child(3){grid-column:2 / 3}
+    .manager-period-row input:nth-child(4){grid-column:1 / 3}
+    .manager-period-row .manager-remove{grid-column:3;grid-row:1}
+    .settings-grid{grid-template-columns:1fr}
+  }
 
   /* --- helpers for Target Labour pill placement --- */
   #targetCtrl{ align-self:flex-end; }
   @media (max-width:900px){ #targetCtrl{ margin-left:0; } }
-
-  .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  @media (max-width:700px){.settings-grid{grid-template-columns:1fr}}
 
   /* --- Layout widen + align with Data bar ---------------------------------- */
   .wrap{ max-width: clamp(1100px, 92vw, 1320px); }
@@ -88,69 +189,126 @@
     </div>
 
     <!-- SETTINGS MODAL (admin only) -->
-    <div id="settingsModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9999; align-items:center; justify-content:center;">
-      <div class="card" style="width:620px; max-width:94%; background:var(--panel); border:1px solid var(--line)">
-        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
-          <div style="font-weight:600">Location Settings</div>
-          <button id="settingsClose">✕</button>
+    <div id="settingsModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9999; align-items:center; justify-content:center; padding:18px;">
+      <div class="card settings-modal-card">
+        <div class="settings-modal-head">
+          <div>
+            <div class="settings-modal-title">Location Settings</div>
+            <div class="small" style="margin-top:3px">Settings apply to the selected location until changed by an admin.</div>
+          </div>
+          <button id="settingsClose" title="Close settings">✕</button>
         </div>
 
-        <div class="small" style="margin-bottom:10px">
-          These values persist for the selected location until changed by an admin.
-          Percentages are decimals (e.g. <code>0.35</code> for 35%).
+        <div class="settings-modal-body">
+          <div class="settings-section">
+            <div class="settings-section-head">
+              <div>
+                <div class="settings-section-title">Salaried Management</div>
+                <div class="settings-section-note">
+                  Weekly salaries use effective dates so historical labour remains accurate.
+                </div>
+              </div>
+              <div class="salary-summary">
+                <span class="small">Selected week total</span>
+                <span id="salTotalPill" class="pill">—</span>
+              </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; margin-bottom:10px">
+              <label class="small" style="display:flex; gap:8px; align-items:center">
+                <input type="checkbox" id="showInactiveChk">
+                Show inactive &amp; future
+              </label>
+            </div>
+
+            <div class="manager-grid-head" aria-hidden="true">
+              <div>Manager</div>
+              <div>Weekly Salary</div>
+              <div>Start Date</div>
+              <div>End Date</div>
+              <div></div>
+            </div>
+
+            <div id="periodList"></div>
+
+            <div class="row" style="align-items:center;margin-top:10px">
+              <button id="addPeriodBtn">+ Add Manager</button>
+              <span class="small">Add a new dated salary period when pay changes. Use an end date to stop salary.</span>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-section-head">
+              <div>
+                <div class="settings-section-title">Labour Controls &amp; Targets</div>
+                <div class="settings-section-note">
+                  Enter percentages as decimals. Example: <code>0.12</code> = 12%.
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-grid">
+              <label class="settings-field">
+                <span class="settings-field-title">Remittance % of Gross Labour</span>
+                <input id="setRemitPct" type="number" step="0.0001" placeholder="0.1400">
+                <span class="settings-field-hint">Applied to gross labour cost.</span>
+              </label>
+
+              <label class="settings-field">
+                <span class="settings-field-title">Overall Labour Target %</span>
+                <input id="setTargetPct" type="number" step="0.0001" placeholder="0.3000">
+                <span class="settings-field-hint">Fallback target for total labour.</span>
+              </label>
+
+              <label class="settings-field">
+                <span class="settings-field-title">FOH Labour Target %</span>
+                <input id="setTargetFohPct" type="number" step="0.0001" placeholder="0.1200">
+                <span class="settings-field-hint">FOH labour ÷ total sales.</span>
+              </label>
+
+              <label class="settings-field">
+                <span class="settings-field-title">BOH Labour Target %</span>
+                <input id="setTargetBohPct" type="number" step="0.0001" placeholder="0.1600">
+                <span class="settings-field-hint">BOH labour ÷ food sales.</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-section-head">
+              <div>
+                <div class="settings-section-title">Purchasing Budget Targets</div>
+                <div class="settings-section-note">
+                  Enter the planned percentage of projected sales for each purchasing category.
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-grid">
+              <label class="settings-field">
+                <span class="settings-field-title">Food Budget %</span>
+                <input id="setPctFood" type="number" step="0.01" placeholder="0.00">
+              </label>
+
+              <label class="settings-field">
+                <span class="settings-field-title">Wine Budget %</span>
+                <input id="setPctWine" type="number" step="0.01" placeholder="0.00">
+              </label>
+
+              <label class="settings-field">
+                <span class="settings-field-title">Liquor Budget %</span>
+                <input id="setPctLiquor" type="number" step="0.01" placeholder="0.00">
+              </label>
+
+              <label class="settings-field">
+                <span class="settings-field-title">Beer Budget %</span>
+                <input id="setPctBeer" type="number" step="0.01" placeholder="0.00">
+              </label>
+            </div>
+          </div>
         </div>
 
-        <div style="margin:8px 0 6px;font-weight:600">Salaried Management</div>
-        <div class="small" style="margin-bottom:10px">
-          Weekly salaries with effective dates. This is what the dashboard uses for labour (keeps history correct).
-        </div>
-
-        <div class="row" style="align-items:center; justify-content:space-between; margin-bottom:10px">
-          <div class="small">Calculated for selected week</div>
-          <span id="salTotalPill" class="pill">—</span>
-        </div>
-
-        <div class="row" style="justify-content:flex-end; margin-bottom:8px">
-          <label class="small" style="display:flex; gap:8px; align-items:center; justify-content:flex-end">
-            <input type="checkbox" id="showInactiveChk">
-            Show inactive &amp; future
-          </label>
-        </div>
-
-        <div id="periodList"></div>
-
-        <div class="row" style="align-items:center;margin-bottom:12px">
-          <button id="addPeriodBtn">+ Add Manager</button>
-          <span class="small">Use “Increase pay” or “End salary” so past weeks don’t change.</span>
-        </div>
-
-        <div class="settings-grid" style="margin-top:6px">
-          <label>Remittance % of Gross Labour<br>
-            <input id="setRemitPct" type="number" step="0.0001" placeholder="0.0000">
-          </label>
-
-          <label>Target Labour % (fallback)<br>
-            <input id="setTargetPct" type="number" step="0.0001" placeholder="0.0000">
-          </label>
-
-          <label>Budget % Food<br>
-            <input id="setPctFood" type="number" step="0.01" placeholder="0.00">
-          </label>
-
-          <label>Budget % Wine<br>
-            <input id="setPctWine" type="number" step="0.01" placeholder="0.00">
-          </label>
-
-          <label>Budget % Liquor<br>
-            <input id="setPctLiquor" type="number" step="0.01" placeholder="0.00">
-          </label>
-
-          <label>Budget % Beer<br>
-            <input id="setPctBeer" type="number" step="0.01" placeholder="0.00">
-          </label>
-        </div>
-
-        <div class="row" style="margin-top:10px">
+        <div class="settings-actions">
           <button id="settingsSave" class="primary">Save Settings</button>
           <span id="settingsMsg" class="small"></span>
         </div>
@@ -441,6 +599,8 @@
     const settingsMsg = document.getElementById("settingsMsg");
     const setRemitPct = document.getElementById("setRemitPct");
     const setTargetPct = document.getElementById("setTargetPct");
+    const setTargetFohPct = document.getElementById("setTargetFohPct");
+    const setTargetBohPct = document.getElementById("setTargetBohPct");
     const setPctFood = document.getElementById("setPctFood");
     const setPctWine = document.getElementById("setPctWine");
     const setPctLiquor = document.getElementById("setPctLiquor");
@@ -494,6 +654,17 @@
       tulia:       { foh: 0.12, boh: 0.16 },
       prohibition: { foh: 0.11, boh: 0.15 },
     };
+
+    function getDeptLabourTargets(locKey, settings = {}){
+      const defaults = DEPT_LABOUR_TARGETS[locKey] || { foh:null, boh:null };
+      const fohSaved = Number(settings?.target_foh_labour_pct);
+      const bohSaved = Number(settings?.target_boh_labour_pct);
+
+      return {
+        foh: Number.isFinite(fohSaved) && fohSaved > 0 ? fohSaved : defaults.foh,
+        boh: Number.isFinite(bohSaved) && bohSaved > 0 ? bohSaved : defaults.boh,
+      };
+    }
 
     // Global error display (now safe: authMsg already exists)
     window.addEventListener("error", e => {
@@ -650,6 +821,8 @@
         salaried_mgmt: 0,
         remit_pct: 0,
         target_labour_pct: 0,
+        target_foh_labour_pct: null,
+        target_boh_labour_pct: null,
         budget_pct_food: 0,
         budget_pct_wine: 0,
         budget_pct_liquor: 0,
@@ -1154,17 +1327,13 @@
     // ----- Settings modal: Salaried Management (dated periods) -----
     function periodRowTemplate(name="", weekly="", start="", end=""){
       const row = document.createElement("div");
-      row.style.display = "grid";
-      row.style.gridTemplateColumns = "1fr 120px 140px 140px 36px";
-      row.style.gap = "8px";
-      row.style.alignItems = "center";
-      row.style.marginBottom = "8px";
+      row.className = "manager-period-row";
       row.innerHTML = `
-        <input type="text" placeholder="Manager name" value="${(name||"").replaceAll('"','&quot;')}">
-        <input type="number" step="0.01" placeholder="0.00" value="${weekly!==""?weekly:""}">
-        <input type="date" value="${start||""}">
-        <input type="date" value="${end||""}">
-        <button title="Remove">🗑</button>
+        <input type="text" aria-label="Manager name" placeholder="Manager name" value="${(name||"").replaceAll('"','&quot;')}">
+        <input type="number" aria-label="Weekly salary" step="0.01" placeholder="0.00" value="${weekly!==""?weekly:""}">
+        <input type="date" aria-label="Salary start date" title="Salary start date" value="${start||""}">
+        <input type="date" aria-label="Salary end date" title="Salary end date" value="${end||""}">
+        <button class="manager-remove" title="Remove salary period" aria-label="Remove salary period">🗑</button>
       `;
       const btn = row.querySelector("button");
       if (btn) btn.onclick = () => { row.remove(); recalcSalaryTotal(); };
@@ -1232,6 +1401,10 @@
       setPctBeer.value  = s.budget_pct_beer ?? 0;
       setTargetPct.value = s.target_labour_pct ?? 0;
 
+      const deptTargets = getDeptLabourTargets(locationSel.value, s);
+      if (setTargetFohPct) setTargetFohPct.value = deptTargets.foh ?? "";
+      if (setTargetBohPct) setTargetBohPct.value = deptTargets.boh ?? "";
+
       if (settingsMsg) settingsMsg.textContent = "";
       if (settingsModal) settingsModal.style.display = "flex";
     };
@@ -1261,6 +1434,8 @@
           budget_pct_liquor:num(setPctLiquor.value),
           budget_pct_beer:  num(setPctBeer.value),
           target_labour_pct: num(setTargetPct.value),
+          target_foh_labour_pct: num(setTargetFohPct?.value),
+          target_boh_labour_pct: num(setTargetBohPct?.value),
           salaried_mgmt: 0
         }, { merge:true });
 
@@ -1559,7 +1734,7 @@
       // FOH / BOH weekly labour split from the dedicated Hours & Wages snapshot.
       // Actual BOH % uses actual food sales. Projected BOH % uses the current
       // Silverware food-sales mix applied to projected total sales.
-      const deptTargets = DEPT_LABOUR_TARGETS[locationSel.value] || { foh:null, boh:null };
+      const deptTargets = getDeptLabourTargets(locationSel.value, settings);
 
       const actualFohLab = toNum(fohBoh?.actual_foh_wages ?? fohBoh?.foh_wages);
       const actualBohLab = toNum(fohBoh?.actual_boh_wages ?? fohBoh?.boh_wages);
@@ -1723,17 +1898,23 @@
     const LOC_LABEL = { beacon:"BEACON", tulia:"TULIA", cesoir:"CE SOIR", prohibition:"PROHIBITION" };
     const LOC_ORDER = ["beacon","tulia","cesoir","prohibition"];
     function pctClass(p){ const g=gradePct(p); return g? g : ""; }
+    function deptPctClass(p, target){
+      if (p == null || target == null) return "";
+      return p <= target ? "good" : "bad";
+    }
 
     async function readWeekForLocation(locKey, weekISO){
       const basePath = `companies/aidan/locations/${locKey}/labour/${weekISO}`;
       const ovrPath  = `companies/aidan/locations/${locKey}/overrides/${weekISO}`;
       const integPath = `companies/aidan/locations/${locKey}/integrations/${weekISO}`;
+      const fohBohPath = `companies/aidan/locations/${locKey}/fohBoh/${weekISO}`;
 
       const settings = await loadSettingsFor(locKey);
 
-      const [baseSnap, ovrSnap] = await Promise.all([
+      const [baseSnap, ovrSnap, fohBohSnap] = await Promise.all([
         getDoc(doc(db, basePath)),
         getDoc(doc(db, ovrPath)),
+        getDoc(doc(db, fohBohPath)),
       ]);
 
       let integ = null;
@@ -1746,6 +1927,7 @@
 
       const base = baseSnap.exists()? baseSnap.data(): null;
       const ovr  = ovrSnap.exists()? ovrSnap.data(): {};
+      const fohBoh = fohBohSnap.exists()? fohBohSnap.data(): null;
 
       const days = base?.days || [];
       const SCALE = detectCurrencyScale(days);
@@ -1821,6 +2003,26 @@
 
       // extras same logic as dashboard
       const foodSales = effSalesFrom(base || {}, ovr || {}, integ || {});
+
+      // FOH / BOH labour KPIs use the same calculations and editable targets as the dashboard.
+      const deptTargets = getDeptLabourTargets(locKey, settings);
+      const actualFohLab = toNum(fohBoh?.actual_foh_wages ?? fohBoh?.foh_wages);
+      const actualBohLab = toNum(fohBoh?.actual_boh_wages ?? fohBoh?.boh_wages);
+      const projFohLab   = toNum(fohBoh?.projected_foh_wages);
+      const projBohLab   = toNum(fohBoh?.projected_boh_wages);
+
+      const foodMix = (totalActSales > 0 && foodSales > 0)
+        ? Math.min(1, Math.max(0, foodSales / totalActSales))
+        : null;
+      const projectedFoodSales = (foodMix != null && projSales > 0)
+        ? projSales * foodMix
+        : null;
+
+      const projFohPct = (projFohLab != null && projSales > 0) ? projFohLab / projSales : null;
+      const actFohPct  = (actualFohLab != null && totalActSales > 0) ? actualFohLab / totalActSales : null;
+      const projBohPct = (projBohLab != null && projectedFoodSales > 0) ? projBohLab / projectedFoodSales : null;
+      const actBohPct  = (actualBohLab != null && foodSales > 0) ? actualBohLab / foodSales : null;
+
       const voidsAuto = getAutoVoidsOnly(integ || {});
       const effVoids  = pickVal(Number(ovr.voids), voidsAuto.value);
 
@@ -1842,6 +2044,12 @@
         projPct,
         actPct,
         delta,
+        projFohPct,
+        actFohPct,
+        projBohPct,
+        actBohPct,
+        fohTarget: deptTargets.foh,
+        bohTarget: deptTargets.boh,
         lastWeek,
         foodSales,
         promos: effPromos,
@@ -1866,6 +2074,13 @@
             <div class="k"><div class="k-h">Actual Sales</div><div class="k-v">${fmtMoneyLocal(s.actSales)}</div></div>
             <div class="k"><div class="k-h">Projected Labour %</div><div class="k-v">${fmtPctLocal(s.projPct)}</div></div>
             <div class="k ${pctClass(s.actPct)}"><div class="k-h">Actual Labour %</div><div class="k-v">${fmtPctLocal(s.actPct)}</div></div>
+          </div>
+
+          <div class="kpis dept-kpis">
+            <div class="k ${deptPctClass(s.projFohPct, s.fohTarget)}"><div class="k-h">Projected FOH Labour %</div><div class="k-v">${fmtPctLocal(s.projFohPct)}</div><div class="k-t">Target ${fmtPctLocal(s.fohTarget)}</div></div>
+            <div class="k ${deptPctClass(s.actFohPct, s.fohTarget)}"><div class="k-h">Actual FOH Labour %</div><div class="k-v">${fmtPctLocal(s.actFohPct)}</div><div class="k-t">Target ${fmtPctLocal(s.fohTarget)}</div></div>
+            <div class="k ${deptPctClass(s.projBohPct, s.bohTarget)}"><div class="k-h">Projected BOH Labour %</div><div class="k-v">${fmtPctLocal(s.projBohPct)}</div><div class="k-t">Target ${fmtPctLocal(s.bohTarget)}</div></div>
+            <div class="k ${deptPctClass(s.actBohPct, s.bohTarget)}"><div class="k-h">Actual BOH Labour %</div><div class="k-v">${fmtPctLocal(s.actBohPct)}</div><div class="k-t">Target ${fmtPctLocal(s.bohTarget)}</div></div>
           </div>
 
           <table class="mini">
@@ -1922,6 +2137,8 @@
           .k{border:1px solid #e5e7eb;border-radius:10px;padding:10px}
           .k-h{font-size:12px;color:#6b7280;margin-bottom:4px}
           .k-v{font-size:16px;font-weight:600}
+          .k-t{font-size:10px;color:#6b7280;margin-top:3px}
+          .dept-kpis{margin-top:8px}
           .k.good .k-v{color:#16a34a}
           .k.warn .k-v{color:#f59e0b}
           .k.bad .k-v{color:#dc2626}
